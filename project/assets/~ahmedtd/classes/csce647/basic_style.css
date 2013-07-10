@@ -1,0 +1,38 @@
+header, footer, section, nav, article {
+    display:block;
+}
+
+header#title-block {
+    text-align: center;
+}
+
+body {
+    margin: 0 auto;
+}
+
+@media only all and (min-width: 72em) {
+    body {
+        width: 72em;
+    }
+}
+
+@media not all and (min-width: 72em) {
+    body {
+        width: 100%
+    }
+}
+
+code {
+    padding : 10px;
+}
+
+figure {
+    display: block;
+    text-align: center;
+    border: thin solid gray;
+    padding: 5px;
+}
+
+figcaption {
+    display:block;
+}

@@ -1,0 +1,49 @@
+{% macro breadcrumbs() %}<!--
+--><ul class="breadcrumbs"><!--
+  --><li class="breadcrumbs-item"><!--
+    --><a href="/">/root</a><!--
+  -->{% for path in varargs %}<!--
+  --><li class="breadcrumbs-item"><!--
+    --><a href="{{path}}">{{path}}</a><!--
+  -->{% endfor %}<!--
+--></ul>
+{%- endmacro %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>{% block title %}{% endblock %} - Row Major (Taahir Ahmed)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet"href="/css/site.css" >
+  </head>
+  <body>
+
+    <!-- There are inline and inline-block elements in the header, so we
+    use comments to remove inter-element whitespace. -->
+    <header id="page-header"><!--
+   --><img src="/img/row-major-logo-optimized.svg" id="page-header-logo"><!--
+   --><h1 id="page-header-title">Row Major: Taahir Ahmed</h1><!--
+ --></header>
+
+    <hr>
+    <nav class="nav">{% block topnav %}{% endblock %}</nav>
+    <hr>
+
+    <main>
+      {% block content %}
+      {% endblock %}
+    </main>
+
+    <footer>
+      {% block footer %}
+      <address>
+        <a href="mailto:ahmed.taahir@gmail.com">Taahir Ahmed</a>
+      </address>
+      {% endblock %}
+    </footer>
+
+    {% block scripts %}
+    {% endblock %}
+  </body>
+</html>

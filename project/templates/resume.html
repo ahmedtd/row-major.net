@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Resume{% endblock %}
+
+{% block topnav %}
+{{  breadcrumbs('/resume') }}
+{% endblock %}
+
+{% block content %}
+<section>
+  <h1>Education</h1>
+  <p>MS Computer Engineering, Texas A&amp;M (In Progress)
+  <p>BS Computer Engineering, Texas A&amp;M (2013)
+</section>
+
+<section>
+  <h1>Skills</h1>
+
+  <h2>Software Development</h2>
+  <p>I have worked on network backends, embedded systems, and a little
+    bit of everything else.
+  <p>My go-to languages are Scheme, C, C++('14), Python 3, and
+  JavaScript.
+  <p>I am always willing to learn new systems and languages.
+
+  <h2>Electronic Design</h2>
+  <p>I have experience designing and fabricating circuit boards with PIC
+    and AVR microcontrollers.
+
+  <h2>Linux</h2>
+  <p>System administration, scripting, and systems programming.
+
+  <h2>Technical Writing</h2>
+  <p> I am an excellent technical writer (this website notwithstanding).
+</section>
+
+<section>
+  <h1>Work Experience</h1>
+
+  <h2>Senior Developer, Frogslayer LLC(2015&ndash;present)</h2>
+  <ul>
+    <li>I was a junior developer from 2015 to 2016, and a senior
+      developer from 2016 onwards.
+    <li>I managed and delivered several projects, including setting and
+      maintaining schedules, development, and creating the integration
+      and deployment infrastructure.
+    <li>I interacted directly with clients &mdash; progress reports,
+      managing expectations, and triaging feature requests.
+    <li>I drove improvements in internal infrastructure, including our
+    source control and continuous integration platforms.
+  </ul>
+
+  <h2>SDE Intern, Amazon (2014)</h2>
+  <ul>
+    <li>I built the initial in-playback audio language switching support
+      for the Amazon Instant Video Kindle app.
+    <li>I contributed QoS reporting improvements and build system
+      improvements.
+  </ul>
+
+  <h2>Developer, RapidLogger Systems LLC (2012&ndash;2014)</h2>
+  <ul>
+    <li>I built a forwarding proxy server for oilfield data streams, as
+      well as an Android application for displaying the streams.
+    <li>I built minimal-state-change control software for the mix ratio
+      of oilfield mixing tanks.
+  </ul>
+</section>
+
+<section>
+  <h1>Activities</h1>
+
+  <h2>Texas A&amp;M CCDC Team</h2>
+  <ul>
+    <li>I was part of an 8-person team that represented Texas A&amp;M at
+      the regional and national Collegiate Cyber Defense Competition.
+    <li>We operated a simulated business while defending against
+      constant and professional network intrusions.
+  </ul>
+</section>
+
+{% endblock %}

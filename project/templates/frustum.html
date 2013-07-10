@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}frustum{% endblock %}
+
+{% block topnav %}
+{{  breadcrumbs('/frustum') }}
+{% endblock %}
+
+{% block content %}
+
+<section>
+  <h1>What is <code>frustum</code>?</h1>
+  <p>Frustum is a C++ math/linear algebra library.  Development is
+    primarily driven by the needs of the ballistae path tracer.
+</section>
+
+<section>
+  <h1>Code</h1>
+  <p><code>frustum</code> is available via git:
+    <pre><code>https://git.row-major.net/ahmedtd/frustum.git</code></pre>
+</section>
+
+{% endblock %}

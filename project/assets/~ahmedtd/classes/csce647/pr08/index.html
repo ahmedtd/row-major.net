@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html>
+  <head>
+    <title>VIZA656/CSCE647 -- Image Synthesis</title>
+
+    <link rel="stylesheet" href="../basic_style.css"/>
+  </head>
+
+  <body>
+
+    <header id="title-block">
+      <h1>Project 8 -- Triangular Meshes</h1>
+      <h2>Taahir Ahmed</h2>
+    </header>
+
+    <section>
+      Code is available as a git checkout (tag <code>csce647-pr10</code>):
+
+      <pre><code>git://row-major.net/personal/ahmedtd/ballistae</code></pre>
+
+      <p>Meshes are loaded from an obj file.  Ray intersections are accelerated
+      using a kd-tree built using a locally-greedy surface area heuristic.  For
+      the Stanford bunny (~5000 triangles), it takes approximately a minute to
+      build the tree, and subsequent queries are only very slightly slower
+      than queries against a sphere.</p>
+    </section>
+
+    <section>
+
+      <figure>
+        <img src="meshes.jpeg" style="width:100%"/>
+
+        <figcaption>
+          <p>A selection of meshes.</p>
+        </figcaption>
+      </figure>
+
+  </body>
+</html>
