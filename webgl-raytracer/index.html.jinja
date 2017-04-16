@@ -1,0 +1,33 @@
+{% extends "base.html.jinja" %}
+
+{% block title %}ballistae{% endblock %}
+
+{% block topnav %}
+{{  breadcrumbs('/webgl-raytracer') }}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="./raytracer.js"></script>
+{% endblock %}
+
+{% block content %}
+<section>
+  <figure>
+    <canvas id="glcanvas" width="800" height="450">
+      Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
+    </canvas>
+  </figure>
+
+  <p>A simple WebGL raytracer.  It's implemented as a a fragment shader,
+    drawn on a quad that covers the viewport.  Scene description and
+    material data are fed to the shader in a truly barbaric fashion: as
+    bytecode packed into a texture.
+
+  <p>It's only been tested on a few platforms -- Firefox on Linux (Intel
+    Graphics), Firefox on Windows (AMD Graphics), Chrome on Windows (AMD
+    graphics).  Since WebGL combines the variance of OpenGL with the
+    variance of Web standards, it probably won't work on any other
+    platforms it hasn't been specifically debugged on.
+</section>
+{% endblock %}

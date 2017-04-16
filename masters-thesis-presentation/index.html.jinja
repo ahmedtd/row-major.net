@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+
+    <title>Dynamic Beamforming Without Phase Shifters</title>
+    
+    <link rel="stylesheet" href="katex/katex.css">
+    <link rel="stylesheet" href="reveal.css">
+    <link rel="stylesheet" href="white.css">
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section>
+          <div style="text-align: center;">Dynamic Beamforming Without Phase Shifters</div>
+          <div style="text-align: center;">Taahir Ahmed</div>
+          <div style="text-align: center;">2017-03-02</div>
+        </section>
+        <section>
+          <h1>What is array beamforming?</h1>
+          <p>Using separate antennas to form a strong beam in a given direction.</p>
+          <p>Provides fast, electronic steering</p>
+          <p>Allows complex radiation patterns: multiple beams, chosen null
+          directions</p>
+        </section>
+        <section>
+          <h1>Existing applications:</h1>
+          <div style="display: flex; flex-direction: row;">
+            <div>
+              <img src="an-spy.jpeg">
+              <div style="text-align: center; font-size: 0.6em;">
+                AN/SPY-1 Radar
+              </div>
+            </div>
+            <div>
+              <img src="ska.jpeg">
+              <div style="text-align: center; font-size: 0.6em;">
+                SKA Pathfinder (Image Credit: CSIRO)
+              </div>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h1>Potential application:</h1>
+          <img src="diamond-robots.svg"> 
+        </section>
+        <section>
+          <h1></h1>
+          <p><em>Classical steering</em> requires a phase shifter for each element.</p>
+          <p>These phase shifters compensate for element position and clock offset.</p>
+          <p>I propose <em>deactivation steering</em>: Turn off elements with the wrong phase.</p>
+        </section>
+        <section>
+          <h1>Array Factor</h1>
+          <div class="eqn-array-factor" style="text-align: center;"></div>
+          <div style="display: flex;">
+            <table style="font-size: 0.8em;">
+              <tbody>
+                <tr>
+                  <th class="eqn-k"></th>
+                  <td>The wavenumber, <span class="eqn-kdef"></span></td>
+                </tr>
+                <tr>
+                  <th class="eqn-vecpi"></th>
+                  <td>The position of element <span class="eqn-i"></span></td>
+                </tr>
+                <tr>
+                  <th class="eqn-hatq"></th>
+                  <td>The query direction (unit vector)</td>
+                </tr>
+                <tr>
+                  <th class="eqn-phi0i"></th>
+                  <td>The arbitrary phase delay of feeding element <span class="eqn-i"></span></td>
+                </tr>
+                <tr>
+                  <th class="eqn-si"></th>
+                  <td>The complex <em>steering coefficient</em> of element <span class="eqn-i"></span></td>
+                </tr>
+              </tbody>
+            </table>
+            <img src="example-array.svg">
+          </div>
+        </section>
+        <section>
+          <h1>Array Factor</h1>
+          <p>Describes radiation pattern of array, without considering radiation pattern of elements.</p>
+          <p><span class="eqn-vecpi"></span> and <span class="eqn-hatq"></span> are in an arbitrary global reference frame.</p>
+          <p>It's not necessary to know every component independently.</p>
+          <p>Only considers the far field behavior (<span class="eqn-farfield"></span>)</p>
+        </section>
+        <section>
+          <h1>The steering vector</h1>
+          <p><span class="eqn-si"></span>: amplitude and phase fed to element <span class="eqn-i"></span></p>
+          <p>In aggregate, called the <em>steering vector</em>.</p>
+          <p>Adjusting the steering vector allows forming a beam.</p>
+        </section>
+        <section>
+          <h1>Array pattern</h1>
+          <p>Sweep <span class="eqn-hatq"></span> in all directions within a plane.</p>
+          <img src="unsteered-specific-pattern.svg">
+        </section>
+        <section>
+          <h1>Phase space</h1>
+          <p>The complex angle of a given element:</p>
+          <div class="eqn-phii-def" style="text-align: center; margin-bottom: 20px;"></div>
+          <div style="display:flex; flex-direction: row;">
+            <img src="example-array.svg">
+            <img src="phase-space-intro.svg">
+          </div>
+        </section>
+        <section>
+          <h1>Phase space</h1>
+          <p>The phase-space position of an element is dependent on <span class="eqn-hatq"></span>.</p>
+          <p>Elements close together constructively interfere.</p>
+          <p>Elements diametrically opposed destructively interfere.</p>
+        </section>
+        <section>
+          <h1>Classical Steering</h1>
+          <div class="eqn-classical-steering" style="text-align: center; margin-bottom: 20px;"></div>
+          <table>
+            <tbody>
+              <tr>
+                <th class="eqn-hatb"></th>
+                <td>A unit vector in the desired beam direction.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+        <section>
+          <h1>Classical steering: phase space</h1>
+          <div class="eqn-phici-def" style="text-align: center; margin-bottom: 20px;"></div>
+          <p>When <span class="eqn-hatb-eq-hatq"></span>, all elements have <span class="eqn-phici-eq-0"></span>.</p>
+          <img src="phase-space-classical-steering.svg">
+        </section>
+        <section>
+          <h1>Classical Steering: Example Array Pattern</h1>
+          <img src="classical-specific-pattern.svg">
+        </section>
+        <section>
+          <h1>Deactivation Steering</h1>
+          <div class="eqn-sdi-def" style="text-align: center; margin-bottom: 20px;"></div>
+          <p><span class="eqn-maximal-interval"></span> is a <em>maximal interval</em>: A section of phase space (width <span class="eqn-w"></span>) that captures the most elements.</p>
+          <p>There are almost always multiple maximal intervals.</p>
+        </section>
+        <section>
+          <h1>Deactivation Steering: Phase Space</h1>
+          Under deactivation steering, all active elements are close together in phase space.
+          <img src="phase-space-deactivation-steering.svg">
+        </section>
+        <section>
+          <h1>Deactivation Steering: Example Array Pattern</h1>
+          <img src="deactivation-specific-pattern.svg">
+        </section>
+
+        <section>
+          <h1>Finding a Maximal Interval</h1>
+          <p>Sweep an interval of width <span class="eqn-w"></span> around phase space.</p>
+          <p>Discretize the sweep using the positions of the elements.</p>
+          <img src="find-maximal-interval.svg">
+        </section>
+
+        <section>
+          <h1><tt>choose_maximal_interval</tt></h1>
+          <pre><code data-noescape>
+# Returns a maximal phase interval <span class="eqn-maximal-interval"></span>
+#
+# Inputs:
+#   * <span class="eqn-hatb"></span>: A unit vector in the desired main beam direction
+#   * <span class="eqn-k"></span>: The wave number (<span class="eqn-kdef"></span>)
+#   * p: An array of the element position vectors
+#   * <span class="eqn-phi0"></span>: An array of the element intrinsic phases
+#   * <span class="eqn-w"></span>: The tolerable phase error (in radians)
+def choose_maximal_interval(<span class="eqn-hatb"></span>, <span class="eqn-k"></span>, p, <span class="eqn-phi0"></span>, <span class="eqn-w"></span>):
+    <span class="eqn-phi"></span> = [<span class="eqn-maximal-interval-phase"></span> for <span class="eqn-vecpi"></span>,<span class="eqn-phi0i"></span> in zip(p, <span class="eqn-phi0"></span>)]
+    max_count = <span class="eqn-minfty"></span>
+    max_interval = None
+    for <span class="eqn-phii"></span> in <span class="eqn-phi"></span>:
+        cur_count = 0
+        for <span class="eqn-phij"></span> in <span class="eqn-phij"></span>:
+            if <span class="eqn-phij-in-interval"></span>:
+                cur_count += 1
+        if cur_count > max_count:
+            max_count = cur_count
+            max_interval = <span class="eqn-phii-interval"></span>
+    return max_interval
+</code></pre>
+        </section>
+
+        <section>
+          <h1>Deactivation: Expected Pattern</h1>
+          <div class="eqn-w-eq-5pct" style="text-align: center; margin-bottom: 20px;"></div>
+          <img src="deactivation-pattern-width5pct.svg">
+        </section>
+        <section>
+          <h1>Deactivation: Expected Pattern</h1>
+          <div class="eqn-w-eq-10pct" style="text-align: center; margin-bottom: 20px;"></div>
+          <img src="deactivation-pattern-width10pct.svg">
+        </section>
+        <section>
+          <h1>Deactivation: Expected Pattern</h1>
+          <div class="eqn-w-eq-25pct" style="text-align: center; margin-bottom: 20px;"></div>
+          <img src="deactivation-pattern-width25pct.svg">
+        </section>
+        <section>
+          <h1>Deactivation: Expected Pattern</h1>
+          <div class="eqn-w-eq-50pct" style="text-align: center; margin-bottom: 20px;"></div>
+          <img src="deactivation-pattern-width50pct.svg">
+        </section>
+        <section>
+          <h1>Deactivation: Expected Pattern</h1>
+          <div class="eqn-w-eq-75pct" style="text-align: center; margin-bottom: 20px;"></div>
+          <img src="deactivation-pattern-width75pct.svg">
+        </section>
+        <section>
+          <h1>Deactivation: Expected Pattern</h1>
+          <div class="eqn-w-eq-100pct" style="text-align: center; margin-bottom: 20px;"></div>
+          <img src="deactivation-pattern-width100pct.svg">
+        </section>
+
+        <section>
+          <h1>Deactivation: Maximum Main Beam Power</h1>
+          <img src="deactivation-main-beam-vs-w.svg">
+          <div style="text-align: center; margin-bottom: 20px">
+            Main beam power maximized at <span class="eqn-w-eq-41pct"></span>
+          </div>
+        </section>
+
+        <section>
+          <h1>Deactivation: Comparison to Classical</h1>
+          <div style="display: flex; flex-direction: row;">
+            <div>
+              <img src="classical-pattern.svg">
+              <div style="text-align: center;">Classical</div>
+            </div>
+            <div>
+              <img src="deactivation-pattern-width41pct.svg">
+              <div style="text-align: center;">Deactivation, <span class="eqn-w-eq-41pct" style="text-align: center;"></span></div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h1>Deactivation: Comparison to Classical</h1>
+          <img src="main-beam-comparison.svg">
+        </section>
+
+        <section>
+          <h1>Deactivation: Comparison to Classical</h1>
+          <p>4.38dB difference in main beam gain.</p>
+          <p>Deactivation steering is 36% as powerful as classical steering.</p>
+          <p>Where did 64% of the power go?</p>
+          <p>50% due to deactivated elements.</p>
+          <p>14% due to destructive interference.<p>
+        </section>
+
+        <section>
+          <h1>Speaking of active elements...</h1>
+          <p>Deactivation strategy picks a slice of phase space &mdash; everything else is deactivated.</p>
+          <p>Is there a lower bound on active elements?</p>
+          <p>How many are active, in general?</p>
+        </section>
+
+        <section>
+          <h1>Guaranteed Lower Bound</h1>
+          <p>A maximal interval is guaranteed to contain at least</p>
+          <div class="eqn-lower-bound" style="text-align: center; margin-bottom: 20px;"></div>
+          <p>elements.</p>
+          <p>Extended Pigeonhole Principle: If <span class="eqn-m"></span> items are to be divided among <span class="eqn-n"></span> bins, with the number of items in each bin denoted as <span class="eqn-mi"></span>, then:</p>
+          <div class="eqn-extended-pigeonhole" style="text-align: center; margin-bottom: 20px;"></div>
+        </section>
+        <section>
+          <h1>Guaranteed Lower Bound: Phase Pigeons</h1>
+          <p>Divide phase space into <span class="eqn-m-eq-2piw"></span> bins</p>
+          <img src="phase-space-pigeonhole.svg">
+        </section>
+        <section>
+          <h1>Expected Number of Active Elements</h1>
+          <img src="captured-elements.svg">
+        </section>
+
+        <section>
+          <h1>Benchtop Trials</h1>
+          <p>2 Trials, conducted on an optics table at 2.5 GHz</p>
+          <p>27 monopole antennas.</p>
+          <p>Element positions chosen at random.</p>
+          <p>
+            Trial Procedure (starting with <span class="eqn-n-eq-27"></span>):
+            <ol>
+              <li> With <span class="eqn-n"></span> antennas active, measure the power gain between the two
+                ports of the network analyzer.
+              </li>
+              <li> Decrement <span class="eqn-n"></span>.  If <span class="eqn-n-eq-1"></span>, stop.  Otherwise, decrease <span class="eqn-w"></span> until the maximal interval contains <span class="eqn-n"></span>. elements.
+              </li>
+            </ol>
+          </p>
+        </section>
+        <section>
+          <h1>Benchtop Trials</h1>
+          <img style="width: 50%" src="experiment-architecture.svg">
+        </section>
+        <section>
+          <h1>Benchtop Trials</h1>
+          <img src="test-setup-close.jpeg">
+        </section>
+        <section>
+          <h1>Benchtop Trials</h1>
+          <img style="width: 50%;" src="test-setup-far.jpeg">
+        </section>
+        <section>
+          <h1>Benchtop Trials: Trial 1</h1>
+          <img style="width: 80%;" src="trial-1-results.png">
+          <div style="text-align: center;">
+            Shape roughly matches expected gain curve.
+          </div>
+        </section>
+        <section>
+          <h1>Benchtop Trials: Trial 2</h1>
+          <img style="width: 80%;" src="trial-2-results.png">
+          <div style="text-align: center;">
+            Shape does not match expected gain curve.
+          </div>
+        </section>
+        <section>
+          <h1>Benchtop Trials: Nonidealities</h1>
+          <p><em>mutual coupling</em>: Elements are close together.</p>
+          <p>Solution: Increase separation (directly, virtually).</p>
+          
+          <p style="margin-top: 40px;"><em>reflections</em>: Many metal panels to reflect sidelobes.</p>
+          <p>Solution: No reflectors (anechoic chamber, outside).</p>
+        </section>
+
+        <section>
+          <h1>Contributions</h1>
+          <p>Described <em>deactivation steering</em>, a way to steer an array without phase shifters.</p>
+          <p>Showed the expected pattern of a deactivation-steered array.</p>
+          <p>Proved a lower bound on the number of active elements under deactivation steering.</p>
+          <p>Tested deactivation steering in a small-scale physical trial.</p>
+        </section>
+        
+        <section>
+          <h1>Contributions</h1>
+          <p>Deactivation steering trades main beam power for element simplicity.</p>
+          <p>Could provide better array performance per dollar.</p>
+          <p>Provides a simpler way to augment a system with beamforming capability.</p>
+        </section>
+        
+      </div>
+    </div>
+
+    <script src="katex/katex.js"></script>
+    <script src="reveal.js"></script>
+    
+    <script>
+     Reveal.initialize({center: false,
+                        controls: true,
+                        slideNumber: true,
+                        transitionSpeed: 'fast',
+                        backgroundTransition: 'none',
+                        history: true});
+
+     Reveal.addEventListener('ready', function(event) {
+     
+       var macros = {};
+
+       function km(elements, expression, display) {
+         elements.forEach(function(element) {
+           katex.render(expression, element, {macros: macros, diplay: (display === true)});
+         });
+       }
+
+       var qsa = function(selector) { return document.querySelectorAll(selector); };
+       
+       km(qsa('.eqn-array-factor'), '\\text{AF}(\\hat{q}) = \\sum_i s_i \\text{e}^{-j(k\\hat{q}\\cdot\\vec{p_i} + \\phi_{0i})}', true);
+       km(qsa('.eqn-k'), 'k');
+       km(qsa('.eqn-kdef'), '\\frac{2\\pi}{\\lambda}');
+       km(qsa('.eqn-vecpi'), '\\vec{p_i}');
+       km(qsa('.eqn-i'), 'i');
+       km(qsa('.eqn-hatq'), '\\hat{q}');
+       km(qsa('.eqn-phi0i'), '\\phi_{0i}');
+       km(qsa('.eqn-si'), 's_i');
+       km(qsa('.eqn-phii-def'), '\\phi_i = (\\angle s_i) + k\\hat{q} \\cdot \\vec{p_i} + \\phi_{0i}', true);
+       km(qsa('.eqn-classical-steering'), 's_{\\text{c}, i} = \\text{e}^{j(k\\hat{b}\\cdot\\vec{p_i} + \\phi_{0i})}', true);
+       km(qsa('.eqn-a'), 'A');
+       km(qsa('.eqn-hatb'), '\\hat{b}');
+       km(qsa('.eqn-phici-def'), '\\phi_{c,i} = k\\hat{b}\\cdot\\vec{p_i} - k\\hat{q}\\cdot\\vec{p_i}', true);
+       km(qsa('.eqn-hatb-eq-hatq'), '\\hat{b} = \\hat{q}');
+       km(qsa('.eqn-phici-eq-0'), '\\phi_{c,i} = 0');
+       km(qsa('.eqn-sdi-def'), ' s_{\\text{d}, i} = \
+  \\begin{cases} \
+    1, &\\text{if}\\ k\\hat{b}\\cdot\\vec{p_i} + \\phi_{0i} \\in [\\phi_{\\text{max}}, \\phi_{\\text{max}} + w)\\\\ \
+    0, &\\text{otherwise} \
+  \\end{cases}', true);
+       km(qsa('.eqn-maximal-interval'), '[\\phi_{\\text{max}}, \\phi_{\\text{max}} + w)');
+       km(qsa('.eqn-w'), 'w');
+       km(qsa('.eqn-phi'), '\\phi');
+       km(qsa('.eqn-phi0'), '\\phi_0');
+       km(qsa('.eqn-phii'), '\\phi_i');
+       km(qsa('.eqn-phij'), '\\phi_j');
+       km(qsa('.eqn-maximal-interval-phase'), 'k\\hat{b}\\cdot\\vec{p_i} + \\phi_{0i}');
+       km(qsa('.eqn-minfty'), '-\\infty');
+       km(qsa('.eqn-phij-in-interval'), '\\phi_j \\in [\\phi_i, \\phi_i + w)');
+       km(qsa('.eqn-phii-interval'), '[\\phi_i, \\phi_i + w)');
+       km(qsa('.eqn-w-eq-5pct'), 'w = 5\\%\\cdot2\\pi');
+       km(qsa('.eqn-w-eq-10pct'), 'w = 10\\%\\cdot2\\pi');
+       km(qsa('.eqn-w-eq-25pct'), 'w = 25\\%\\cdot2\\pi');
+       km(qsa('.eqn-w-eq-41pct'), 'w = 41\\%\\cdot2\\pi');
+       km(qsa('.eqn-w-eq-50pct'), 'w = 50\\%\\cdot2\\pi');
+       km(qsa('.eqn-w-eq-75pct'), 'w = 75\\%\\cdot2\\pi');
+       km(qsa('.eqn-w-eq-100pct'), 'w = 100\\%\\cdot2\\pi');
+       km(qsa('.eqn-lower-bound'), '\\left\\lfloor\\frac{m - 1}{\\left\\lceil\\frac{2\\pi}{w}\\right\\rceil }\\right\\rfloor + 1', true);
+       km(qsa('.eqn-extended-pigeonhole'), '\\exists i: m_i \\geq \\left\\lfloor {\\frac{m - 1}{n}} \\right\\rfloor + 1', true);
+       km(qsa('.eqn-m-eq-2piw'), '\\left\\lceil\\frac{2\\pi}{w}\\right\\rceil');
+       km(qsa('.eqn-m'), 'm');
+       km(qsa('.eqn-mi'), 'm_i');
+       km(qsa('.eqn-n'), 'n');
+       km(qsa('.eqn-farfield'), '\\frac{2D^2}{\\lambda}');
+       km(qsa('.eqn-n-eq-27'), 'n = 27');
+       km(qsa('.eqn-n-eq-1'), 'n = 1');
+     });
+    </script>
+  </body>
+</html>
