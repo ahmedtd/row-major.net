@@ -1,0 +1,29 @@
+{% extends "base.html.jinja" %}
+
+{% block title %}Reinforcement Learning Force Tube{% endblock %}
+
+{% block topnav %}
+  {{ breadcrumbs('/articles', '/rl-force-tube') }}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script defer src="d3/d3.js"></script>
+  <script defer src="rl-force-tube.js"></script>
+{% endblock %}
+
+{% block content %}
+  <section>
+    <figure id="state-figure">
+      <canvas id="rl-canvas"
+              width="800"
+              height="450">
+        Your browser doesn't appear to support the HTML5 <code>canvas</code> element.
+      </canvas>
+    </figure>
+
+    <figure id="action-value-function">
+      <figcaption>The current action-value functions</figcaption>
+    </figure>
+  </section>
+{% endblock %}

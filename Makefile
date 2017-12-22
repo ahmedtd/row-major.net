@@ -11,6 +11,7 @@ all_clean_files :=
 
 all_templated := \
   index.html \
+  articles/rl-force-tube/index.html \
   about/index.html \
   ballistae/index.html \
   frustum/index.html \
@@ -25,6 +26,7 @@ $(all_templated): %.html: %.html.jinja jinjaize.py base.html.jinja
 
 # Static incompressible files.  They will not be gzipped.
 all_static_incompressible := \
+  articles/rl-force-tube/rl-force-tube.js \
   ballistae/angry-bunny.jpeg \
   ballistae/crystal-bunny.jpeg \
   masters-thesis-presentation/katex/fonts/KaTeX_Size2-Regular.eot \
@@ -118,6 +120,7 @@ all_static_incompressible := \
 # Static compressible files.  They will get the gzip pre-treatment
 # below.
 all_static_compressibles := \
+  articles/rl-force-tube/d3/d3.js \
   masters-thesis-presentation/reveal.js \
   masters-thesis-presentation/reveal.css \
   masters-thesis-presentation/white.css \
