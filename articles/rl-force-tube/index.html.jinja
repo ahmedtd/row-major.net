@@ -8,22 +8,58 @@
 
 {% block scripts %}
   {{ super() }}
-  <script defer src="d3/d3.js"></script>
+  <script defer src="Chart.js"></script>
   <script defer src="rl-force-tube.js"></script>
 {% endblock %}
 
 {% block content %}
   <section>
+    <p>An interactive demonstration of some of the techniques described in
+      Sutton and Barto's <i>Reinforcement Learning: An Introduction</i> (the
+      in-progress second edition).
+
+    <p>The specific algorithm implemented is "Differential Semi-Gradient Sarsa
+    for Control", found in Section 10.3.
+
     <figure id="state-figure">
-      <canvas id="rl-canvas"
+      <canvas id="state-figure-canvas"
               width="800"
               height="450">
         Your browser doesn't appear to support the HTML5 <code>canvas</code> element.
       </canvas>
+      <label>
+        Timescale
+        <select id="input-timescale">
+          <option value="1" selected>1x</option>
+          <option value="10">10x</option>
+          <option value="100">100x</option>
+          <option value="1000">1000x</option>
+        </select>
+      </label>
     </figure>
 
     <figure id="action-value-function">
+      <canvas id="action-value-function-canvas"
+              width="800"
+              height="450">
+        Your browser doesn't appear to support the HTML5 <code>canvas</code> element.
+      </canvas>
       <figcaption>The current action-value functions</figcaption>
+      <label>
+        Policy Update Frequency
+        <select id="input-learn-frequency">
+          <option value="100" selected>100 Hz</option>
+          <option value="1000">1000 Hz</option>
+        </select>
+    </figure>
+
+    <figure id="episodic-reward-trace">
+      <canvas id="episodic-reward-trace-canvas"
+              width="800"
+              height="450">
+        Your browser doesn't appear to support the HTML5 <code>canvas</code> element.
+      </canvas>
+      <figcaption>Reward history</figcaption>
     </figure>
   </section>
 {% endblock %}
