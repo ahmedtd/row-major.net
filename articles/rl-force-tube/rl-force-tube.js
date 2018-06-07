@@ -7,29 +7,29 @@
 // drawing at, my stroke width and fill characteristics should stay
 // the same.
 
-let viewport_make = (pixels_per_unit) => ({pixels_per_unit: pixels_per_unit,
-                                           center: center,
-                                           angle: angle});
+let viewport_make = (pixels_per_unit,
+                     pixel_width
+                     ) => ({pixels_per_unit: pixels_per_unit,
+                                  center: center});
 
-let viewport_fit = (pixel_top, pixel_left, pixel_bottom, pixel_right,
+let viewport_fit = (pixel_width, pixel_height,
                     unit_width, unit_height
-                    unit_center,
-                    angle) => {
+                    unit_center) => {
     let min = Math.min;
     let pixels_per_unit = min(pixel_width, pixel_height) / min(unit_width, unit_height);
-    
+    return {pixels_per_unit: pixels_per_unit,
+            pixel_width: pixel_width,
+            pixel_height: pixel_height,
+            unit_width: unit_width,
+            unit_height: unit_height,
+            unit_center: unit_center};                                                     
 };
 
 let viewport_apply_point = (viewport, p) => {
-    let cos = Math.cos;
-    let sin = Math.sin;
-    let mat_00 = cos(viewport.angle);
-    let mat_01 = sin(viewport.angle);
-    let mat_10 = -sin(viewport.angle);
-    let mat_11 = cos(viewport.angle);
-
-    return [pixels_per_unit * (mat_00 * p[0] + mat_01 * p[1]),
-            pixels_per_unit * (mat_10 * p[0] + mat_11 * p[1])];
+    let screen_center = [viewport.pixel_width / 2,
+                         viewport.pixel_height / 2];
+    return [viewport.pixels_per_unit * p[0] - (viewport.unit_center[0],
+            viewport.pixels_per_unit * p[1] - viewport.unit_center[1]];
 };
 
 // First, let's set up the physical system's dynamics.
@@ -285,6 +285,8 @@ let state_visualize = (cnv) => {
 
     return (cur_ball, agent_force) => {
         ctx.clearRect(0, 0, cnv.getWidth, cnv.getHeight);
+
+        
     };
 };
 
