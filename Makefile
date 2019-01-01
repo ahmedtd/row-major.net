@@ -22,7 +22,7 @@ all_clean_files += $(all_templated)
 
 all: $(all_templated)
 $(all_templated): %.html: %.html.jinja jinjaize.py base.html.jinja
-	PYTHONIOENCODING=utf8 python3 jinjaize.py --template-path='./' <$< >$@
+	PYTHONIOENCODING=utf8 python3 jinjaize.py --template-path='./' <$< >$@ || exit 1
 
 # Static incompressible files.  They will not be gzipped.
 all_static_incompressible := \
@@ -162,10 +162,10 @@ all_compressed := $(all_compressibles:=.gz)
 all_clean_files += $(all_compressed)
 all: $(all_compressed)
 $(all_compressed): %.gz: %
-	gzip <$< >$@
+	gzip <$< >$@ || exit 1
 
 # These files have to have the tilde in them.  The exist to not break
-# Ergun Akleman's TMAU CSCE Image Synthesis class galleries.  Don't
+# Ergun Akleman's TAMU CSCE Image Synthesis class galleries.  Don't
 # bother minifying them, since hardly anyone fetches them.
 all_troublesome := \
   \~ahmedtd/classes/csce647/basic_style.css \
@@ -244,13 +244,12 @@ all_troublesome := \
   \~ahmedtd/classes/csce647/pr15/01.jpg                            \
   \~ahmedtd/classes/csce647/pr15/index.html                        \
   \~ahmedtd/classes/csce647/pr15/thumbnail.jpg                 \
-  \
 
 
-all_deploy = $(all_templated) $(all_static) $(all_compressed) $(all_troublesom)
+all_deploy = $(all_templated) $(all_static) $(all_compressed) # $(all_troublesome)
 .PHONY: deploy
 deploy: $(all_deploy)
-	rsync -vRz $(all_deploy) root@www.row-major.net:/var/www/
+	rsync -vRz $(all_deploy) root@www.row-major.net:/var/www/ || exit 1
 
 .PHONY: clean
 clean:
