@@ -121,6 +121,7 @@ all_static_incompressible := \
 # below.
 all_static_compressibles := \
   articles/rl-force-tube/d3/d3.js \
+  articles/rl-force-tube/rl-force-tube.js \
   masters-thesis-presentation/reveal.js \
   masters-thesis-presentation/reveal.css \
   masters-thesis-presentation/white.css \
