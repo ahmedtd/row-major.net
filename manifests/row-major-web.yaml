@@ -1,0 +1,98 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: row-major-web
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: row-major-web-content-service
+  namespace: row-major-web
+  labels:
+    app: row-major-web
+    component: content
+spec:
+  selector:
+    app: row-major-web
+    component: content
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: row-major-web-content-deployment
+  namespace: row-major-web
+  labels:
+    app: row-major-web
+    component: content
+spec:
+  selector:
+    matchLabels:
+      app: row-major-web
+      component: content
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: row-major-web
+        component: content
+    spec:
+      containers:
+        - name: row-major-web-content
+          image: gcr.io/bomsync-214520/row-major-website:latest
+          ports:
+            - containerPort: 80
+
+---
+
+kind: Ingress
+apiVersion: extensions/v1beta1
+metadata:
+  name: row-major-web-ingress
+  namespace: row-major-web
+  labels:
+    app: row-major-web
+    component: ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # cert-manager will pick up this annotation and automtically provision the
+    # certs needed by this ingress.  This way, we don't have to manually create
+    # Certificate resources.
+    certmanager.k8s.io/cluster-issuer: letsencrypt-prod
+spec:
+  rules:
+    - host: www-gke.row-major.net
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: row-major-web-content-service
+              servicePort: http
+    - host: www.row-major.net
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: row-major-web-content-service
+              servicePort: http
+    - host: row-major.net
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: row-major-web-content-service
+              servicePort: http
+  tls:
+    - hosts:
+        - www-gke.row-major.net
+        - www.row-major.net
+        - row-major.net
+      secretName: row-major-web-certificate

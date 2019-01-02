@@ -169,89 +169,113 @@ $(all_compressed): %.gz: %
 # Ergun Akleman's TAMU CSCE Image Synthesis class galleries.  Don't
 # bother minifying them, since hardly anyone fetches them.
 all_troublesome := \
-  \~ahmedtd/classes/csce647/basic_style.css \
-  \~ahmedtd/classes/csce647/index.html \
-  \~ahmedtd/classes/csce647/pr01/00.jpg \
-  \~ahmedtd/classes/csce647/pr01/ballistae-pr01.tar.gz         \
-  \~ahmedtd/classes/csce647/pr01/index.html                        \
-  \~ahmedtd/classes/csce647/pr01/picture_0xss.jpeg             \
-  \~ahmedtd/classes/csce647/pr01/picture_1xss.jpeg             \
-  \~ahmedtd/classes/csce647/pr01/picture_2xss.jpeg               \
-  \~ahmedtd/classes/csce647/pr01/picture_3xss.jpeg             \
-  \~ahmedtd/classes/csce647/pr01/thumbnail.jpg                 \
-  \~ahmedtd/classes/csce647/pr02/00.jpg                          \
-  \~ahmedtd/classes/csce647/pr02/index.html                        \
-  \~ahmedtd/classes/csce647/pr02/vp1_fov0.jpeg                 \
-  \~ahmedtd/classes/csce647/pr02/vp1_fov1.jpeg                 \
-  \~ahmedtd/classes/csce647/pr02/vp1_fov2.jpeg                 \
-  \~ahmedtd/classes/csce647/pr02/vp2_fov0.jpeg                 \
-  \~ahmedtd/classes/csce647/pr02/vp2_fov1.jpeg                 \
-  \~ahmedtd/classes/csce647/pr02/vp2_fov2.jpeg                 \
-  \~ahmedtd/classes/csce647/pr03/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr03/index.html                        \
-  \~ahmedtd/classes/csce647/pr03/simple-gooch-scene.jpeg           \
-  \~ahmedtd/classes/csce647/pr03/simple-gooch-scene.scm            \
-  \~ahmedtd/classes/csce647/pr03/simple-lambert-scene.jpeg       \
-  \~ahmedtd/classes/csce647/pr03/simple-lambert-scene.scm      \
-  \~ahmedtd/classes/csce647/pr03/simple-phong-scene.jpeg           \
-  \~ahmedtd/classes/csce647/pr03/simple-phong-scene.scm            \
-  \~ahmedtd/classes/csce647/pr04/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr04/dirlight.jpeg                   \
-  \~ahmedtd/classes/csce647/pr04/index.html                        \
-  \~ahmedtd/classes/csce647/pr04/two-pointlights.jpeg          \
-  \~ahmedtd/classes/csce647/pr04/two-spotlights.jpeg               \
-  \~ahmedtd/classes/csce647/pr05/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr05/index.html                        \
-  \~ahmedtd/classes/csce647/pr05/soft-shadow-directional.jpeg    \
-  \~ahmedtd/classes/csce647/pr05/thumbnail.jpg                 \
-  \~ahmedtd/classes/csce647/pr05/volumetric-light.jpeg         \
-  \~ahmedtd/classes/csce647/pr06/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr06/2d-textures-1.jpeg                \
-  \~ahmedtd/classes/csce647/pr06/index.html                        \
-  \~ahmedtd/classes/csce647/pr07/00.jpg                          \
-  \~ahmedtd/classes/csce647/pr07/index.html                        \
-  \~ahmedtd/classes/csce647/pr07/solid-textures.jpeg               \
-  \~ahmedtd/classes/csce647/pr08/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr08/index.html                        \
-  \~ahmedtd/classes/csce647/pr08/meshes.jpeg                       \
-  \~ahmedtd/classes/csce647/pr09/00.jpg                          \
-  \~ahmedtd/classes/csce647/pr09/index.html                        \
-  \~ahmedtd/classes/csce647/pr09/reflectance-demo-1.jpeg           \
-  \~ahmedtd/classes/csce647/pr10/00.jpg                          \
-  \~ahmedtd/classes/csce647/pr10/bunny-through-glass.jpeg        \
-  \~ahmedtd/classes/csce647/pr10/index.html                        \
-  \~ahmedtd/classes/csce647/pr10/scene-through-dodecahedron.jpeg   \
-  \~ahmedtd/classes/csce647/pr10/transparency-demo-1.jpeg        \
-  \~ahmedtd/classes/csce647/pr10/transparency-demo-2.jpeg        \
-  \~ahmedtd/classes/csce647/pr11/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr11/01.jpg                            \
-  \~ahmedtd/classes/csce647/pr11/index.html                        \
-  \~ahmedtd/classes/csce647/pr11/thumbnail.jpg                 \
-  \~ahmedtd/classes/csce647/pr12/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr12/index.html                        \
-  \~ahmedtd/classes/csce647/pr12/ior-animation-frame.jpeg        \
-  \~ahmedtd/classes/csce647/pr12/rolling-marble-frame.jpeg     \
-  \~ahmedtd/classes/csce647/pr13/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr13/ambient-occlusion-demo.jpeg       \
-  \~ahmedtd/classes/csce647/pr13/bunny-lit-by-bunny.jpeg           \
-  \~ahmedtd/classes/csce647/pr13/index.html                        \
-  \~ahmedtd/classes/csce647/pr13/reflectance-demo-1.jpeg           \
-  \~ahmedtd/classes/csce647/pr13/soft-shadow-directional.jpeg  \
-  \~ahmedtd/classes/csce647/pr14/00.jpg                          \
-  \~ahmedtd/classes/csce647/pr14/01.jpg                            \
-  \~ahmedtd/classes/csce647/pr14/index.html                        \
-  \~ahmedtd/classes/csce647/pr14/thumbnail.jpg                 \
-  \~ahmedtd/classes/csce647/pr15/00.jpg                            \
-  \~ahmedtd/classes/csce647/pr15/01.jpg                            \
-  \~ahmedtd/classes/csce647/pr15/index.html                        \
-  \~ahmedtd/classes/csce647/pr15/thumbnail.jpg                 \
+  old-homedir/classes/csce647/basic_style.css \
+  old-homedir/classes/csce647/index.html \
+  old-homedir/classes/csce647/pr01/00.jpg \
+  old-homedir/classes/csce647/pr01/ballistae-pr01.tar.gz         \
+  old-homedir/classes/csce647/pr01/index.html                        \
+  old-homedir/classes/csce647/pr01/picture_0xss.jpeg             \
+  old-homedir/classes/csce647/pr01/picture_1xss.jpeg             \
+  old-homedir/classes/csce647/pr01/picture_2xss.jpeg               \
+  old-homedir/classes/csce647/pr01/picture_3xss.jpeg             \
+  old-homedir/classes/csce647/pr01/thumbnail.jpg                 \
+  old-homedir/classes/csce647/pr02/00.jpg                          \
+  old-homedir/classes/csce647/pr02/index.html                        \
+  old-homedir/classes/csce647/pr02/vp1_fov0.jpeg                 \
+  old-homedir/classes/csce647/pr02/vp1_fov1.jpeg                 \
+  old-homedir/classes/csce647/pr02/vp1_fov2.jpeg                 \
+  old-homedir/classes/csce647/pr02/vp2_fov0.jpeg                 \
+  old-homedir/classes/csce647/pr02/vp2_fov1.jpeg                 \
+  old-homedir/classes/csce647/pr02/vp2_fov2.jpeg                 \
+  old-homedir/classes/csce647/pr03/00.jpg                            \
+  old-homedir/classes/csce647/pr03/index.html                        \
+  old-homedir/classes/csce647/pr03/simple-gooch-scene.jpeg           \
+  old-homedir/classes/csce647/pr03/simple-gooch-scene.scm            \
+  old-homedir/classes/csce647/pr03/simple-lambert-scene.jpeg       \
+  old-homedir/classes/csce647/pr03/simple-lambert-scene.scm      \
+  old-homedir/classes/csce647/pr03/simple-phong-scene.jpeg           \
+  old-homedir/classes/csce647/pr03/simple-phong-scene.scm            \
+  old-homedir/classes/csce647/pr04/00.jpg                            \
+  old-homedir/classes/csce647/pr04/dirlight.jpeg                   \
+  old-homedir/classes/csce647/pr04/index.html                        \
+  old-homedir/classes/csce647/pr04/two-pointlights.jpeg          \
+  old-homedir/classes/csce647/pr04/two-spotlights.jpeg               \
+  old-homedir/classes/csce647/pr05/00.jpg                            \
+  old-homedir/classes/csce647/pr05/index.html                        \
+  old-homedir/classes/csce647/pr05/soft-shadow-directional.jpeg    \
+  old-homedir/classes/csce647/pr05/thumbnail.jpg                 \
+  old-homedir/classes/csce647/pr05/volumetric-light.jpeg         \
+  old-homedir/classes/csce647/pr06/00.jpg                            \
+  old-homedir/classes/csce647/pr06/2d-textures-1.jpeg                \
+  old-homedir/classes/csce647/pr06/index.html                        \
+  old-homedir/classes/csce647/pr07/00.jpg                          \
+  old-homedir/classes/csce647/pr07/index.html                        \
+  old-homedir/classes/csce647/pr07/solid-textures.jpeg               \
+  old-homedir/classes/csce647/pr08/00.jpg                            \
+  old-homedir/classes/csce647/pr08/index.html                        \
+  old-homedir/classes/csce647/pr08/meshes.jpeg                       \
+  old-homedir/classes/csce647/pr09/00.jpg                          \
+  old-homedir/classes/csce647/pr09/index.html                        \
+  old-homedir/classes/csce647/pr09/reflectance-demo-1.jpeg           \
+  old-homedir/classes/csce647/pr10/00.jpg                          \
+  old-homedir/classes/csce647/pr10/bunny-through-glass.jpeg        \
+  old-homedir/classes/csce647/pr10/index.html                        \
+  old-homedir/classes/csce647/pr10/scene-through-dodecahedron.jpeg   \
+  old-homedir/classes/csce647/pr10/transparency-demo-1.jpeg        \
+  old-homedir/classes/csce647/pr10/transparency-demo-2.jpeg        \
+  old-homedir/classes/csce647/pr11/00.jpg                            \
+  old-homedir/classes/csce647/pr11/01.jpg                            \
+  old-homedir/classes/csce647/pr11/index.html                        \
+  old-homedir/classes/csce647/pr11/thumbnail.jpg                 \
+  old-homedir/classes/csce647/pr12/00.jpg                            \
+  old-homedir/classes/csce647/pr12/index.html                        \
+  old-homedir/classes/csce647/pr12/ior-animation-frame.jpeg        \
+  old-homedir/classes/csce647/pr12/rolling-marble-frame.jpeg     \
+  old-homedir/classes/csce647/pr13/00.jpg                            \
+  old-homedir/classes/csce647/pr13/ambient-occlusion-demo.jpeg       \
+  old-homedir/classes/csce647/pr13/bunny-lit-by-bunny.jpeg           \
+  old-homedir/classes/csce647/pr13/index.html                        \
+  old-homedir/classes/csce647/pr13/reflectance-demo-1.jpeg           \
+  old-homedir/classes/csce647/pr13/soft-shadow-directional.jpeg  \
+  old-homedir/classes/csce647/pr14/00.jpg                          \
+  old-homedir/classes/csce647/pr14/01.jpg                            \
+  old-homedir/classes/csce647/pr14/index.html                        \
+  old-homedir/classes/csce647/pr14/thumbnail.jpg                 \
+  old-homedir/classes/csce647/pr15/00.jpg                            \
+  old-homedir/classes/csce647/pr15/01.jpg                            \
+  old-homedir/classes/csce647/pr15/index.html                        \
+  old-homedir/classes/csce647/pr15/thumbnail.jpg                 \
 
+all_deploy := $(all_templated) $(all_static) $(all_compressed)
 
-all_deploy = $(all_templated) $(all_static) $(all_compressed) # $(all_troublesome)
-.PHONY: deploy
-deploy: $(all_deploy)
-	rsync -vRz $(all_deploy) root@www.row-major.net:/var/www/ || exit 1
+.PHONY: build-dist
+build-dist: $(all_deploy)
+	rm -rf ./dist || exit 1
+	mkdir ./dist || exit 1
+	rsync -vR $(all_deploy) dist/ || exit 1
+	rsync -vr old-homedir/ dist/~ahmedtd || exit 1
+
+gcp-project-id:=bomsync-214520
+gcp-container-prefix:=gcr.io/$(gcp-project-id)
+
+.PHONY: container-push-gke
+container-push-gke:
+	docker build -t row-major-website:latest . || exit 1
+	docker tag row-major-website $(gcp-container-prefix)/row-major-website:latest || exit 1
+	docker push $(gcp-container-prefix)/row-major-website:latest || exit 1
+
+.PHONY: apply-gke
+apply-gke:
+	kubectl apply -f manifests/ || exit 1
+
+.PHONY: deploy-gke
+deploy-gke: container-push-gke apply-gke
+
+.PHONY: clean-gke
+clean-gke:
+	kubectl delete -f manifests/ || exit 1
 
 .PHONY: clean
 clean:
-	rm -rf $(all_clean_files)
+	rm -rf $(all_clean_files) || exit 1
+	rm -rf dist || exit 1
