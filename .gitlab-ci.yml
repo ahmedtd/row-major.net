@@ -1,0 +1,7 @@
+stages:
+  - deploy
+
+deploy to prod kubernetes:
+  stage: deploy
+  script:
+    - make deploy-gke
