@@ -3,5 +3,9 @@ stages:
 
 deploy to prod kubernetes:
   stage: deploy
+  image: docker:1.11
+  services:
+    - docker:dind
   script:
+    - docker version
     - make deploy-gke
