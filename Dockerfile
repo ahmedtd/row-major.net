@@ -1,7 +1,8 @@
 FROM alpine:3.8 as build
 
 RUN apk update \
-    && apk add make rsync
+    && apk add make rsync python3 bash curl \
+    && pip3 install csscompressor htmlmin jinja2
 
 COPY ./ ./app
 WORKDIR ./app

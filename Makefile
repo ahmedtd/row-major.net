@@ -3,6 +3,9 @@
 .ONESHELL:
 .DELETE_ON_ERROR:
 
+# Life is too short for POSIX shell
+SHELL=/bin/bash
+
 # `all` is the first target, so it's built by default
 .PHONY: all
 all:
@@ -255,25 +258,23 @@ build-dist: $(all_deploy)
 	rsync -vR $(all_deploy) dist/ || exit 1
 	rsync -vr old-homedir/ dist/~ahmedtd || exit 1
 
-gcp-project-id:=bomsync-214520
-gcp-container-prefix:=gcr.io/$(gcp-project-id)
+gcp-project-id := bomsync-214520
+image-tag := gcr.io/$(gcp-project-id)/row-major-website
 
 .PHONY: container-push-gke
 container-push-gke:
-	docker build -t row-major-website:latest . || exit 1
-	docker tag row-major-website $(gcp-container-prefix)/row-major-website:latest || exit 1
-	docker push $(gcp-container-prefix)/row-major-website:latest || exit 1
+	bash tools/container-push.bash ./Dockerfile $(image-tag) manifests/
 
 .PHONY: apply-gke
 apply-gke:
-	kubectl apply -f manifests/ || exit 1
+	kustomize build manifests/ | kubectl apply -f - || exit 1
 
 .PHONY: deploy-gke
 deploy-gke: container-push-gke apply-gke
 
 .PHONY: clean-gke
 clean-gke:
-	kubectl delete -f manifests/ || exit 1
+	kustomize build manifests/ | kubectl delete -f - || exit 1
 
 .PHONY: clean
 clean:

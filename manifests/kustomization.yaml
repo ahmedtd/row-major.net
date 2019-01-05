@@ -1,0 +1,10 @@
+# Apply this namespace to all resources
+namespace: row-major-web
+
+resources:
+- row-major-web.yaml
+imageTags:
+- digest: sha256:f6e4323c70142ffd0af1bf9bdc2d33d5890d92d6c942614dea321d227c029529
+  name: gcr.io/bomsync-214520/row-major-website
+apiVersion: v1beta1
+kind: Kustomization
