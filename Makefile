@@ -263,7 +263,7 @@ image-tag := gcr.io/$(gcp-project-id)/row-major-website
 
 .PHONY: container-push-gke
 container-push-gke:
-	bash tools/container-push.bash ./Dockerfile $(image-tag) manifests/
+	bash tools/container-push.bash ./ $(image-tag) manifests/
 
 .PHONY: apply-gke
 apply-gke:

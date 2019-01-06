@@ -1,10 +1,10 @@
-# bash container-push.bash path/to/Dockerfile registry imagename path/to/kustomization
+# bash container-pu# bash container-push.bash path/to/build-context registry imagename path/to/kustomization
 #
 # This script handles building the container image, pushing the container to the
 # registry, and editing our kubernetes manifest kustomization to use the image's
 # digest.
 
-dockerfile="${1}"
+build_context="${1}"
 image_name="${2}"
 kustomization_dir="${3}"
 
@@ -15,7 +15,7 @@ tag=$(head -c 16 /dev/urandom | xxd -p)
 tagged_image="${image_name}:${tag}"
 
 # Run the build, labeling the resulting image with our tag.
-docker build --file="${dockerfile}" --tag="${tagged_image}" . || exit 1
+docker build --tag="${tagged_image}" "${build_context}" || exit 1
 
 # Push the image to the registry.  The registry will compute a cryptographic
 # digest for the image.  The digest value is different for different registries.
