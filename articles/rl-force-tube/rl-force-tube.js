@@ -13,7 +13,7 @@ let viewport_make = (pixels_per_unit,
                                   center: center});
 
 let viewport_fit = (pixel_width, pixel_height,
-                    unit_width, unit_height
+                    unit_width, unit_height,
                     unit_center) => {
     let min = Math.min;
     let pixels_per_unit = min(pixel_width, pixel_height) / min(unit_width, unit_height);
@@ -28,7 +28,7 @@ let viewport_fit = (pixel_width, pixel_height,
 let viewport_apply_point = (viewport, p) => {
     let screen_center = [viewport.pixel_width / 2,
                          viewport.pixel_height / 2];
-    return [viewport.pixels_per_unit * p[0] - (viewport.unit_center[0],
+    return [viewport.pixels_per_unit * p[0] - viewport.unit_center[0],
             viewport.pixels_per_unit * p[1] - viewport.unit_center[1]];
 };
 

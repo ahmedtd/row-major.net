@@ -123,7 +123,7 @@ all_static_incompressible := \
 # Static compressible files.  They will get the gzip pre-treatment
 # below.
 all_static_compressibles := \
-  articles/rl-force-tube/d3/d3.js \
+  articles/rl-force-tube/Chart.js \
   articles/rl-force-tube/rl-force-tube.js \
   masters-thesis-presentation/reveal.js \
   masters-thesis-presentation/reveal.css \
