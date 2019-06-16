@@ -1,12 +1,18 @@
 stages:
   - deploy
 
-deploy to prod kubernetes:
+container-push:
   stage: deploy
-  image: docker:1.11
-  services:
-    - docker:dind
+  image: gcr.io/google/bazel:0.26.1
   script:
-    - apt-get install -Y make python3 python3-jinja2
-    - docker version
-    - make deploy-gke
+    - bazel run //:site-push
+
+# kubernetes-apply:
+#   stage: deploy
+#   image: gcr.io/google/bazel:0.26.1
+#   services:
+#     - docker:dind
+#   script:
+#     - apt-get install -Y make python3 python3-jinja2
+#     - docker version
+#     - make deploy-gke
