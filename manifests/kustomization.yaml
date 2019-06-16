@@ -4,7 +4,7 @@ namespace: row-major-web
 resources:
 - row-major-web.yaml
 imageTags:
-- digest: sha256:7253f16a2bd8e65142dfe9a31377b4d7f81d931532cbfe512a0b7acd3723d413
+- digest: sha256:4c7e7c3bab8fe105b0b44db5274fe6534f8f7821d4114dd7390d1566d9b80c78
   name: gcr.io/bomsync-214520/row-major-website
 apiVersion: v1beta1
 kind: Kustomization

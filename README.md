@@ -1,27 +1,13 @@
 # row-major.net
 
-A small static site built on `make` and `jinja`.  Features:
+Build and push the site's container:
 
-  * CSS and HTML minification.
-  * Generates gzip files that `nginx` will use as precompressed files.
-  * Incremental rebuilding with `make`.
+    bazel run //:site-push
 
-To build:
+This will print out the digest of the pushed image.
 
-    make
+Update manifests/kustomization.yaml with the new digest.
 
-To clean:
+Run
 
-    make clean
-
-To deploy:
-
-    make deploy
-
-# Dependencies
-
-  * GNU Make
-  * python3
-  * csscompressor (from PyPI)
-  * htmlmin (from PyPI)
-  * jinja2 (from PyPI)
+    kustomize build manifests/ | kubectl apply -f -
