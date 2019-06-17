@@ -3,7 +3,7 @@ stages:
 
 container-push:
   stage: deploy
-  image: gcr.io/google/bazel:0.26.1
+  image: marketplace.gcr.io/google/bazel:0.26.1
   script:
     - bazel run //:site-push
 
