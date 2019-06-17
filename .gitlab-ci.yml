@@ -1,11 +1,11 @@
 stages:
   - deploy
 
-container-push:
-  stage: deploy
-  image: marketplace.gcr.io/google/bazel:0.26.1
-  script:
-    - bazel run //:site-push
+# container-push:
+#   stage: deploy
+#   image: marketplace.gcr.io/google/bazel:0.26.1
+#   script:
+#     - bazel run //:site-push
 
 # kubernetes-apply:
 #   stage: deploy
