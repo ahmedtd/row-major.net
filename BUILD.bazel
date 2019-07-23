@@ -22,6 +22,7 @@ py_binary(
 all_jinja_templates = [
     "index.html.jinja",
     "articles/rl-force-tube/index.html.jinja",
+    "articles/2019-07-21-program-trace-analysis-with-wireshark/index.html.jinja",
     "about/index.html.jinja",
     "ballistae/index.html.jinja",
     "frustum/index.html.jinja",
@@ -48,6 +49,8 @@ filegroup(
 all_static_incompressible = [
     "ballistae/angry-bunny.jpeg",
     "ballistae/crystal-bunny.jpeg",
+    "articles/2019-07-21-program-trace-analysis-with-wireshark/wireshark-custom-dissector.png",
+    "articles/2019-07-21-program-trace-analysis-with-wireshark/wireshark-custom-dissector-example.png",
     "masters-thesis-presentation/katex/fonts/KaTeX_Size2-Regular.eot",
     "masters-thesis-presentation/katex/fonts/KaTeX_Math-BoldItalic.eot",
     "masters-thesis-presentation/katex/fonts/KaTeX_AMS-Regular.ttf",
@@ -139,6 +142,10 @@ all_static_incompressible = [
 all_static_compressible = [
   "articles/rl-force-tube/Chart.js",
   "articles/rl-force-tube/rl-force-tube.js",
+  "articles/2019-07-21-program-trace-analysis-with-wireshark/packet_dump.pcap",
+  "articles/2019-07-21-program-trace-analysis-with-wireshark/example-protocol-dissector.lua",
+  "articles/2019-07-21-program-trace-analysis-with-wireshark/unmodified-example-program.cc",
+  "articles/2019-07-21-program-trace-analysis-with-wireshark/modified-example-program.cc",
   "masters-thesis-presentation/reveal.js",
   "masters-thesis-presentation/reveal.css",
   "masters-thesis-presentation/white.css",

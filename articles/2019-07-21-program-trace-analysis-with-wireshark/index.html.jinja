@@ -1,0 +1,111 @@
+{% extends "base.html.jinja" %}
+
+{% block title %}Program Trace Analysis With WireShark{% endblock %}
+
+{% block topnav %}
+  {{ breadcrumbs('/articles', '/Program Trace Analysis With Wireshark') }}
+{% endblock %}
+
+{% block content %}
+<section>
+  <p>I've been exploring the OpenJK (open-source maintained version of
+  Jedi Academy) codebase.</p>
+  
+  <p>The game engine is a quake derivative, so even though it has a
+  single-player mode, there's a conceptual separation between the
+  "server" and the "client".  The server processes game logic, while
+  the client handles display and input.  There's some blurring due to
+  the fact that these two components are actually dynamic libraries
+  loaded into the same process.</p>
+
+  <p>I wanted to get a better understanding of the communication between
+  these two halves, especially at game startup.  Most of the
+  communication takes a place over a virtual network device (an
+  in-memory ring buffer; packet sends and receives operate on sections
+  of the ring buffer).</p>
+
+  <p>Logging these packets to a file seemed simple enough, but
+  exploring that seemed like it would be a pain, since most of the
+  packets are serialized binary structures.  Thinking about it some
+  more, I realized that the problem I was actually very similar to
+  analyzing a network capture using Wireshark.</p>
+
+  <p>The basic strategy is to dump the internal packets I'm interested
+  in into a pcap file, then write a Wireshark custom dissector in Lua
+  to analyze the packets.  I'm quite happy with how it turned out
+  &mdash; I get the full power of Wireshark's filtering and searching,
+  as well as a nice visual dissection for all of the packet types I
+    support in my custom dissector.</p>
+
+  <figure>
+    <img src="wireshark-custom-dissector.png">
+    <figcaption>My custom dissector in action.</figcaption>
+  </figure>
+
+  <p>I was originally nudged toward this technique because of the
+  packet-like nature of the data I was analyzing, but it works so well
+  that I would consider using it for analyzing more general program
+  traces as well, especially for a large program that I don't
+  understand well.</p>
+
+  <p>Wireshark's custom dissector framework seems well-designed and
+  capable.  I've been looking for a tool like it for
+  reverse-engineering binary formats; I often find myself wanting a
+  way to prototype parsing logic with visual feedback; for example,
+  showing me both the extracted value for a field as well as
+  highlighting the bytes in the file that it occupies.  I'm
+  considering creating a fork of Wireshark that just keeps the
+  dissection framework and the hex editor view (or, more likely, just
+  wrapping the file I'm analyzing in a dummy pcap file).
+
+  <p>Read on for a walkthrough of the process on a simple example
+  program.</p>
+  
+</section>
+<section>
+  <h2>Step-By-Step</h2>
+
+  <p>We'll start with a small example program.  Pretend that it's a big,
+  complicated program that we're having trouble understanding.
+  Pretend it makes some calls to a plugin system, and we want to log
+  them for later analysis using Wireshark.</p>
+  
+  <script src="https://gitlab.com/snippets/1877548.js"></script>
+
+  <p>The first step is to instrument our program so that it saves a
+  pcap file containing our "packets".
+  The <a href="https://wiki.wireshark.org/Development/LibpcapFileFormat">
+  pcap format </a> is very simple, so we don't need a library.  It's a
+  binary format, with a short header at the beginning of the file,
+  followed by a series of length-delimited packet records.  We just
+  need to add two functions: one to write the overall pcap header, and
+  another to write out each packet.</p>
+
+  <script src="https://gitlab.com/snippets/1877907.js"></script>
+
+  <p>Now, running the program will save a file named
+  "packet_dump.pcap" in the current directory.  If we open it up in
+  Wireshark, we can see the sequence of "packets" that we logged, as
+  well as their contents in the hex editor.  But Wireshark doesn't
+  understand the format of what's inside the packets, so it's not too
+  useful.</p>
+
+  <p>We can fix this by giving Wireshark a custom dissector,
+  registered for the link-layer packet type we hardcoded into our pcap
+  file (USER0).  Wireshark supports custom dissectors written in Lua.</p>
+  
+  <script src="https://gitlab.com/snippets/1877912.js"></script>
+  
+  <p>To compile and run the program, and run Wireshark on the
+  resulting pcap file:</p>
+
+  <script src="https://gitlab.com/snippets/1877911.js"></script>
+  
+  <figure>
+    <img src="wireshark-custom-dissector.png">
+    <figcaption>The example custom dissector working.</figcaption>
+  </figure>
+  
+</section>      
+
+{% endblock %}
