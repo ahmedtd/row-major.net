@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 # Download the rules_docker repository at release v0.7.0
@@ -52,3 +52,10 @@ pip_import(
 # repositories.
 load("@jinjaize_deps//:requirements.bzl", "pip_install")
 pip_install()
+
+# Download kustomize
+http_file(
+    name = "kustomize",
+    urls = ["https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.3/kustomize_2.0.3_linux_amd64"],
+    sha256 = "a04d79a013827c9ebb0abfe9d41cbcedf507a0310386c8d9a7efec7a36f9d7a3",
+)

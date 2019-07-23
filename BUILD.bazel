@@ -305,10 +305,27 @@ container_image(
 
 # This rule generates the push digest as //:push-site-container.digest
 container_push(
-    name="site-push",
+    name="site-push-actual",
     image=":site-image",
     format="Docker",
     registry="gcr.io",
     repository="bomsync-214520/row-major-website",
     tag="{BUILD_TIMESTAMP}"
+)
+
+# genrule(
+#     name="site-push",
+#     srcs=["//:site-push-actual-container.digest"],
+#     tools=["@kustomize//file"],
+#     outs=["manifests/new-kustomization.yaml"],
+#     cmd="",
+# )
+
+# Generate
+genrule(
+    name="kustomize-manifests",
+    srcs=glob(["manifests/**/*.yaml"]),
+    tools=["@kustomize//file"],
+    outs=["kustomized-manifest.yaml"],
+    cmd="kustomize build manifests/ >$@",
 )
