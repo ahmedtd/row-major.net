@@ -10,4 +10,4 @@ Update manifests/kustomization.yaml with the new digest.
 
 Run
 
-    kustomize build manifests/ | kubectl apply -f -
+    kubectl kustomize build manifests/ | kubectl apply -f -
