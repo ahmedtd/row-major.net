@@ -1,10 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 # Apply this namespace to all resources
 namespace: row-major-web
 
 resources:
 - row-major-web.yaml
-imageTags:
-- digest: sha256:f1af47a64acc4e24e4c3e77e6e1d5aa3768e5723691c3d9ec66b79935c339bf2
-  name: gcr.io/bomsync-214520/row-major-website
-apiVersion: v1beta1
-kind: Kustomization

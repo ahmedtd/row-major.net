@@ -1,0 +1,35 @@
+{% extends "base.html.jinja" %}
+
+{% block title %}Word Squares{% endblock %}
+
+{% block topnav %}
+  {{ breadcrumbs('/articles', '/Word Squares') }}
+{% endblock %}
+
+{% block content %}
+<section>
+  <p>This program implements the "Word Rectangles" example from The
+  Art of Computer Programming, Volume 4 Fascicle 5, Chapter 7.2.2.</p>
+
+  <p>Given an input file containing a list of five-letter words (for
+  example, from
+  Knuth's <a href="https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt">Stanford
+      Graphbase</a>), this program uses a backtracking search to produce all 5x5 squares where each column is a unique word from the file, and each row is also a word from the file.</p>
+
+  <p>Some example output: <pre>
+about
+torte
+lotta
+ashes
+store
+
+about
+batty
+other
+utero
+tyros
+  </pre></p>
+
+  <script src="https://gitlab.com/snippets/1943965.js"></script>
+</section>
+{% endblock %}
