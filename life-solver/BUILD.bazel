@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "life",
+    srcs = ["life.go"],
+    importpath = "row-major/life-solver/life",
+)
+
+go_test(
+    name = "life_test",
+    srcs = ["life_test.go"],
+    embed = [":life"],
+    importpath = "row-major/life-solver/life",
+)
