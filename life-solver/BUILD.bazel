@@ -12,3 +12,9 @@ go_test(
     embed = [":life"],
     importpath = "row-major/life-solver/life",
 )
+
+go_binary(
+    name = "life-reverser",
+    srcs = ["main.go"],
+    deps = [":life"],
+)

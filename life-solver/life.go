@@ -3,9 +3,10 @@ package life
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
-type CellState int
+type CellState int8
 
 const (
 	CellUnknown CellState = iota
@@ -28,43 +29,64 @@ func NewCellBoard(numRows, numCols int) CellBoard {
 }
 
 func NewCellBoardFromSource(pic string) CellBoard {
-	cells := make([]CellState, 0)
-	nrows := 0
-	ncols := 0
+	trailer, _ := utf8.DecodeLastRuneInString(pic)
+	lines := strings.Split(pic, "\n")
+	if trailer == '\n' {
+		lines = lines[0 : len(lines)-1]
+	}
 
-	for _, r := range pic {
-		if r == '█' {
-			if nrows == 0 {
-				ncols++
-			}
-			cells = append(cells, CellAlive)
-		} else if r == '_' {
-			if nrows == 0 {
-				ncols++
-			}
-			cells = append(cells, CellDead)
-		} else if r == '\n' {
-			nrows++
-		} else {
+	rows := 0
+	cols := 0
+	for _, line := range lines {
+		first, _ := utf8.DecodeRuneInString(line)
+		if first == '!' {
+			continue
 		}
+		rows++
+		cols = max(cols, utf8.RuneCountInString(line))
+	}
+
+	cells := make([]CellState, rows*cols)
+	for i := 0; i < len(cells); i++ {
+		cells[i] = CellDead
+	}
+
+	r := 0
+	for _, line := range lines {
+		first, _ := utf8.DecodeRuneInString(line)
+		if first == '!' {
+			continue
+		}
+
+		c := 0
+		for _, ch := range line {
+			if ch == '█' || ch == 'O' {
+				cells[r*cols+c] = CellAlive
+			} else if ch == '_' || ch == '.' {
+				cells[r*cols+c] = CellDead
+			}
+			c++
+		}
+
+		r++
 	}
 
 	return CellBoard{
-		NumRows: nrows,
-		NumCols: ncols,
+		NumRows: rows,
+		NumCols: cols,
 		Cells:   cells,
 	}
 }
 
-func (b CellBoard) At(r, c int) CellState {
+func (b *CellBoard) At(r, c int) CellState {
 	return b.Cells[r*b.NumCols+c]
 }
 
-func (b CellBoard) Set(r, c int, cs CellState) {
+func (b *CellBoard) Set(r, c int, cs CellState) {
 	b.Cells[r*b.NumCols+c] = cs
 }
 
-func (b CellBoard) Equals(o CellBoard) bool {
+func (b *CellBoard) Equals(o CellBoard) bool {
 	if b.NumRows != o.NumRows || b.NumCols != o.NumCols {
 		return false
 	}
@@ -80,7 +102,7 @@ func (b CellBoard) Equals(o CellBoard) bool {
 	return true
 }
 
-func (s CellBoard) DisplayString() string {
+func (s *CellBoard) DisplayString() string {
 	b := strings.Builder{}
 
 	b.WriteRune('┌')
@@ -116,7 +138,7 @@ func (s CellBoard) DisplayString() string {
 	return b.String()
 }
 
-func (b CellBoard) Copy() CellBoard {
+func (b *CellBoard) Copy() CellBoard {
 	copy := CellBoard{
 		NumRows: b.NumRows,
 		NumCols: b.NumCols,
@@ -152,6 +174,38 @@ func (b *IntBoard) Set(r, c, cs int) {
 	b.Cells[r*b.NumCols+c] = cs
 }
 
+func RangeBoardDisplayString(mins IntBoard, maxs IntBoard) string {
+	b := &strings.Builder{}
+
+	b.WriteRune('┌')
+	for c := 0; c < mins.NumCols; c++ {
+		b.WriteString("─────")
+	}
+	b.WriteRune('┐')
+
+	b.WriteRune('\n')
+
+	for r := 0; r < mins.NumRows; r++ {
+		b.WriteRune('│')
+		for c := 0; c < mins.NumCols; c++ {
+			b.WriteString(fmt.Sprintf("[%d,%d]", mins.At(r, c), maxs.At(r, c)))
+		}
+		b.WriteRune('│')
+
+		b.WriteRune('\n')
+	}
+
+	b.WriteRune('└')
+	for c := 0; c < mins.NumCols; c++ {
+		b.WriteString("─────")
+	}
+	b.WriteRune('┘')
+
+	b.WriteRune('\n')
+
+	return b.String()
+}
+
 type backtrackMode int
 
 const (
@@ -159,40 +213,35 @@ const (
 	backtrackModeAscending
 )
 
-type traceFunction func(msg string)
-
 type ReverseSolver struct {
 	CurBoard CellBoard
 
-	preBoard            CellBoard
-	preLiveNeighborsMin IntBoard
-	preLiveNeighborsMax IntBoard
+	PreBoard            CellBoard
+	PreLiveNeighborsMin IntBoard
+	PreLiveNeighborsMax IntBoard
 
-	curDepth int
-	btMode   backtrackMode
+	CurDepth int
+	BTMode   backtrackMode
 
-	traceFn traceFunction
+	StatsMaxDepth            int
+	StatsNumStatesConsidered int64
+	StatsReadMems            int64
+	StatsWriteMems           int64
 }
 
 type ReverseSolverOption func(s *ReverseSolver)
-
-func WithTraceFn(traceFn traceFunction) ReverseSolverOption {
-	return func(s *ReverseSolver) {
-		s.traceFn = traceFn
-	}
-}
 
 func NewReverseSolver(curBoard CellBoard, opts ...ReverseSolverOption) *ReverseSolver {
 	s := &ReverseSolver{
 
 		CurBoard: curBoard.Copy(),
 
-		preBoard:            NewCellBoard(curBoard.NumRows, curBoard.NumCols),
-		preLiveNeighborsMin: NewIntBoard(curBoard.NumRows, curBoard.NumCols),
-		preLiveNeighborsMax: NewIntBoard(curBoard.NumRows, curBoard.NumCols),
+		PreBoard:            NewCellBoard(curBoard.NumRows, curBoard.NumCols),
+		PreLiveNeighborsMin: NewIntBoard(curBoard.NumRows, curBoard.NumCols),
+		PreLiveNeighborsMax: NewIntBoard(curBoard.NumRows, curBoard.NumCols),
 
-		curDepth: 0,
-		btMode:   backtrackModeDescending,
+		CurDepth: 0,
+		BTMode:   backtrackModeDescending,
 	}
 
 	for r := 0; r < s.NumRows(); r++ {
@@ -201,7 +250,7 @@ func NewReverseSolver(curBoard CellBoard, opts ...ReverseSolverOption) *ReverseS
 			s.execForEachNeighbor(r, c, func(i, j int) {
 				numNeighbors++
 			})
-			s.preLiveNeighborsMax.Set(r, c, numNeighbors)
+			s.PreLiveNeighborsMax.Set(r, c, numNeighbors)
 		}
 	}
 
@@ -245,32 +294,39 @@ func (s *ReverseSolver) execForEachNeighbor(r, c int, f func(i, j int)) {
 }
 
 func (s *ReverseSolver) checkConsistentAt(r, c int) bool {
+	s.StatsReadMems++
 	switch s.CurBoard.At(r, c) {
 	case CellUnknown:
 		panic("CellUnknown is not allowed in CurBoard")
 	case CellDead:
-		switch s.preBoard.At(r, c) {
+		s.StatsReadMems++
+		switch s.PreBoard.At(r, c) {
 		case CellUnknown:
 			// Do nothing.  All live neighbor values are possibly valid if
 			// we don't have an assigned preboard value.
 			return true
 		case CellDead:
-			return !(s.preLiveNeighborsMin.At(r, c) == 3 && s.preLiveNeighborsMax.At(r, c) == 3)
+			s.StatsReadMems += 2
+			return !(s.PreLiveNeighborsMin.At(r, c) == 3 && s.PreLiveNeighborsMax.At(r, c) == 3)
 		case CellAlive:
-			return !(2 <= s.preLiveNeighborsMin.At(r, c) && s.preLiveNeighborsMin.At(r, c) <= 3 &&
-				2 <= s.preLiveNeighborsMax.At(r, c) && s.preLiveNeighborsMax.At(r, c) <= 3)
+			s.StatsReadMems += 2
+			return !(2 <= s.PreLiveNeighborsMin.At(r, c) && s.PreLiveNeighborsMin.At(r, c) <= 3 &&
+				2 <= s.PreLiveNeighborsMax.At(r, c) && s.PreLiveNeighborsMax.At(r, c) <= 3)
 		}
 	case CellAlive:
-		switch s.preBoard.At(r, c) {
+		s.StatsReadMems++
+		switch s.PreBoard.At(r, c) {
 		case CellUnknown:
 			// Do nothing.  All live neighbor values are possibly valid if
 			// we don't have an assigned preboard value.
 			return true
 		case CellDead:
-			return s.preLiveNeighborsMin.At(r, c) <= 3 && 3 <= s.preLiveNeighborsMax.At(r, c)
+			s.StatsReadMems += 2
+			return s.PreLiveNeighborsMin.At(r, c) <= 3 && 3 <= s.PreLiveNeighborsMax.At(r, c)
 		case CellAlive:
-			return (s.preLiveNeighborsMin.At(r, c) <= 2 && 2 <= s.preLiveNeighborsMax.At(r, c)) ||
-				(s.preLiveNeighborsMin.At(r, c) <= 3 && 3 <= s.preLiveNeighborsMax.At(r, c))
+			s.StatsReadMems += 2
+			return (s.PreLiveNeighborsMin.At(r, c) <= 2 && 2 <= s.PreLiveNeighborsMax.At(r, c)) ||
+				(s.PreLiveNeighborsMin.At(r, c) <= 3 && 3 <= s.PreLiveNeighborsMax.At(r, c))
 		}
 	}
 
@@ -289,250 +345,160 @@ func (s *ReverseSolver) checkConsistentAround(r, c int) bool {
 }
 
 func (s *ReverseSolver) preLiveNeighborsInvariant(r, c int) {
-	if s.preLiveNeighborsMin.At(r, c) < 0 {
+	if s.PreLiveNeighborsMin.At(r, c) < 0 {
 		panic(fmt.Sprintf("live neighbor min (%d, %d) < 0", r, c))
 	}
-	if s.preLiveNeighborsMin.At(r, c) > 8 {
+	if s.PreLiveNeighborsMin.At(r, c) > 8 {
 		panic(fmt.Sprintf("live neighbor min (%d, %d) > 8", r, c))
 	}
-	if s.preLiveNeighborsMax.At(r, c) < 0 {
+	if s.PreLiveNeighborsMax.At(r, c) < 0 {
 		panic(fmt.Sprintf("live neighbor max (%d, %d) < 0", r, c))
 	}
-	if s.preLiveNeighborsMax.At(r, c) > 8 {
+	if s.PreLiveNeighborsMax.At(r, c) > 8 {
 		panic(fmt.Sprintf("live neighbor max (%d, %d) > 8", r, c))
 	}
-	if s.preLiveNeighborsMin.At(r, c) > s.preLiveNeighborsMax.At(r, c) {
-		panic(fmt.Sprintf("live neighbor (%d, %d) max(%d) < min(%d)", r, c, s.preLiveNeighborsMax.At(r, c), s.preLiveNeighborsMin.At(r, c)))
+	if s.PreLiveNeighborsMin.At(r, c) > s.PreLiveNeighborsMax.At(r, c) {
+		panic(fmt.Sprintf("live neighbor (%d, %d) max(%d) < min(%d)", r, c, s.PreLiveNeighborsMax.At(r, c), s.PreLiveNeighborsMin.At(r, c)))
 	}
 }
 
 func (s *ReverseSolver) setPreBoard(r, c int, cs CellState) {
-	if s.preBoard.At(r, c) == CellUnknown && cs == CellUnknown {
+	s.StatsReadMems++
+	if s.PreBoard.At(r, c) == CellUnknown && cs == CellUnknown {
 		panic("invalid preboard state transition unknown->unknown")
-	} else if s.preBoard.At(r, c) == CellUnknown && cs == CellDead {
+	} else if s.PreBoard.At(r, c) == CellUnknown && cs == CellDead {
 		// Decrement the live neighbor maximum for neighbors of this cell.
 		s.execForEachNeighbor(r, c, func(i, j int) {
-			s.preLiveNeighborsMax.Set(i, j, s.preLiveNeighborsMax.At(i, j)-1)
+			s.StatsReadMems++
+			s.StatsWriteMems++
+			s.PreLiveNeighborsMax.Set(i, j, s.PreLiveNeighborsMax.At(i, j)-1)
 			s.preLiveNeighborsInvariant(i, j)
 		})
-	} else if s.preBoard.At(r, c) == CellUnknown && cs == CellAlive {
+	} else if s.PreBoard.At(r, c) == CellUnknown && cs == CellAlive {
 		panic("invalid preboard state transition unknown->alive")
-	} else if s.preBoard.At(r, c) == CellDead && cs == CellUnknown {
+	} else if s.PreBoard.At(r, c) == CellDead && cs == CellUnknown {
 		panic("invalid preboard state transition dead->unknown")
-	} else if s.preBoard.At(r, c) == CellDead && cs == CellDead {
+	} else if s.PreBoard.At(r, c) == CellDead && cs == CellDead {
 		panic("invalid preboard state transition dead->dead")
-	} else if s.preBoard.At(r, c) == CellDead && cs == CellAlive {
+	} else if s.PreBoard.At(r, c) == CellDead && cs == CellAlive {
 		// Increment the live neighbor maximum for neighbors of this cell
 		// (transition away from dead)
 		s.execForEachNeighbor(r, c, func(i, j int) {
-			s.preLiveNeighborsMax.Set(i, j, s.preLiveNeighborsMax.At(i, j)+1)
+			s.StatsReadMems++
+			s.StatsWriteMems++
+			s.PreLiveNeighborsMax.Set(i, j, s.PreLiveNeighborsMax.At(i, j)+1)
 			s.preLiveNeighborsInvariant(i, j)
 		})
 
 		// Increment the live neighbor minimum for neighbors of this cell
 		// (transition into alive)
 		s.execForEachNeighbor(r, c, func(i, j int) {
-			s.preLiveNeighborsMin.Set(i, j, s.preLiveNeighborsMin.At(i, j)+1)
+			s.StatsReadMems++
+			s.StatsWriteMems++
+			s.PreLiveNeighborsMin.Set(i, j, s.PreLiveNeighborsMin.At(i, j)+1)
 			s.preLiveNeighborsInvariant(i, j)
 		})
-	} else if s.preBoard.At(r, c) == CellAlive && cs == CellUnknown {
+	} else if s.PreBoard.At(r, c) == CellAlive && cs == CellUnknown {
 		// Decrement the live neighbor minimum for neighbors of this cell
 		// (transition away from alive)
 		s.execForEachNeighbor(r, c, func(i, j int) {
-			s.preLiveNeighborsMin.Set(i, j, s.preLiveNeighborsMin.At(i, j)-1)
+			s.StatsReadMems++
+			s.StatsWriteMems++
+			s.PreLiveNeighborsMin.Set(i, j, s.PreLiveNeighborsMin.At(i, j)-1)
 			s.preLiveNeighborsInvariant(i, j)
 		})
-	} else if s.preBoard.At(r, c) == CellAlive && cs == CellDead {
+	} else if s.PreBoard.At(r, c) == CellAlive && cs == CellDead {
 		panic("invalid preboard state transition alive->dead")
-	} else if s.preBoard.At(r, c) == CellAlive && cs == CellAlive {
+	} else if s.PreBoard.At(r, c) == CellAlive && cs == CellAlive {
 		panic("invalid preboard state transition alive->alive")
 	}
 
-	s.preBoard.Set(r, c, cs)
+	s.StatsWriteMems++
+	s.PreBoard.Set(r, c, cs)
 }
 
-func (s *ReverseSolver) dumpBoardStates() string {
-	b := &strings.Builder{}
+type YieldStatus int
 
-	b.WriteRune('┌')
-	for c := 0; c < s.NumCols(); c++ {
-		b.WriteRune('─')
-	}
-	b.WriteRune('┐')
+const (
+	YieldFinished YieldStatus = iota
+	YieldOutOfGas
+	YieldSolution
+)
 
-	b.WriteRune(' ')
-
-	b.WriteRune('┌')
-	for c := 0; c < s.NumCols(); c++ {
-		b.WriteRune('─')
-	}
-	b.WriteRune('┐')
-
-	b.WriteRune(' ')
-
-	b.WriteRune('┌')
-	for c := 0; c < s.NumCols(); c++ {
-		b.WriteString("─────")
-	}
-	b.WriteRune('┐')
-
-	b.WriteRune('\n')
-
-	for r := 0; r < s.NumRows(); r++ {
-		b.WriteRune('│')
-		for c := 0; c < s.NumCols(); c++ {
-			switch s.CurBoard.At(r, c) {
-			case CellUnknown:
-				b.WriteRune(' ')
-			case CellDead:
-				b.WriteRune('0')
-			case CellAlive:
-				b.WriteRune('1')
-			}
-		}
-		b.WriteRune('│')
-
-		b.WriteRune(' ')
-
-		b.WriteRune('│')
-		for c := 0; c < s.NumCols(); c++ {
-			switch s.preBoard.At(r, c) {
-			case CellUnknown:
-				b.WriteRune(' ')
-			case CellDead:
-				b.WriteRune('0')
-			case CellAlive:
-				b.WriteRune('1')
-			}
-		}
-		b.WriteRune('│')
-
-		b.WriteRune(' ')
-
-		b.WriteRune('│')
-		for c := 0; c < s.NumCols(); c++ {
-			b.WriteString(fmt.Sprintf("[%d,%d]", s.preLiveNeighborsMin.At(r, c), s.preLiveNeighborsMax.At(r, c)))
-		}
-		b.WriteRune('│')
-
-		b.WriteRune('\n')
-	}
-
-	b.WriteRune('└')
-	for c := 0; c < s.NumCols(); c++ {
-		b.WriteRune('─')
-	}
-	b.WriteRune('┘')
-
-	b.WriteRune(' ')
-
-	b.WriteRune('└')
-	for c := 0; c < s.NumCols(); c++ {
-		b.WriteRune('─')
-	}
-	b.WriteRune('┘')
-
-	b.WriteRune(' ')
-
-	b.WriteRune('└')
-	for c := 0; c < s.NumCols(); c++ {
-		b.WriteString("─────")
-	}
-	b.WriteRune('┘')
-
-	b.WriteRune('\n')
-
-	return b.String()
-}
-
-func (s *ReverseSolver) YieldSolution() (finished bool, board CellBoard) {
+func (s *ReverseSolver) YieldSolution() (state YieldStatus, board CellBoard) {
 	for {
-		// TODO(ahmedtd): Try other exploration orders that might have more focus.
-		r := s.curDepth / s.NumCols()
-		c := s.curDepth % s.NumCols()
+		status, sol := s.YieldSolutionBounded(1000000000)
+		if status == YieldFinished || status == YieldSolution {
+			return status, sol
+		}
+	}
+}
 
-		if s.traceFn != nil {
-			if s.btMode == backtrackModeDescending {
-				s.traceFn(fmt.Sprintf("descending, looking at %d (%d, %d)", s.curDepth, r, c))
-			} else if s.btMode == backtrackModeAscending {
-				s.traceFn(fmt.Sprintf("ascending, looking at %d (%d, %d)", s.curDepth, r, c))
-			}
-			s.traceFn(fmt.Sprintf("\n%s", s.dumpBoardStates()))
+func (s *ReverseSolver) YieldSolutionBounded(gas int64) (state YieldStatus, board CellBoard) {
+	for {
+		gas--
+		if gas < 0 {
+			return YieldOutOfGas, CellBoard{}
 		}
 
-		switch s.btMode {
+		// TODO(ahmedtd): Try other exploration orders that might have more focus.
+		r := s.CurDepth / s.NumCols()
+		c := s.CurDepth % s.NumCols()
+
+		switch s.BTMode {
 		case backtrackModeDescending:
-			switch s.preBoard.At(r, c) {
+			s.StatsReadMems++
+			switch s.PreBoard.At(r, c) {
 			case CellUnknown:
+				s.StatsNumStatesConsidered++
 				s.setPreBoard(r, c, CellDead)
-				if s.traceFn != nil {
-					s.traceFn(fmt.Sprintf("set (%d, %d) = CellDead", r, c))
-				}
 			case CellDead:
 				if s.checkConsistentAround(r, c) {
-					if s.traceFn != nil {
-						s.traceFn(fmt.Sprintf("choice is consistent"))
-					}
-					s.curDepth += 1
-					if s.curDepth == s.NumRows()*s.NumCols() {
-						if s.traceFn != nil {
-							s.traceFn(fmt.Sprintf("yielding solution, switching to ascending"))
-						}
-						s.btMode = backtrackModeAscending
-						s.curDepth -= 1
-						return false, s.preBoard
+					s.CurDepth += 1
+					if s.CurDepth == s.NumRows()*s.NumCols() {
+						s.BTMode = backtrackModeAscending
+						s.CurDepth -= 1
+						return YieldSolution, s.PreBoard
 					}
 				} else {
+					s.StatsNumStatesConsidered++
 					s.setPreBoard(r, c, CellAlive)
-					if s.traceFn != nil {
-						s.traceFn(fmt.Sprintf("set (%d, %d) = CellDead", r, c))
-					}
 				}
 			case CellAlive:
 				if s.checkConsistentAround(r, c) {
-					if s.traceFn != nil {
-						s.traceFn(fmt.Sprintf("choice is consistent"))
+					s.CurDepth += 1
+					if s.CurDepth > s.StatsMaxDepth {
+						s.StatsMaxDepth = s.CurDepth
 					}
-					s.curDepth += 1
-					if s.curDepth == s.NumRows()*s.NumCols() {
-						if s.traceFn != nil {
-							s.traceFn(fmt.Sprintf("yielding solution, switching to ascending"))
-						}
-						s.btMode = backtrackModeAscending
-						s.curDepth -= 1
-						return false, s.preBoard
+					if s.CurDepth == s.NumRows()*s.NumCols() {
+						s.BTMode = backtrackModeAscending
+						s.CurDepth -= 1
+						return YieldSolution, s.PreBoard
 					}
 				} else {
 					s.setPreBoard(r, c, CellUnknown)
-					s.btMode = backtrackModeAscending
-					if s.curDepth == 0 {
-						return true, CellBoard{}
+					s.BTMode = backtrackModeAscending
+					if s.CurDepth == 0 {
+						return YieldFinished, CellBoard{}
 					}
-					s.curDepth -= 1
+					s.CurDepth -= 1
 				}
 			}
 		case backtrackModeAscending:
-			switch s.preBoard.At(r, c) {
+			s.StatsReadMems++
+			switch s.PreBoard.At(r, c) {
 			case CellUnknown:
 				panic("invariant violation: not allowed to ascend onto a cell with unassigned state")
 			case CellDead:
-				if s.traceFn != nil {
-					s.traceFn(fmt.Sprintf("set (%d, %d) = CellAlive", r, c))
-				}
+				s.StatsNumStatesConsidered++
 				s.setPreBoard(r, c, CellAlive)
-				s.btMode = backtrackModeDescending
-				if s.traceFn != nil {
-					s.traceFn(fmt.Sprintf("switching to descending"))
-				}
+				s.BTMode = backtrackModeDescending
 			case CellAlive:
 				s.setPreBoard(r, c, CellUnknown)
-				if s.curDepth == 0 {
-					if s.traceFn != nil {
-						s.traceFn("no more solutions to yield")
-					}
-					return true, CellBoard{}
+				if s.CurDepth == 0 {
+					return YieldFinished, CellBoard{}
 				}
-				s.curDepth -= 1
+				s.CurDepth -= 1
 			}
 		}
 	}

@@ -22,8 +22,8 @@ func init() {
 func Test1x1Blank(t *testing.T) {
 	solver := NewReverseSolver(board1x1Dead)
 
-	fin, sol := solver.YieldSolution()
-	if fin {
+	status, sol := solver.YieldSolution()
+	if status != YieldSolution {
 		t.Errorf("Solver didn't yield a first solution")
 	}
 	if !sol.Equals(board1x1Dead) {
@@ -33,8 +33,8 @@ func Test1x1Blank(t *testing.T) {
 		t.Errorf("First solution is not a valid predecessor of the input board")
 	}
 
-	fin, sol = solver.YieldSolution()
-	if fin {
+	status, sol = solver.YieldSolution()
+	if status != YieldSolution {
 		t.Errorf("Solver didn't yield a second solution")
 	}
 	if !sol.Equals(board1x1Alive) {
@@ -44,8 +44,8 @@ func Test1x1Blank(t *testing.T) {
 		t.Errorf("Second solution is not a valid predecessor of the input board")
 	}
 
-	fin, _ = solver.YieldSolution()
-	if !fin {
+	status, _ = solver.YieldSolution()
+	if status != YieldFinished {
 		t.Errorf("Solver yielded more than two solutions")
 	}
 }
@@ -53,8 +53,8 @@ func Test1x1Blank(t *testing.T) {
 func Test1x1Live(t *testing.T) {
 	solver := NewReverseSolver(board1x1Alive)
 
-	fin, _ := solver.YieldSolution()
-	if !fin {
+	status, _ := solver.YieldSolution()
+	if status != YieldFinished {
 		t.Errorf("Solver yielded a solution, but wanted none")
 	}
 }
@@ -77,8 +77,8 @@ func TestAll2x2(t *testing.T) {
 			solver := NewReverseSolver(input)
 
 			for {
-				fin, sol := solver.YieldSolution()
-				if fin {
+				status, sol := solver.YieldSolution()
+				if status == YieldFinished {
 					break
 				}
 				if !ForwardStep(sol).Equals(input) {
@@ -110,7 +110,8 @@ func (t *lastNTracer) get(i int) string {
 	return t.buf[(t.cur+i)%len(t.buf)]
 }
 
-var glider1 = NewCellBoardFromSource(`_______
+var glider1 = NewCellBoardFromSource(`!
+_______
 _______
 ___█___
 ____█__
@@ -119,7 +120,8 @@ _______
 _______
 `)
 
-var glider2 = NewCellBoardFromSource(`_______
+var glider2 = NewCellBoardFromSource(`!
+_______
 _______
 _______
 __█_█__
@@ -131,6 +133,8 @@ _______
 func TestGlider(t *testing.T) {
 	// Sanity check
 	if !ForwardStep(glider1).Equals(glider2) {
+		t.Logf("glider1:\n%s", glider1.DisplayString())
+		t.Logf("glider2:\n%s", glider2.DisplayString())
 		t.Fatalf("Running the glider forward is broken")
 	}
 
@@ -151,8 +155,8 @@ func TestGlider(t *testing.T) {
 
 	solver := NewReverseSolver(glider2) // , WithTraceFn(tracer.trace))
 	for {
-		fin, sol := solver.YieldSolution()
-		if fin {
+		status, sol := solver.YieldSolution()
+		if status == YieldFinished {
 			break
 		}
 
@@ -172,35 +176,66 @@ func TestGlider(t *testing.T) {
 }
 
 func TestRandomSmallBoards(t *testing.T) {
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 10; i++ {
 		i := i
 
 		t.Run(fmt.Sprintf("Case %d", i), func(t *testing.T) {
 			r := rand.New(rand.NewSource(487489 * int64(i)))
 
-			in := NewCellBoard(r.Intn(20), r.Intn(20))
-
-			for i := 0; i < in.NumRows*in.NumCols; i++ {
+			before := NewCellBoard(r.Intn(20)+1, r.Intn(20)+1)
+			for i := 0; i < before.NumRows*before.NumCols; i++ {
 				if r.Intn(2) == 0 {
-					in.Cells[i] = CellDead
+					before.Cells[i] = CellDead
 				} else {
-					in.Cells[i] = CellAlive
+					before.Cells[i] = CellAlive
 				}
 			}
+			t.Logf("input before board:\n%s", before.DisplayString())
 
-			t.Logf("input board:\n%s", in.DisplayString())
+			after := ForwardStep(before)
+			t.Logf("input after board:\n%s", after.DisplayString())
 
-			solver := NewReverseSolver(in)
+			solver := NewReverseSolver(after)
 
 			for {
-				fin, sol := solver.YieldSolution()
-				if fin {
+				status, sol := solver.YieldSolution()
+				if status == YieldFinished {
 					break
 				}
 				stepped := ForwardStep(sol)
-				if !stepped.Equals(in) {
+				if !stepped.Equals(after) {
 					t.Errorf("Solution is not a valid predecessor of the input\nsolution\n%sstep(solution)\n%s", sol, stepped)
 				}
+
+				// Only find one solution.
+				break
+			}
+		})
+	}
+}
+
+func BenchRandomSmallBoards(b *testing.B) {
+	for dim := 1; dim <= 10; dim++ {
+		dim := dim
+		b.Run(fmt.Sprintf("%dx%d board", dim, dim), func(b *testing.B) {
+			r := rand.New(rand.NewSource(487489 * int64(dim)))
+
+			before := NewCellBoard(r.Intn(20)+1, r.Intn(20)+1)
+			for i := 0; i < before.NumRows*before.NumCols; i++ {
+				if r.Intn(2) == 0 {
+					before.Cells[i] = CellDead
+				} else {
+					before.Cells[i] = CellAlive
+				}
+			}
+
+			after := ForwardStep(before)
+
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				solver := NewReverseSolver(after)
+				_, _ = solver.YieldSolution()
 			}
 		})
 	}
