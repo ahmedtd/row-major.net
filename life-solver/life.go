@@ -86,7 +86,7 @@ func (b *CellBoard) Set(r, c int, cs CellState) {
 	b.Cells[r*b.NumCols+c] = cs
 }
 
-func (b *CellBoard) Equals(o CellBoard) bool {
+func (b CellBoard) Equals(o CellBoard) bool {
 	if b.NumRows != o.NumRows || b.NumCols != o.NumCols {
 		return false
 	}
@@ -102,7 +102,7 @@ func (b *CellBoard) Equals(o CellBoard) bool {
 	return true
 }
 
-func (s *CellBoard) DisplayString() string {
+func (s CellBoard) DisplayString() string {
 	b := strings.Builder{}
 
 	b.WriteRune('┌')
@@ -219,6 +219,7 @@ type ReverseSolver struct {
 	PreBoard            CellBoard
 	PreLiveNeighborsMin IntBoard
 	PreLiveNeighborsMax IntBoard
+	PreLiveAllowed      IntBoard
 
 	CurDepth int
 	BTMode   backtrackMode
@@ -231,14 +232,34 @@ type ReverseSolver struct {
 
 type ReverseSolverOption func(s *ReverseSolver)
 
+func WithFoamSuppression() ReverseSolverOption {
+	return func(s *ReverseSolver) {
+		for r := 0; r < s.NumRows(); r++ {
+			for c := 0; c < s.NumCols(); c++ {
+				numLiveNeighbors := 0
+				s.execForEachNeighbor(r, c, func(i, j int) {
+					if s.CurBoard.At(i, j) == CellAlive {
+						numLiveNeighbors++
+					}
+				})
+				if numLiveNeighbors > 0 {
+					s.PreLiveAllowed.Set(r, c, 1)
+				} else {
+					s.PreLiveAllowed.Set(r, c, 0)
+				}
+			}
+		}
+	}
+}
+
 func NewReverseSolver(curBoard CellBoard, opts ...ReverseSolverOption) *ReverseSolver {
 	s := &ReverseSolver{
-
 		CurBoard: curBoard.Copy(),
 
 		PreBoard:            NewCellBoard(curBoard.NumRows, curBoard.NumCols),
 		PreLiveNeighborsMin: NewIntBoard(curBoard.NumRows, curBoard.NumCols),
 		PreLiveNeighborsMax: NewIntBoard(curBoard.NumRows, curBoard.NumCols),
+		PreLiveAllowed:      NewIntBoard(curBoard.NumRows, curBoard.NumCols),
 
 		CurDepth: 0,
 		BTMode:   backtrackModeDescending,
@@ -251,6 +272,7 @@ func NewReverseSolver(curBoard CellBoard, opts ...ReverseSolverOption) *ReverseS
 				numNeighbors++
 			})
 			s.PreLiveNeighborsMax.Set(r, c, numNeighbors)
+			s.PreLiveAllowed.Set(r, c, 1)
 		}
 	}
 
@@ -334,6 +356,9 @@ func (s *ReverseSolver) checkConsistentAt(r, c int) bool {
 }
 
 func (s *ReverseSolver) checkConsistentAround(r, c int) bool {
+	if s.PreBoard.At(r, c) == CellAlive && s.PreLiveAllowed.At(r, c) != 1 {
+		return false
+	}
 	for i := max(0, r-1); i <= min(r+1, s.NumRows()-1); i++ {
 		for j := max(0, c-1); j <= min(c+1, s.NumCols()-1); j++ {
 			if !s.checkConsistentAt(i, j) {

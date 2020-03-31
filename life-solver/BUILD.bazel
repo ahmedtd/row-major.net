@@ -15,6 +15,12 @@ go_test(
 
 go_binary(
     name = "life-reverser",
-    srcs = ["main.go"],
+    srcs = ["reverser-main.go"],
+    deps = [":life"],
+)
+
+go_binary(
+    name = "life-benchmarker",
+    srcs = ["benchmark-main.go"],
     deps = [":life"],
 )

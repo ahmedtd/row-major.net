@@ -32,7 +32,7 @@ func main() {
 		http.ListenAndServe(":8080", nil)
 	}()
 
-	solver := life.NewReverseSolver(successorBoard)
+	solver := life.NewReverseSolver(successorBoard, life.WithFoamSuppression())
 	start := time.Now()
 	for {
 		status, sol := solver.YieldSolutionBounded(100000000)
