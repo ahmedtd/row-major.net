@@ -4,43 +4,55 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
+	"row-major/webalator/site"
 	"time"
 
 	"cloud.google.com/go/profiler"
-	texporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
-	"go.opentelemetry.io/otel/api/global"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"contrib.go.opencensus.io/exporter/stackdriver"
+	"go.opencensus.io/trace"
 )
 
 var (
-	listen = flag.String("listen", "0.0.0.0:80", "Where should we listen for incoming connections?")
+	listen           = flag.String("listen", "0.0.0.0:80", "Where should we listen for incoming connections?")
+	staticContentDir = flag.String("static-content-dir", "./", "A directory of static content to serve.")
+	enableProfiling  = flag.Bool("enable-profiling", false, "")
+	enableTracing    = flag.Bool("enable-tracing", false, "")
 )
 
 func main() {
+	flag.Parse()
+	log.Printf("listen %q", *listen)
+
 	// Cloud Profiler initialization, best done as early as possible.
-	if err := profiler.Start(profiler.Config{
-		Service:        "webalator",
-		ServiceVersion: "0.0.1",
-	}); err != nil {
-		log.Fatalf("Error initializing profiler: %v", err)
+	if *enableProfiling {
+		if err := profiler.Start(profiler.Config{
+			Service:        "webalator",
+			ServiceVersion: "0.0.1",
+		}); err != nil {
+			log.Fatalf("Error initializing profiler: %v", err)
+		}
 	}
 
-	// Create Cloud Trace exporter.
-	exporter, err := texporter.NewExporter()
-	if err != nil {
-		log.Fatalf("Error initializing Cloud Trace exporter: %v", err)
+	// Create and register a OpenCensus Stackdriver Trace exporter.
+	if *enableTracing {
+		exporter, err := stackdriver.NewExporter(stackdriver.Options{})
+		if err != nil {
+			log.Fatal("Error initializing tracing: %v", err)
+		}
+		trace.RegisterExporter(exporter)
 	}
 
-	// Create trace provider with the exporter.
-	config := sdktrace.Config{DefaultSampler: sdktrace.ProbabilitySampler(0.5)}
-	tp, err := sdktrace.NewProvider(sdktrace.WithConfig(config), sdktrace.WithSyncer(exporter))
+	dir, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("Error registering Cloud Trace exporter: %v", err)
+		log.Fatal(err)
 	}
-	global.SetTraceProvider(tp)
+	log.Printf("Running from: %s", dir)
+
+	site := site.New(*staticContentDir)
 
 	serveMux := http.NewServeMux()
-	serveMux.Register("/", basicHandler)
+	serveMux.Handle("/", site.Mux)
 
 	server := &http.Server{
 		Addr: *listen,
@@ -55,8 +67,4 @@ func main() {
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Error while serving http: %v", err)
 	}
-}
-
-func basicHandler(w http.ResponseWriter, req *http.Request) {
-	w.Write("Hello, world!")
 }

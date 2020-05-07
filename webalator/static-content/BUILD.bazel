@@ -158,22 +158,13 @@ all_static_compressible = [
     "masters-thesis-presentation/classical-specific-pattern.svg",
     "masters-thesis-presentation/deactivation-specific-pattern.svg",
     "masters-thesis-presentation/unsteered-specific-pattern.svg",
-    "webgl-raytracer/raytracer.frag",
-    "webgl-raytracer/raytracer.js",
-    "webgl-raytracer/raytracer.vert",
+    ":webgl-raytracer/raytracer.frag",
+    ":webgl-raytracer/raytracer.js",
+    ":webgl-raytracer/raytracer.vert",
 ]
 
-all_static = all_static_incompressible + all_static_compressible
-
-all_compressibles = all_jinja_template_outputs + all_static_compressible
-
-all_compressed = ["{}.gz".format(f) for f in all_compressibles]
-
-[genrule(
-    name = "compress-{}".format(i),
-    srcs = [i],
-    outs = [o],
-    cmd = "gzip <$< >$@",
-) for i, o in zip(all_compressibles, all_compressed)]
-
-all_deploy = all_jinja_template_outputs + all_static + all_compressed
+filegroup(
+    name = "all_deploy",
+    srcs = [":jinja_template_results"] + all_static_incompressible + all_static_compressible,
+    visibility = ["//webalator:__subpackages__"],
+)

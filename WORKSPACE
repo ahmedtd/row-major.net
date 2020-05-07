@@ -100,14 +100,3 @@ http_archive(
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
 gazelle_dependencies()
-
-#
-# Go dependencies I haven't vendored
-#
-
-go_repository(
-    name = "com_github_jlaffaye_ftp",
-    importpath = "github.com/jlaffaye/ftp",
-    sum = "h1:dzYWuozdWNaY7mTQh5ZdmoJt2BUMavwhiux0AfGwg90=",
-    version = "v0.0.0-20200422224957-b9f3ade29122",
-)

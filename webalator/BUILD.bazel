@@ -1,7 +1,21 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_binary(
-    name = "turbodefacer",
+    name = "webalator",
+    data = ["//webalator/static-content:all_deploy"],
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "go_default_library",
     srcs = ["main.go"],
-    deps = [],
+    importpath = "row-major/webalator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//vendor/cloud.google.com/go/profiler:go_default_library",
+        "//vendor/contrib.go.opencensus.io/exporter/stackdriver:go_default_library",
+        "//vendor/go.opencensus.io/trace:go_default_library",
+        "//webalator/site:go_default_library",
+    ],
 )

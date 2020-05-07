@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "deprecated.go",
+        "monitored_resources.go",
+    ],
+    importmap = "row-major/vendor/contrib.go.opencensus.io/exporter/stackdriver/monitoredresource",
+    importpath = "contrib.go.opencensus.io/exporter/stackdriver/monitoredresource",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/aws:go_default_library",
+        "//vendor/contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp:go_default_library",
+    ],
+)

@@ -1,7 +1,15 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_binary(
     name = "turbodefacer",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "go_default_library",
     srcs = ["main.go"],
-    deps = ["@com_github_jlaffaye_ftp//:go_default_library"],
+    importpath = "row-major/turbodefacer",
+    visibility = ["//visibility:private"],
+    deps = ["//vendor/github.com/jlaffaye/ftp:go_default_library"],
 )
