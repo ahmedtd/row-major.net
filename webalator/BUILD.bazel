@@ -32,6 +32,7 @@ go_library(
     importpath = "row-major/webalator",
     visibility = ["//visibility:private"],
     deps = [
+        "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
         "//vendor/cloud.google.com/go/profiler:go_default_library",
         "//vendor/contrib.go.opencensus.io/exporter/stackdriver:go_default_library",
         "//vendor/go.opencensus.io/trace:go_default_library",

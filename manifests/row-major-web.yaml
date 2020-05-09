@@ -5,6 +5,16 @@ metadata:
 
 ---
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: webalator
+  namespace: row-major-web  
+  annotations:
+    iam.gke.io/gcp-service-account: webalator@bomsync-214520.iam.gserviceaccount.com
+
+---
+
 kind: Service
 apiVersion: v1
 metadata:
@@ -46,9 +56,10 @@ spec:
         app: row-major-web
         component: content
     spec:
+      serviceAccountName: webalator
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:1588998991
+          image: gcr.io/bomsync-214520/webalator:1589009045
           ports:
             - containerPort: 80
           command:
@@ -57,6 +68,7 @@ spec:
             - --listen=0.0.0.0:80
             - --enable-profiling
             - --enable-tracing
+            - --enable-metrics
 
 ---
 apiVersion: networking.gke.io/v1beta1

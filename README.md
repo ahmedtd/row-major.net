@@ -1,3 +1,8 @@
+# Update vendor
+
+    go mod tidy
+    bazel run //:gazelle
+
 # row-major.net
 
 Build and push the site's container:
