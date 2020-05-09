@@ -48,9 +48,15 @@ spec:
     spec:
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/row-major-website:1582449908
+          image: gcr.io/bomsync-214520/webalator:1588998991
           ports:
             - containerPort: 80
+          command:
+            - /app/webalator/webalator
+            - --static-content-dir=webalator/static-content
+            - --listen=0.0.0.0:80
+            - --enable-profiling
+            - --enable-tracing
 
 ---
 apiVersion: networking.gke.io/v1beta1

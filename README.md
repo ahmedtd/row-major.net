@@ -2,11 +2,11 @@
 
 Build and push the site's container:
 
-    bazel run //:site-push
+    bazel run //webalator:webalator_push
 
-This will print out the digest of the pushed image.
+This will print out the tag of the pushed image.
 
-Update manifests/kustomization.yaml with the new digest.
+Update manifests/row-major-web.yaml with the tag.
 
 Run
 
