@@ -1,15 +1,8 @@
-{% extends "base.html.jinja" %}
-
-{% block title %}Home{% endblock %}
-
-{% block topnav %}
-{{  breadcrumbs() }}
-{% endblock %}
-
-{% set ur_fascism_url = 'http://www.nybooks.com/articles/1995/06/22/ur-fascism/' %}
-
-{% block content %}
-
+{{define "title"}}Home{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li></ul>
+{{- end}}
+{{define "content"}}
 <section>
   <h1>Projects</h1>
   <ul>
@@ -34,7 +27,7 @@
 <section>
   <h1>Articles worth reading</h1>
   <ul>
-    <li> <a href="{{ ur_fascism_url }}">Ur-Fascism</a> (Umberto Eco)</li>
+    <li> <a href="http://www.nybooks.com/articles/1995/06/22/ur-fascism/">Ur-Fascism</a> (Umberto Eco)</li>
     <li> <a href="http://blissbat.net/balzac.html">The Pleasures and Pains of Coffee</a> (Honore de Balzac, translated by Robert Onopa)</li>
     <li> <a href="https://philosophynow.org/issues/46/Newtons_Flaming_Laser_Sword">Newton's Flaming Laser Sword</a> (Mike Alder)</li>
     <li> <a href="http://askakorean.blogspot.com/2008/01/america-least-racist-country-in-world.html">America, the least racist country in the world</a> (Anonymous, writing as The Korean)</li>
@@ -47,10 +40,6 @@
 
   <p> <a href="mailto:ahmed.taahir@gmail.com">ahmed.taahir@gmail.com</a>
 
-  <p> PGP Key ID:
-    <code>DF31 161F 4C20 72F2 3193 BB23 FD1D 181D A639 A2C6</code>
-
   <p> View my <a href="/resume">resume</a>
 </section>
-
-{% endblock %}
+{{end}}

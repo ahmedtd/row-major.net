@@ -21,7 +21,10 @@ container_push(
 
 go_binary(
     name = "webalator",
-    data = ["//webalator/static-content:all_deploy"],
+    data = [
+        "//webalator/content:all_deploy",
+        "//webalator/static-content:all_deploy",
+    ],
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )

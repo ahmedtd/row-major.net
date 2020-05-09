@@ -17,6 +17,7 @@ import (
 var (
 	listen           = flag.String("listen", "0.0.0.0:80", "Where should we listen for incoming connections?")
 	staticContentDir = flag.String("static-content-dir", "./", "A directory of static content to serve.")
+	templateDir      = flag.String("template-dir", "./", "A directory of templates to serve.")
 	enableProfiling  = flag.Bool("enable-profiling", false, "")
 	enableTracing    = flag.Bool("enable-tracing", false, "")
 	enableMetrics    = flag.Bool("enable-metrics", false, "")
@@ -25,11 +26,14 @@ var (
 func main() {
 	flag.Parse()
 	log.Printf("listen: %q", *listen)
-	sa, err := metadata.Email("")
-	if err != nil {
-		log.Fatalf("Error fetching service account: %v", err)
+
+	if metadata.OnGCE() {
+		sa, err := metadata.Email("")
+		if err != nil {
+			log.Fatalf("Error fetching service account: %v", err)
+		}
+		log.Printf("serviceaccount: %s", sa)
 	}
-	log.Printf("serviceaccount: %s", sa)
 
 	// Cloud Profiler initialization, best done as early as possible.
 	if *enableProfiling {
@@ -69,7 +73,10 @@ func main() {
 	}
 	log.Printf("Running from: %s", dir)
 
-	site := site.New(*staticContentDir)
+	site, err := site.New(*staticContentDir, *templateDir)
+	if err != nil {
+		log.Fatalf("Error creating site: %v", err)
+	}
 
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/", site.Mux)

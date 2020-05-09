@@ -1,21 +1,8 @@
-{% macro breadcrumbs() %}{#- -#}
-  <ul class="breadcrumbs">{#- -#}
-    <li class="breadcrumbs-item">{#- -#}
-      <a href="/">/root</a>{#- -#}
-      {% for path in varargs %}{#- -#}
-        <li class="breadcrumbs-item">{#- -#}
-          {{path}}{#- -#}
-        </li>{#- -#}
-      {% endfor %}{#- -#}
-    </li>{#- -#}
-  </ul>{#- -#}
-{%- endmacro %}
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>{{.Title}} - Row-Major (Taahir Ahmed)</title>
+    <title>{{block "title" .}}Title{{end}} - Row-Major (Taahir Ahmed)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
        #page-header {
@@ -88,18 +75,15 @@
       </style>
   </head>
   <body>
-    <header id="page-header">{{-  -}}
-      <img src="{{.LogoDataURI}}"
-           id="page-header-logo">{{-  -}}
-      <h1 id="page-header-title">Row-Major</h1>{{-  -}}
-    </header>
+    <header id="page-header"><img src="/row-major-logo-optimized.svg"
+           id="page-header-logo"><h1 id="page-header-title">Row-Major</h1></header>
 
     <hr>
-    <nav class="nav">{{.BreadCrumbs}}</nav>
+    <nav class="nav">{{block "breadcrumbs" .}}<nav class="nav"> <ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li></ul> </nav>{{end}}</nav>
     <hr>
 
     <main>
-      {{.Content}}
+      {{block "content" .}}{{end}}
     </main>
 
     <footer>
@@ -108,6 +92,6 @@
       </address>
     </footer>
 
-    {{.Scripts}}
+    {{block "scripts" .}}{{end}}
   </body>
 </html>

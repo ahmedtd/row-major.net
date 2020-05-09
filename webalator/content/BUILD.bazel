@@ -1,0 +1,5 @@
+filegroup(
+    name = "all_deploy",
+    srcs = glob(include = ["**/*.html.tmpl"]),
+    visibility = ["//webalator:__subpackages__"],
+)
