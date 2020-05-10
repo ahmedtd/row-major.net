@@ -1,12 +1,8 @@
-{% extends "base.html.jinja" %}
-
-{% block title %}Resume{% endblock %}
-
-{% block topnav %}
-{{  breadcrumbs('/resume') }}
-{% endblock %}
-
-{% block content %}
+{{define "title"}}Resume{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/resume</li></ul>
+{{- end}}
+{{define "content"}}
 <section>
   <h1>Taahir Ahmed</h1>
   <ul>
@@ -103,4 +99,4 @@
   </ul>
 </section>
 
-{% endblock %}
+{{end}}

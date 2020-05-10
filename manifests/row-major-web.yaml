@@ -59,12 +59,13 @@ spec:
       serviceAccountName: webalator
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:1589009045
+          image: gcr.io/bomsync-214520/webalator:1589078951
           ports:
             - containerPort: 80
           command:
             - /app/webalator/webalator
             - --static-content-dir=webalator/static-content
+            - --template-dir=webalator/content
             - --listen=0.0.0.0:80
             - --enable-profiling
             - --enable-tracing

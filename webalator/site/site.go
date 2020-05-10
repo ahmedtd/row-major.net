@@ -76,8 +76,10 @@ type requestMetricsHandler struct {
 }
 
 func (h *requestMetricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Serving path=%q", r.URL.Path)
+
 	h.inner.ServeHTTP(w, r)
+
+	log.Printf("Served path=%q", r.URL.Path)
 
 	stats.RecordWithOptions(
 		r.Context(),
@@ -123,6 +125,7 @@ func newTemplateHandler(templateDir string, inner http.Handler) (*templateHandle
 func (h *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tpl, ok := h.tpls[r.URL.Path]
 	if !ok {
+		log.Printf("Didn't find template %q, delegating to inner", r.URL.Path)
 		h.inner.ServeHTTP(w, r)
 		return
 	}

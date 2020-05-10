@@ -1,17 +1,8 @@
-{% extends "base.html.jinja" %}
-
-{% block title %}ballistae{% endblock %}
-
-{% block topnav %}
-{{  breadcrumbs('/webgl-raytracer') }}
-{% endblock %}
-
-{% block scripts %}
-{{ super() }}
-<script src="./raytracer.js"></script>
-{% endblock %}
-
-{% block content %}
+{{define "title"}}WebGL Raytracer{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/webgl-raytracer</li></ul>
+{{- end}}
+{{define "content"}}
 <section>
   <figure>
     <canvas id="glcanvas" width="800" height="450">
@@ -30,4 +21,7 @@
     variance of Web standards, it probably won't work on any other
     platforms it hasn't been specifically debugged on.
 </section>
-{% endblock %}
+{{end}}
+{{define "scripts"}}
+<script src="./raytracer.js"></script>
+{{end}}

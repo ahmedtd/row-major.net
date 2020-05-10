@@ -1,12 +1,8 @@
-{% extends "base.html.jinja" %}
-
-{% block title %}Word Squares{% endblock %}
-
-{% block topnav %}
-  {{ breadcrumbs('/articles', '/Word Squares') }}
-{% endblock %}
-
-{% block content %}
+{{define "title"}}Word Squares{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/articles</li><li class="breadcrumbs-item">/Word Squares</li></ul>
+{{- end}}
+{{define "content"}}
 <section>
   <p>This program implements the "Word Rectangles" example from The
   Art of Computer Programming, Volume 4 Fascicle 5, Chapter 7.2.2.</p>
@@ -32,4 +28,4 @@ tyros
 
   <script src="https://gitlab.com/snippets/1943965.js"></script>
 </section>
-{% endblock %}
+{{end}}

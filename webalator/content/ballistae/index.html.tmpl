@@ -1,13 +1,8 @@
-{% extends "base.html.jinja" %}
-
-{% block title %}ballistae{% endblock %}
-
-{% block topnav %}
-{{  breadcrumbs('/ballistae') }}
-{% endblock %}
-
-{% block content %}
-
+{{define "title"}}Ballistae{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/ballistae</li></ul>
+{{- end}}
+{{define "content"}}
 <section>
   <h1>What is ballistae?</h1>
 
@@ -53,4 +48,4 @@
   <p><code>ballistae</code> is available via git:
     <pre><code>https://gitlab.com/ahmedtd/ballistae.git</code></pre>
 </section>
-{% endblock %}
+{{end}}

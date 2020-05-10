@@ -1,24 +1,14 @@
-{% extends "base.html.jinja" %}
+{{define "title"}}Reinforcement Learning Force Tube{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/articles</li><li class="breadcrumbs">/Reinforcement Learning Force Tube</li></ul>
+{{- end}}
+{{define "content"}}
+<section>
+  <p>An interactive demonstration of some of the techniques described in
+    Sutton and Barto's <i>Reinforcement Learning: An Introduction</i> (the
+    in-progress second edition).
 
-{% block title %}Reinforcement Learning Force Tube{% endblock %}
-
-{% block topnav %}
-  {{ breadcrumbs('/articles', '/rl-force-tube') }}
-{% endblock %}
-
-{% block scripts %}
-  {{ super() }}
-  <script defer src="Chart.js"></script>
-  <script defer src="rl-force-tube.js"></script>
-{% endblock %}
-
-{% block content %}
-  <section>
-    <p>An interactive demonstration of some of the techniques described in
-      Sutton and Barto's <i>Reinforcement Learning: An Introduction</i> (the
-      in-progress second edition).
-
-    <p>The specific algorithm implemented is "Differential Semi-Gradient Sarsa
+  <p>The specific algorithm implemented is "Differential Semi-Gradient Sarsa
     for Control", found in Section 10.3.
 
     <figure id="state-figure">
@@ -61,5 +51,10 @@
       </canvas>
       <figcaption>Reward history</figcaption>
     </figure>
-  </section>
-{% endblock %}
+</section>
+{{end}}
+
+{{define "scripts"}}
+  <script defer src="Chart.js"></script>
+  <script defer src="rl-force-tube.js"></script>
+{{end}}

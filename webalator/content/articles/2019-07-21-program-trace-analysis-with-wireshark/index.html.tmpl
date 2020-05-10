@@ -1,12 +1,8 @@
-{% extends "base.html.jinja" %}
-
-{% block title %}Program Trace Analysis With WireShark{% endblock %}
-
-{% block topnav %}
-  {{ breadcrumbs('/articles', '/Program Trace Analysis With Wireshark') }}
-{% endblock %}
-
-{% block content %}
+{{define "title"}}Program Trace Analysis With Wireshark{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/articles</li><li class="breadcrumbs-item">/Program Trace Analysis With Wireshark</ul>
+{{- end}}
+{{define "content"}}
 <section>
   <p>I've been exploring the OpenJK (open-source maintained version of
   Jedi Academy) codebase.</p>
@@ -111,6 +107,5 @@
     <figcaption>The example custom dissector working.</figcaption>
   </figure>
   
-</section>      
-
-{% endblock %}
+</section>
+{{end}}
