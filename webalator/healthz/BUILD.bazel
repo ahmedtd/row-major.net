@@ -2,7 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["site.go"],
-    importpath = "row-major/webalator/site",
+    srcs = ["healthz.go"],
+    importpath = "row-major/webalator/healthz",
     visibility = ["//visibility:public"],
 )

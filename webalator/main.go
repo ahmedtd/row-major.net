@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"row-major/webalator/healthz"
+	"row-major/webalator/httpmetrics"
 	"row-major/webalator/site"
 	"time"
 
@@ -16,7 +18,8 @@ import (
 )
 
 var (
-	listen           = flag.String("listen", "0.0.0.0:80", "Where should we listen for incoming connections?")
+	listen           = flag.String("listen", "0.0.0.0:8080", "Where should we listen for incoming connections?")
+	debugListen      = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
 	staticContentDir = flag.String("static-content-dir", "./", "A directory of static content to serve.")
 	templateDir      = flag.String("template-dir", "./", "A directory of templates to serve.")
 	enableProfiling  = flag.Bool("enable-profiling", false, "")
@@ -26,7 +29,15 @@ var (
 
 func main() {
 	flag.Parse()
+
+	log.Printf("flags:")
 	log.Printf("listen: %q", *listen)
+	log.Printf("debug-listen: %q", *debugListen)
+	log.Printf("static-content-dir: %q", *staticContentDir)
+	log.Printf("template-dir: %q", *templateDir)
+	log.Printf("enable-profiling: %q", *enableProfiling)
+	log.Printf("enable-tracing: %q", *enableTracing)
+	log.Printf("enable-metrics: %q", *enableMetrics)
 
 	if metadata.OnGCE() {
 		sa, err := metadata.Email("")
@@ -82,13 +93,34 @@ func main() {
 		log.Fatalf("Error creating site: %v", err)
 	}
 
+	debugServeMux := http.NewServeMux()
+	debugServeMux.Handle("/healthz", healthz.New())
+	debugServer := &http.Server{
+		Addr:    *debugListen,
+		Handler: debugServeMux,
+
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	go func() {
+		if err := debugServer.ListenAndServe(); err != nil {
+			log.Printf("Debug server died: %v", err)
+		}
+	}()
+
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/", site.Mux)
+	serveMux.Handle("/healthz", healthz.New())
+	serveMux.Handle("/readyz", healthz.New())
+
+	mw := httpmetrics.New(serveMux)
+	mw.RegisterMetrics()
 
 	server := &http.Server{
 		Addr: *listen,
 
-		Handler: serveMux,
+		Handler: mw,
 
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,

@@ -32,7 +32,7 @@ spec:
     - name: http
       protocol: TCP
       port: 8001
-      targetPort: 80
+      targetPort: 8080
 
 ---
 
@@ -59,18 +59,31 @@ spec:
       serviceAccountName: webalator
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:1589084035
+          image: gcr.io/bomsync-214520/webalator:1589144014
           ports:
-            - containerPort: 80
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
           command:
             - /app/webalator/webalator
             - --static-content-dir=webalator/static-content
             - --template-dir=webalator/content
-            - --listen=0.0.0.0:80
+            - --listen=0.0.0.0:8080
+            - --debug-listen=0.0.0.0:8081
             - --enable-profiling
             - --enable-tracing
             - --enable-metrics
-
+          
 ---
 apiVersion: networking.gke.io/v1beta1
 kind: ManagedCertificate
@@ -91,7 +104,7 @@ spec:
 kind: Ingress
 apiVersion: extensions/v1beta1
 metadata:
-  name: ingress4
+  name: ingress6
   namespace: row-major-web
   labels:
     app: row-major-web
