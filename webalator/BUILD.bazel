@@ -38,6 +38,7 @@ go_library(
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
         "//vendor/cloud.google.com/go/profiler:go_default_library",
         "//vendor/contrib.go.opencensus.io/exporter/stackdriver:go_default_library",
+        "//vendor/contrib.go.opencensus.io/exporter/stackdriver/monitoredresource:go_default_library",
         "//vendor/go.opencensus.io/trace:go_default_library",
         "//webalator/site:go_default_library",
     ],

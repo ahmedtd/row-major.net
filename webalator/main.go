@@ -11,6 +11,7 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/profiler"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/trace"
 )
 
@@ -47,7 +48,9 @@ func main() {
 
 	// Create and register a OpenCensus Stackdriver Trace exporter.
 	if *enableTracing {
-		exporter, err := stackdriver.NewExporter(stackdriver.Options{})
+		exporter, err := stackdriver.NewExporter(stackdriver.Options{
+			MonitoredResource: monitoredresource.Autodetect(),
+		})
 		if err != nil {
 			log.Fatal("Error initializing tracing: %v", err)
 		}
@@ -58,6 +61,7 @@ func main() {
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
 			MetricPrefix:      "webalator",
 			ReportingInterval: 60 * time.Second,
+			MonitoredResource: monitoredresource.Autodetect(),
 		})
 		if err != nil {
 			log.Fatal("Error initializing tracing: %v", err)
