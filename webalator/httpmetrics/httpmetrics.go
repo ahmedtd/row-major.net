@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
@@ -41,9 +42,13 @@ func (h *Wrapper) RegisterMetrics() {
 }
 
 func (h *Wrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	h.inner.ServeHTTP(w, r)
+	finish := time.Now()
 
-	log.Printf("Served path=%q useragent=%q remoteaddr=%q", r.URL.Path, r.Header["User-Agent"], r.Header["X-Forwarded-For"])
+	duration := finish.Sub(start)
+
+	log.Printf("Served path=%q useragent=%q remoteaddr=%q duration=%v", r.URL.Path, r.Header["User-Agent"], r.Header["X-Forwarded-For"], duration)
 
 	stats.RecordWithOptions(
 		r.Context(),

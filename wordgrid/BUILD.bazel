@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "handler.go",
+        "wordgrid.go",
+    ],
+    data = [":sgb-words.txt"],
+    importpath = "row-major/wordgrid",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "trie_test.go",
+        "wordgrid_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = ["//vendor/github.com/google/go-cmp/cmp:go_default_library"],
+)

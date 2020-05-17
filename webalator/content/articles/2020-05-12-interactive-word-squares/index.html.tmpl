@@ -1,0 +1,65 @@
+{{define "title"}}Interactive Word Squares{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/articles</li><li class="breadcrumbs-item">/Interactive Word Squares</li></ul>
+{{- end}}
+{{define "styles"}}
+.gridcell {
+}
+.gridcell-constrained-valid {
+  background: lightgreen;
+}
+.gridcell-constrained-nosolution {
+  background: crimson;
+}
+
+.wordsquare-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wordsquare {
+  font-family: monospace;
+  font-size: x-large;
+}
+.wordsquare-valid {
+  outline: lightgreen solid 2px;
+}
+.wordsquare-nosolution {
+  outline: crimson solid 2px;
+}
+{{end}}
+{{define "content"}}
+<section>
+  <figure>
+    <div id="ui-container"></div>
+  </figure>
+  
+  <p>This is an interactive reimplementation (see
+  my <a href="/articles/2020-02-22-word-squares/">original</a>) of the "Word
+  Rectangles" example from The Art of Computer Programming, Volume 4 Fascicle 5,
+  Chapter 7.2.2.  It searches a list of five-letter words to find configurations
+  that can be placed in a 5x5 grid, where each column is a unique word from the
+  list, and the rows are also words.  You can take a look at the
+  source <a href="https://gitlab.com/ahmedtd/row-major.net/-/tree/master/wordgrid">code
+  in my repo.</a></p>
+
+  <p>I've enhanced it by adding the ability to constrain which letters appear in
+  which positions; use the clunky form input at the bottom to add constraints.
+  If you overconstrain the problem, the grid will go red; remove constraints to
+  recover.</p>
+
+  <p>The source wordlist is
+  the <a href="https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt">list of
+  five-letter English words</a> from the Stanford Graphbase.  Fair warning;
+  Knuth included <b>all</b> the five-letter words.</p>
+
+</section>
+{{end}}
+
+{{define "scripts"}}
+<!-- <script src="https://unpkg.com/react@16/umd/react.development.js" crossorigin></script> -->
+<!-- <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js" crossorigin></script> -->
+<script src="https://unpkg.com/react@16/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js" crossorigin></script>
+<script src="ui.js"></script>
+{{end}}

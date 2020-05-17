@@ -5,4 +5,5 @@ go_library(
     srcs = ["site.go"],
     importpath = "row-major/webalator/site",
     visibility = ["//visibility:public"],
+    deps = ["//wordgrid:go_default_library"],
 )

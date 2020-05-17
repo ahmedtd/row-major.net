@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"row-major/wordgrid"
 	"strings"
 )
 
@@ -26,6 +27,12 @@ func New(staticContentDir string, templateDir string) (*Site, error) {
 		return nil, fmt.Errorf("while creating template handler: %w", err)
 	}
 	s.Mux.Handle("/", tp)
+
+	wordgridHandler, err := wordgrid.NewHandlerFromFile("wordgrid/sgb-words.txt")
+	if err != nil {
+		return nil, fmt.Errorf("while creating wordgrid handler: %w", err)
+	}
+	s.Mux.Handle("/articles/2020-05-12-interactive-word-squares/evaluate", wordgridHandler)
 
 	return s, nil
 }
