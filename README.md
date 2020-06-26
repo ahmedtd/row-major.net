@@ -15,4 +15,4 @@ Update manifests/row-major-web.yaml with the tag.
 
 Run
 
-    kubectl kustomize build manifests/ | kubectl apply -f -
+    kubectl kustomize manifests/ | kubectl apply -f -

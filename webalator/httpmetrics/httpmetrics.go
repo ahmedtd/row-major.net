@@ -3,7 +3,6 @@ package httpmetrics
 import (
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"go.opencensus.io/stats"
@@ -26,7 +25,7 @@ func New(inner http.Handler) *Wrapper {
 		Name:        "requests",
 		Description: "Counter of requests that have been handled",
 
-		TagKeys: []tag.Key{tag.MustNewKey("path"), tag.MustNewKey("useragent"), tag.MustNewKey("remoteaddr")},
+		TagKeys: []tag.Key{},
 
 		Measure:     r.requestCount,
 		Aggregation: view.Count(),
@@ -52,10 +51,5 @@ func (h *Wrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	stats.RecordWithOptions(
 		r.Context(),
-		stats.WithTags(
-			tag.Insert(tag.MustNewKey("path"), r.URL.Path),
-			tag.Insert(tag.MustNewKey("useragent"), strings.Join(r.Header["User-Agent"], "|")),
-			tag.Insert(tag.MustNewKey("remoteaddr"), strings.Join(r.Header["X-Forwarded-For"], "|")),
-		),
 		stats.WithMeasurements(h.requestCount.M(1)))
 }

@@ -1,5 +1,7 @@
 module row-major
 
+go 1.14
+
 require (
 	cloud.google.com/go v0.56.0
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.1
