@@ -1,0 +1,17 @@
+{{define "title"}}Sign In{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/ballistae</li></ul>
+{{- end}}
+
+{{define "head"}}
+<meta name="google-signin-client_id" content="628524500615-mhkgddrs40gnqgvl06oer82rr2kllio3.apps.googleusercontent.com">
+{{end}}
+
+{{define "content"}}
+<div class="g-signin2" data-onsuccess="onSignIn"></div>
+{{end}}
+
+{{define "scripts"}}
+<script src="logic.js" async defer></script>
+<script src="https://apis.google.com/js/platform.js" async defer></script>
+{{end}}

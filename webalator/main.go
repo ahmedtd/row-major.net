@@ -7,6 +7,7 @@ import (
 	"os"
 	"row-major/webalator/healthz"
 	"row-major/webalator/httpmetrics"
+	"row-major/webalator/mdredir"
 	"row-major/webalator/site"
 	"time"
 
@@ -111,6 +112,7 @@ func main() {
 
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/", site.Mux)
+	serveMux.Handle("/metadata-redirect", mdredir.New())
 	serveMux.Handle("/healthz", healthz.New())
 	serveMux.Handle("/readyz", healthz.New())
 

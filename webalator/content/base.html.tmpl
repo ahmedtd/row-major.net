@@ -4,77 +4,78 @@
     <meta charset="UTF-8">
     <title>{{block "title" .}}Title{{end}} - Row-Major (Taahir Ahmed)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-       #page-header {
-           height: 100px;
-       }
+    {{block "head" .}}{{end}}
+    <style>
+      #page-header {
+          height: 100px;
+      }
 
-       #page-header-logo {
-           display: inline-block;
-           vertical-align: middle;
-           height: 100%;
-       }
+      #page-header-logo {
+          display: inline-block;
+          vertical-align: middle;
+          height: 100%;
+      }
 
-       #page-header-title {
-           display: inline;
-           font-size: 28pt;
-           vertical-align: middle;
-       }
+      #page-header-title {
+          display: inline;
+          font-size: 28pt;
+          vertical-align: middle;
+      }
 
-       .nav {
-           display: block;
-           width: 100%;
-           left: 0px;
-       }
+      .nav {
+          display: block;
+          width: 100%;
+          left: 0px;
+      }
 
-       .breadcrumbs {
-           display: inline-block;
-           padding: 0px;
-           margin: 0px;
-           left: 0px;
-           list-style: none;
-       }
+      .breadcrumbs {
+          display: inline-block;
+          padding: 0px;
+          margin: 0px;
+          left: 0px;
+          list-style: none;
+      }
 
-       .breadcrumbs li {
-           display: inline;
-           padding-right: 0.5em;
-       }
+      .breadcrumbs li {
+          display: inline;
+          padding-right: 0.5em;
+      }
 
-       .breadcrumbs li:not(:first-child):before {
-           content: '➛';
-           display: inline-block;
-           padding-right: 0.5em;
-       }
+      .breadcrumbs li:not(:first-child):before {
+          content: '➛';
+          display: inline-block;
+          padding-right: 0.5em;
+      }
 
-       body {
-           max-width: 55em;
-           margin: auto;
-           font-family: Sans-Serif;
-           font-size: 10pt;
-       }
+      body {
+          max-width: 55em;
+          margin: auto;
+          font-family: Sans-Serif;
+          font-size: 10pt;
+      }
 
-       main h1 {
-           font-size: 20pt;
-       }
+      main h1 {
+          font-size: 20pt;
+      }
 
-       main h2 {
-           font-size: 14pt;
-       }
+      main h2 {
+          font-size: 14pt;
+      }
 
-       main figure {
-           padding: 10px;
-           margin-left: 0px;
-           margin-right: 0px;
-           background-color: bisque;
-           max-width: 100%;
-       }
+      main figure {
+          padding: 10px;
+          margin-left: 0px;
+          margin-right: 0px;
+          background-color: bisque;
+          max-width: 100%;
+      }
 
-       main figure * {
-           max-width: 100%;
-       }
+      main figure * {
+          max-width: 100%;
+      }
 
-       {{block "styles" .}}{{end}}
-      </style>
+      {{block "styles" .}}{{end}}
+    </style>
   </head>
   <body>
     <header id="page-header"><img src="/row-major-logo-optimized.svg"

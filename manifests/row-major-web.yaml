@@ -59,7 +59,7 @@ spec:
       serviceAccountName: webalator
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:1593145228
+          image: gcr.io/bomsync-214520/webalator:1599365705
           ports:
             - containerPort: 8080
           livenessProbe:

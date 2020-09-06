@@ -42,6 +42,7 @@ go_library(
         "//vendor/go.opencensus.io/trace:go_default_library",
         "//webalator/healthz:go_default_library",
         "//webalator/httpmetrics:go_default_library",
+        "//webalator/mdredir:go_default_library",
         "//webalator/site:go_default_library",
     ],
 )
