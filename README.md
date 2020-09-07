@@ -3,6 +3,12 @@
     go mod tidy
     bazel run //:gazelle
 
+# CI
+
+I use Gitlab CI to kick off a Google Cloud Build job that builds and pushes the
+containers.  I am still working on automatically updating and applying the
+Kubernetes manifests.
+
 # row-major.net
 
 Build and push the site's container:
