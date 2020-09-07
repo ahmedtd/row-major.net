@@ -3,4 +3,4 @@ job-test:
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}
-    - gcloud --project=bomsync-214520 builds submit ./ --config=cloudbuild.yaml --timeout=10m
+    - gcloud --project=bomsync-214520 builds submit ./ --config=cloudbuild.yaml --timeout=10m --substitutions=_COMMIT_SHA=${CI_COMMIT_SHA}
