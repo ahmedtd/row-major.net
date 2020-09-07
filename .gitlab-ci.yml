@@ -1,10 +1,59 @@
 stages:
-  - deploy
+  - upload-images
+  - update-image-in-manifest
 
-job-deploy:
-  stage: deploy
-  image:
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+job-upload-images:
+  stage: upload-images
+  rules:
+    - if: "${CI_COMMIT_MESSAGE} =~ /^NO_UPLOAD_IMAGES=/"
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
-    - gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}
-    - gcloud --project=bomsync-214520 builds submit ./ --config=cloudbuild.yaml --timeout=10m --substitutions=COMMIT_SHA=${CI_COMMIT_SHA}
+    - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
+    - "gcloud --project=bomsync-214520 builds submit ./ --config=cloudbuild.yaml --timeout=10m --substitutions=COMMIT_SHA=${CI_COMMIT_SHA}"
+
+job-update-image-in-manifest:
+  stage: update-image-in-manifest
+  rules:
+    - if: "${CI_COMMIT_MESSAGE} =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/"
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+    - |
+      echo >patch.yaml <<EOF
+      # This file is overwritten by CI
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: row-major-web-content-deployment
+        namespace: row-major-web
+      spec:
+        template:
+          spec:
+            containers:
+              - name: row-major-web-content
+                image: gcr.io/bomsync-214520/webalator:${CI_COMMIT_SHA}
+      EOF
+
+    - |
+      echo >commit-message.txt <<EOF
+      Manifest update for ${CI_COMMIT_SHA}
+
+      NO_UPLOAD_IMAGES=
+      NO_UPDATE_IMAGES_IN_MANIFEST=
+      EOF
+
+    - |
+      curl \
+        --request POST \
+        --header "PRIVATE-TOKEN=${GITLAB_API_TOKEN}" \
+        --form "branch=master" \
+        --form "start_branch=master" \
+        --form "commit_message=<commit-message.txt" \
+        --form "actions[][action]=update"
+        --form "actions[][file_path]=manifests/production/production-images.patch.yaml"
+        --form "actions[][content]=<patch.yaml"
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
+      
+      
+
+    
+    
