@@ -9,4 +9,4 @@ spec:
     spec:
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:fb78ac2ad899757a16b9e58c4cbecf381c29d373
+          image: gcr.io/bomsync-214520/webalator:293cba77c875deffaee137c4bb567bc6a09b2689
