@@ -1,0 +1,6 @@
+job-test:
+  image:
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+    - gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}
+    - gcloud builds submit --config=cloudbuild.yaml ./

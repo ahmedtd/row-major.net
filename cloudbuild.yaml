@@ -1,0 +1,11 @@
+steps:
+- name: 'gcr.io/cloud-marketplace-containers/google/bazel'
+  entrypoint: 'bazel'
+  args: ['test', '--', '//...', '-//vendor/...']
+- name: 'gcr.io/cloud-marketplace-containers/google/bazel'
+  entrypoint: 'bazel'
+  args: ['run', '//webalator:webalator_image']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator']
+images:
+  - 'gcr.io/$PROJECT_ID/webalator'
