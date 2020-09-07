@@ -48,7 +48,7 @@ job-update-image-in-manifest:
         --form "branch=master" \
         --form "start_branch=master" \
         --form "commit_message=<commit-message.txt" \
-        --form "actions[][action]=update"
-        --form "actions[][file_path]=manifests/production/production-images.patch.yaml"
-        --form "actions[][content]=<patch.yaml"
+        --form "actions[][action]=update" \
+        --form "actions[][file_path]=manifests/production/production-images.patch.yaml" \
+        --form "actions[][content]=<patch.yaml" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
