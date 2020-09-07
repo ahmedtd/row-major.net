@@ -11,10 +11,10 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator:latest']
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator:${_COMMIT_SHA}']
+  args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator:${COMMIT_SHA}']
 
 images:
   - 'gcr.io/$PROJECT_ID/webalator:latest'
-  - 'gcr.io/$PROJECT_ID/webalator:${_COMMIT_SHA}'
+  - 'gcr.io/$PROJECT_ID/webalator:${COMMIT_SHA}'
 
 logsBucket: 'gs://cloud-build-logs.row-major.net'
