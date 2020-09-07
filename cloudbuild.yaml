@@ -9,3 +9,4 @@ steps:
   args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator']
 images:
   - 'gcr.io/$PROJECT_ID/webalator'
+logsBucket: 'gs://cloud-build-logs.row-major.net'
