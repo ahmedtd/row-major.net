@@ -1,13 +1,13 @@
 stages:
-#  - check-access
+  - check-access
   - deploy
 
-# job-check-access:
-#   stage: deploy
-#   image: gcr.io/google.com/cloudsdktool/cloud-sdk
-#   script:
-#     - "curl -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/email"
-#     - "curl -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/"
+job-check-access:
+  stage: deploy
+  script:
+    - "apt-get install -y curl"
+    - "curl -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/email"
+    - "curl -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/"
 
 job-deploy:
   stage: deploy
