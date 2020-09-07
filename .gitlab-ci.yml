@@ -5,7 +5,7 @@ stages:
 job-upload-images:
   stage: upload-images
   rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/"
+    - if: "$CI_COMMIT_MESSAGE !~ /^NO_UPLOAD_IMAGES=/"
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
@@ -14,7 +14,7 @@ job-upload-images:
 job-update-image-in-manifest:
   stage: update-image-in-manifest
   rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/"
+    - if: "$CI_COMMIT_MESSAGE !~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/"
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
