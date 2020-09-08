@@ -39,6 +39,7 @@ Update Manifest:
 
       NO_UPLOAD_IMAGES=
       NO_UPDATE_IMAGES_IN_MANIFEST=
+      APPLY_MANIFEST=
       EOF
     - kubectl kustomize manifests/production > manifests/production/rendered.yaml
     - |
@@ -57,6 +58,8 @@ Update Manifest:
 
 Apply Manifest:
   stage: apply-manifest
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^APPLY_MANIFEST=/m"
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
