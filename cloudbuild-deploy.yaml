@@ -1,0 +1,5 @@
+steps:
+- id: apply
+  name: gcr.io/cloud-builders/kubectl
+  args: ['apply', '-f', 'manifests/production/rendered.yaml']
+logsBucket: 'gs://cloud-build-logs.row-major.net'
