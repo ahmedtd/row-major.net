@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: row-major-web
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    iam.gke.io/gcp-service-account: webalator@bomsync-214520.iam.gserviceaccount.com
+  name: webalator
+  namespace: row-major-web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: row-major-web
+    component: content
+  name: row-major-web-content-service
+  namespace: row-major-web
+spec:
+  ports:
+  - name: http
+    port: 8001
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: row-major-web
+    component: content
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: row-major-web
+    component: content
+  name: row-major-web-content-deployment
+  namespace: row-major-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: row-major-web
+      component: content
+  template:
+    metadata:
+      labels:
+        app: row-major-web
+        component: content
+    spec:
+      containers:
+      - command:
+        - /app/webalator/webalator
+        - --static-content-dir=webalator/static-content
+        - --template-dir=webalator/content
+        - --listen=0.0.0.0:8080
+        - --debug-listen=0.0.0.0:8081
+        - --enable-profiling
+        - --enable-tracing
+        - --enable-metrics
+        image: gcr.io/bomsync-214520/webalator:f42f619ca5823710899273952f7f9f05299a1580
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        name: row-major-web-content
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      serviceAccountName: webalator
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: row-major-web
+    networking.gke.io/managed-certificates: www-row-major-net,row-major-net
+  labels:
+    app: row-major-web
+    component: ingress
+  name: ingress6
+  namespace: row-major-web
+spec:
+  backend:
+    serviceName: row-major-web-content-service
+    servicePort: http
+---
+apiVersion: networking.gke.io/v1beta1
+kind: ManagedCertificate
+metadata:
+  name: row-major-net
+  namespace: row-major-web
+spec:
+  domains:
+  - row-major.net
+---
+apiVersion: networking.gke.io/v1beta1
+kind: ManagedCertificate
+metadata:
+  name: www-row-major-net
+  namespace: row-major-web
+spec:
+  domains:
+  - www.row-major.net
