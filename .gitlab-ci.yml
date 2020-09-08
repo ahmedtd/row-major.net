@@ -50,7 +50,7 @@ Update Manifest:
         --form "actions[][action]=update" \
         --form "actions[][file_path]=manifests/production/production-images.patch.yaml" \
         --form "actions[][content]=<manifests/production/production-images.patch.yaml" \
-        --form "actions[][action]=create \
+        --form "actions[][action]=create" \
         --form "actions[][file_path]=manifests/production/rendered.yaml" \
         --form "actions[][content]=<manifests/production/rendered.yaml" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
