@@ -60,7 +60,7 @@ spec:
         - --enable-profiling
         - --enable-tracing
         - --enable-metrics
-        image: gcr.io/bomsync-214520/webalator:6d1f78e925d058b5012acadbc8329bcc278d1b3c
+        image: gcr.io/bomsync-214520/webalator:f0c103bc105485547af311192e865fd5a41785fa
         livenessProbe:
           httpGet:
             path: /healthz
