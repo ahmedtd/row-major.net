@@ -259,8 +259,8 @@ class Grid {
 	  x += dt * vx;
 	  y += dt * vy;
 
-	  x += Math.random() * 0.01;
-	  y += Math.random() * 0.01;
+	  x += (2*Math.random()-1.0) * 0.025;
+	  y += (2*Math.random()-1.0) * 0.025;
 
 	  if(x < 1.0) {
 		x = 1.0;
@@ -286,8 +286,8 @@ class Grid {
 	this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
 	// Draw vector field.
-	for(let cx = 0; cx < this.cols; cx+=2) {
-	  for(let cy = 0; cy < this.rows; cy+=2) {
+	for(let cx = 0; cx < this.cols; cx+=1) {
+	  for(let cy = 0; cy < this.rows; cy+=1) {
 		let vecBaseX = cx * gridCellSizePx + 0.5 * gridCellSizePx;
 		let vecBaseY = this.canvas.height - (cy * gridCellSizePx + 0.5 * gridCellSizePx);
 
