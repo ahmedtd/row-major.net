@@ -12,28 +12,29 @@
 
   <p>
     (Note: this doesn't work on Firefox.  I'm using OffScreenCanvas
-    and WebWorkers to avoid tanking the main thread, but Firefox doesn't
-    support 2d contexts on Offscreen Canvases, and Offscreen Canvases
-    are behind a config flag anyways).
+    and WebWorkers to avoid tanking the main thread, but Firefox
+    doesn't support 2d contexts on Offscreen Canvases, and Offscreen
+    Canvases are behind a config flag anyways).
   <p>
 
   <p>
     Each physics step consists of an advection step, and a
     divergence-removal step.  The advection step is semi-Lagrangian;
-    basically, we look backwards along the velocity vector for each cell
-    to see where the fluid particle at the center of the cell would have
-    come from, and then use that origin location's velocity for the new
-    cell velocity.  (I can kind of understand the inuition there, but if
-    I think about it too hard, it makes my brain hurt).  The
-    divergence-removal is run many times per timestep, and consist of
-    computing the gradient of the divergence across each 3x3 patch, and
-    adding it back in to cancel the divergence.  Repeating many times
-    per timestep allows the 3x3 convolution to spread its effects
-    through the environment.
+    basically, we look backwards along the velocity vector for each
+    cell to see where the fluid particle at the center of the cell
+    would have come from, and then use that origin location's velocity
+    for the new cell velocity.  (I can kind of understand the inuition
+    there, but if I think about it too hard, it makes my brain hurt).
+    The divergence-removal is run many times per timestep, and
+    consists of computing the gradient of the divergence across each
+    3x3 patch, and adding it back in to cancel the divergence.
+    Repeating many times per timestep allows the 3x3 convolution to
+    spread its effects through the environment.
   </p>
 
   <p>
-    The tracer particles have a bit of jitter, to help keep them from clumping up.
+    The tracer particles have a bit of jitter, to help keep them from
+    clumping up.
   </p>
 
   <p>
@@ -50,7 +51,9 @@
     Nearly all of the simulation time is spent in the
     divergence-removal step.  I'd like to try converting that to wasm,
     or perhaps trying to do it from a GPU shader.
+  </p>
 
+  <p>
     Additionally, I'd like to add some basic surface-level tracking to
     simulate water; right now the simulation is for a gas or liquid
     that totally fills the box.

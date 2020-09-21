@@ -19,10 +19,11 @@ class Grid {
 	this.stirrerY = 0.0;
 	this.stirrerRadius = 10.0;
 
-	this.particlePosX = new Float32Array(100);
-	this.particlePosY = new Float32Array(100);
-	for(let i = 0; i < 100; i++) {
-	  this.particlePosX[i] = i+2;
+	this.numParticles = cols-2;
+	this.particlePosX = new Float32Array(this.numParticles);
+	this.particlePosY = new Float32Array(this.numParticles);
+	for(let i = 1; i < cols-1; i++) {
+	  this.particlePosX[i] = i+0.5;
 	  this.particlePosY[i] = 50;
 	}
 
@@ -233,7 +234,7 @@ class Grid {
   }
 
   updateParticles(dt) {
-	for(let i = 0; i < 100; ++i) {
+	for(let i = 0; i < this.numParticles; ++i) {
 	  let x = this.particlePosX[i];
 	  let y = this.particlePosY[i];
 
