@@ -1,0 +1,66 @@
+{{define "title"}}WebGL Fluid Simulation{{end}}
+{{define "breadcrumbs" -}}
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li><li class="breadcrumbs-item">/toys</li><li class="breadcrumbs-item">/WebGL Fluid</li></ul>
+{{- end}}
+{{define "content"}}
+<section>
+  <figure>
+    <canvas id="fluid-viewer" width="700" height="700" style="width:700px; height:700px;"></canvas>
+  </figure>
+
+  <p>A lava lamp-like thing to help pass them time.</p>
+
+  <p>
+    (Note: this doesn't work on Firefox.  I'm using OffScreenCanvas
+    and WebWorkers to avoid tanking the main thread, but Firefox
+    doesn't support 2d contexts on Offscreen Canvases, and Offscreen
+    Canvases are behind a config flag anyways).
+  <p>
+
+  <p>
+    Each physics step consists of an advection step, and a
+    divergence-removal step.  The advection step is semi-Lagrangian;
+    basically, we look backwards along the velocity vector for each
+    cell to see where the fluid particle at the center of the cell
+    would have come from, and then use that origin location's velocity
+    for the new cell velocity.  (I can kind of understand the inuition
+    there, but if I think about it too hard, it makes my brain hurt).
+    The divergence-removal is run many times per timestep, and
+    consists of computing the gradient of the divergence across each
+    3x3 patch, and adding it back in to cancel the divergence.
+    Repeating many times per timestep allows the 3x3 convolution to
+    spread its effects through the environment.
+  </p>
+
+  <p>
+    The tracer particles have a bit of jitter, to help keep them from
+    clumping up.
+  </p>
+
+  <p>
+    I worked
+    from <a href="http://www.cs.columbia.edu/~batty/teaching/COMS6998/GridFluids_overview.pdf">Christopher
+    Batty's slides</a>
+    and <a href="https://www.karlsims.com/fluid-flow.html">Karl Sim's
+    page</a> (although I had to derive the divergence-removal step
+    separately; his pseudo-code caused some wild behavior, but I
+    probably just implemented it wrong).
+  </p>
+
+  <p>
+    Nearly all of the simulation time is spent in the
+    divergence-removal step.  I'd like to try converting that to wasm,
+    or perhaps trying to do it from a GPU shader.
+  </p>
+
+  <p>
+    Additionally, I'd like to add some basic surface-level tracking to
+    simulate water; right now the simulation is for a gas or liquid
+    that totally fills the box.
+  </p>
+</section>
+{{end}}
+
+{{define "scripts"}}
+<script src="ui.js"></script>
+{{end}}

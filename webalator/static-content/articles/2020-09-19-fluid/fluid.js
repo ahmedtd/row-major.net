@@ -27,8 +27,17 @@ class Grid {
 	  this.particlePosY[i] = 50;
 	}
 
+	this.oldLiquidAmountBuf = new Float32Array(rows * cols);
+	this.newLiquidAmountBuf = new Float32Array(rows * cols);
+	for(let cx = 1; cx < 30; cx++) {
+	  for(let cy = 30; cy < 50; cy++) {
+		this.oldLiquidAmountBuf[cy * this.cols + cx] = 1.0;
+	  }
+	}
+
 	this.canvas = canvas;
 	this.context = canvas.getContext('2d');
+	this.gl = canvas.getContext('webgl2');
   }
 
   velX(x, y) {
@@ -63,20 +72,12 @@ class Grid {
 	this.divVelBuf[y * this.cols + x] = val;
   }
 
-  gradDivVelX(x, y) {
-	return this.gradDivVelXBuf[y * this.cols + x];
+  liquidAmount(x, y) {
+	return this.oldLiquidAmountBuf[y * this.cols + x];
   }
 
-  setGradDivVelX(x, y, val) {
-	this.gradDivVelXBuf[y * this.cols + x] = val;
-  }
-
-  gradDivVelY(x, y) {
-	return this.gradDivVelYBuf[y * this.cols + x];
-  }
-
-  setGradDivVelY(x, y, val) {
-	this.gradDivVelYBuf[y * this.cols + x] = val;
+  setLiquidAmount(x, y, val) {
+	this.newLiquidAmountBuf[y * this.cols + x] = val;
   }
 
   flipBuffers() {
@@ -89,19 +90,10 @@ class Grid {
 	this.newVelYBuf = tmpY;
   }
 
-  update(dt) {
-	this.forceStirrerVelocity();
-
-	this.setBoundary();
-	this.advect(dt);
-	this.flipBuffers();
-
-	for(let i = 0; i < 60; i++) {
-	  this.forceStirrerVelocity();
-	  this.setBoundary();
-	  this.killDivergence();
-	  this.flipBuffers();
-	}
+  flipLiquidBuf() {
+	let tmpL = this.oldLiquidAmountBuf;
+	this.oldLiquidAmountBuf = this.newLiquidAmountBuf;
+	this.newLiquidAmountBuf = tmpL;
   }
 
   setBoundary() {
@@ -233,7 +225,15 @@ class Grid {
 	}
   }
 
-  updateParticles(dt) {
+  moveLiquid(dt) {
+	for(let cx = 1; cx < this.cols-1; cx++) {
+	  for(let cy = 1; cy < this.cols-1; cy++) {
+		this.setLiquidAmount(cx, cy, this.liquidAmount(cx, cy));
+	  }
+	}
+  }
+
+  moveParticles(dt) {
 	for(let i = 0; i < this.numParticles; ++i) {
 	  let x = this.particlePosX[i];
 	  let y = this.particlePosY[i];
@@ -286,9 +286,23 @@ class Grid {
 
 	this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+	// Draw liquid
+	let liquidSum = 0.0;
+	for(let cx = 1; cx < this.cols-1; cx++) {
+	  for(let cy = 1; cy < this.rows-1; cy++) {
+		liquidSum += this.liquidAmount(cx, cy);
+		if(this.liquidAmount(cx, cy) > 0.0) {
+		  this.context.fillStyle = 'rgba(0, 0, 255, 1)';
+		  this.context.fillRect(cx * gridCellSizePx, this.canvas.height - (cy * gridCellSizePx), gridCellSizePx, gridCellSizePx);
+		}
+	  }
+	}
+	this.context.font = '50px serif';
+	this.context.fillText(''+liquidSum, 10, 50);
+
 	// Draw vector field.
-	for(let cx = 0; cx < this.cols; cx+=1) {
-	  for(let cy = 0; cy < this.rows; cy+=1) {
+	for(let cx = 0; cx < this.cols; cx+=5) {
+	  for(let cy = 0; cy < this.rows; cy+=5) {
 		let vecBaseX = cx * gridCellSizePx + 0.5 * gridCellSizePx;
 		let vecBaseY = this.canvas.height - (cy * gridCellSizePx + 0.5 * gridCellSizePx);
 
@@ -354,8 +368,26 @@ class Grid {
 		this.stirrerX = this.cols / 2.0 + this.cols / 2.0 * Math.cos(physicsCurTime / 10.0);
 		this.stirrerY = 5;
 
-		this.update(physicsDT);
-		this.updateParticles(physicsDT);
+		this.forceStirrerVelocity();
+
+		this.setBoundary();
+		this.advect(physicsDT);
+		this.flipBuffers();
+
+		// this.liquidGravity(physicsDT);
+		// this.flipBuffers();
+
+		for(let i = 0; i < 60; i++) {
+		  this.forceStirrerVelocity();
+		  this.setBoundary();
+		  this.killDivergence();
+		  this.flipBuffers();
+		}
+
+		this.moveLiquid(physicsDT);
+		this.flipLiquidBuf();
+
+		this.moveParticles(physicsDT);
 
 		physicsCurTime += physicsDT;
 	  }
