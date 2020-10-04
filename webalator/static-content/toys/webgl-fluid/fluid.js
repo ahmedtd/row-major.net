@@ -247,38 +247,72 @@ precision highp int;
 precision highp sampler2D;
 
 uniform ivec2 viewport;
+uniform float metersPerCell;
 uniform sampler2D oldVelocity;
 uniform sampler2D divergence;
 
 out vec4 fragColor;
 
-float onLine(vec2 point, vec2 start, vec2 end) {
+float onNeedle(vec2 point, vec2 start, vec2 end, float widthBase, float aaBorder) {
   if(length(end - start) < 0.001) {
     return 0.0;
   }
 
-  float t = dot(normalize(end - start), point - start);
-  vec2 parallel = t * normalize(end - start);
+  float lengthParallel = dot(normalize(end - start), point - start);
+  vec2 parallel = lengthParallel * normalize(end - start);
   vec2 perpendicular = (point - start) - parallel;
 
-  if(t < 0.0 || t > length(end-start)) {
+  float t = lengthParallel / length(end - start);
+
+  if(t < 0.0 || t > 1.0) {
     return 0.0;
   }
 
-  if(length(perpendicular) < 0.5) {
+  float width = t * 0.0 + (1.0-t) * widthBase;
+
+  if(length(perpendicular) < width - aaBorder) {
     return 1.0;
-  } else if(length(perpendicular) < 3.0) {
-    return 1.0 - (length(perpendicular) - 0.5) / (3.0 - 0.5);
+  } else if(length(perpendicular) < width + aaBorder) {
+    float s = (length(perpendicular) - (width - aaBorder)) / ((width + aaBorder) - (width - aaBorder));
+    return 1.0 - s;
   } else {
     return 0.0;
   }
 }
 
 void main() {
-  vec2 velocitySize = vec2(textureSize(oldVelocity, 0));
-  vec2 velocityGridFragCoord = gl_FragCoord.xy / vec2(viewport) * velocitySize;
-  vec2 velocityCellCenter = floor(velocityGridFragCoord) + vec2(0.5, 0.5);
-  vec2 velocity = texelFetch(oldVelocity, ivec2(velocityGridFragCoord), 0).xy;
+  ivec2 velocitySize = textureSize(oldVelocity, 0);
+  vec2 pxPerGrid = vec2(viewport) / vec2(velocitySize);
+
+  vec2 velocityGridFragCoord = gl_FragCoord.xy / pxPerGrid;
+
+  float maxOnNeedle = 0.0;
+  for(int dx = -3; dx <= 3; dx++) {
+    for(int dy = -3; dy <= 3; dy++) {
+      ivec2 cell;
+      cell.x = int(velocityGridFragCoord.x) + dx;
+      cell.y = int(velocityGridFragCoord.y) + dy;
+
+      if(cell.x < 0 || cell.x >= velocitySize.x || cell.y < 0 || cell.y >= velocitySize.y) {
+        continue;
+      }
+
+      vec2 velocity = texelFetch(oldVelocity, cell, 0).xy;
+      vec2 cellCenter = vec2(cell) + vec2(0.5, 0.5);
+
+      float curOnNeedle = onNeedle(
+        gl_FragCoord.xy,
+        cellCenter * pxPerGrid,
+        (cellCenter + velocity / vec2(metersPerCell)) * pxPerGrid,
+        1.0,
+        0.5
+      );
+
+      if(curOnNeedle > maxOnNeedle) {
+        maxOnNeedle = curOnNeedle;
+      }
+    }
+  }
 
   vec2 divergenceSize = vec2(textureSize(divergence, 0));
   vec2 divergenceGridCoord = gl_FragCoord.xy / vec2(viewport) * divergenceSize;
@@ -295,10 +329,9 @@ void main() {
     divergenceColor = mix(divergence0Color, divergenceMaxColor, clamp(divergence / 1.0, 0.0, 1.0));
   }
 
-  float onVelocityLine = onLine(gl_FragCoord.xy, velocityCellCenter / velocitySize * vec2(viewport), velocityCellCenter / velocitySize * vec2(viewport) + velocity);
   vec3 lineColor = vec3(0.0, 0.0, 0.0);
 
-  fragColor.rgb = mix(divergenceColor, lineColor, onVelocityLine);
+  fragColor.rgb = mix(divergenceColor, lineColor, maxOnNeedle);
   fragColor.a = 1.0;
 }
 `;
@@ -481,6 +514,7 @@ class Grid {
 											[renderFragmentShader]);
 	this.renderVertexLoc = this.gl.getAttribLocation(this.renderProgram, 'vertexPos');
 	this.renderViewportLoc = this.gl.getUniformLocation(this.renderProgram, 'viewport');
+	this.renderMetersPerCellLoc = this.gl.getUniformLocation(this.renderProgram, 'metersPerCell');
 	this.renderOldVelocityLoc = this.gl.getUniformLocation(this.renderProgram, 'oldVelocity');
 	this.renderDivergenceLoc = this.gl.getUniformLocation(this.renderProgram, 'divergence');
   }
@@ -638,6 +672,8 @@ class Grid {
 	this.gl.bindTexture(this.gl.TEXTURE_2D, this.divergenceTexture);
 
 	this.gl.uniform2i(this.renderViewportLoc, this.canvas.width, this.canvas.height);
+
+	this.gl.uniform1f(this.renderMetersPerCellLoc, this.gridScale);
 
 	this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
