@@ -9,20 +9,21 @@ import (
 	"path/filepath"
 	"row-major/wordgrid"
 	"strings"
+	"sync"
 )
 
 type Site struct {
 	Mux *http.ServeMux
 }
 
-func New(staticContentDir string, templateDir string) (*Site, error) {
+func New(staticContentDir string, templateDir string, rescan bool) (*Site, error) {
 	s := &Site{
 		Mux: http.NewServeMux(),
 	}
 
 	log.Printf("serving from %q", staticContentDir)
 
-	tp, err := newTemplateHandler(templateDir, http.FileServer(http.Dir(staticContentDir)))
+	tp, err := newTemplateHandler(templateDir, http.FileServer(http.Dir(staticContentDir)), rescan)
 	if err != nil {
 		return nil, fmt.Errorf("while creating template handler: %w", err)
 	}
@@ -38,19 +39,32 @@ func New(staticContentDir string, templateDir string) (*Site, error) {
 }
 
 type templateHandler struct {
-	tpls  map[string]*template.Template
-	inner http.Handler
+	lock sync.Mutex
+	tpls map[string]*template.Template
+
+	rescan      bool
+	templateDir string
+	inner       http.Handler
 }
 
-func newTemplateHandler(templateDir string, inner http.Handler) (*templateHandler, error) {
-	baseTemplate := filepath.Join(templateDir, "base.html.tmpl")
-
+func newTemplateHandler(templateDir string, inner http.Handler, rescan bool) (*templateHandler, error) {
 	th := &templateHandler{
-		tpls:  map[string]*template.Template{},
-		inner: inner,
+		tpls:        map[string]*template.Template{},
+		rescan:      rescan,
+		templateDir: templateDir,
+		inner:       inner,
+	}
+	if err := th.doRescan(); err != nil {
+		return nil, err
 	}
 
-	err := filepath.Walk(templateDir, func(path string, info os.FileInfo, err error) error {
+	return th, nil
+}
+
+func (h *templateHandler) doRescan() error {
+	baseTemplate := filepath.Join(h.templateDir, "base.html.tmpl")
+
+	return filepath.Walk(h.templateDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() || info.Name() == "base.html.tmpl" {
 			return nil
 		}
@@ -60,20 +74,25 @@ func newTemplateHandler(templateDir string, inner http.Handler) (*templateHandle
 			return fmt.Errorf("while parsing template %q: %w", path, err)
 		}
 
-		rp := strings.TrimPrefix(filepath.Dir(path)+"/", templateDir)
+		rp := strings.TrimPrefix(filepath.Dir(path)+"/", h.templateDir)
 		log.Printf("Registering path %q", rp)
-		th.tpls[rp] = tpl
+
+		h.lock.Lock()
+		h.tpls[rp] = tpl
+		h.lock.Unlock()
+
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return th, nil
 }
 
 func (h *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h.rescan {
+		h.doRescan()
+	}
+
+	h.lock.Lock()
 	tpl, ok := h.tpls[r.URL.Path]
+	h.lock.Unlock()
 	if !ok {
 		log.Printf("Didn't find template %q, delegating to inner", r.URL.Path)
 		h.inner.ServeHTTP(w, r)

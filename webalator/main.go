@@ -19,13 +19,14 @@ import (
 )
 
 var (
-	listen           = flag.String("listen", "0.0.0.0:8080", "Where should we listen for incoming connections?")
-	debugListen      = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
-	staticContentDir = flag.String("static-content-dir", "./", "A directory of static content to serve.")
-	templateDir      = flag.String("template-dir", "./", "A directory of templates to serve.")
-	enableProfiling  = flag.Bool("enable-profiling", false, "")
-	enableTracing    = flag.Bool("enable-tracing", false, "")
-	enableMetrics    = flag.Bool("enable-metrics", false, "")
+	listen                = flag.String("listen", "0.0.0.0:8080", "Where should we listen for incoming connections?")
+	debugListen           = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
+	staticContentDir      = flag.String("static-content-dir", "./", "A directory of static content to serve.")
+	templateDir           = flag.String("template-dir", "./", "A directory of templates to serve.")
+	enableTemplateRefresh = flag.Bool("enable-template-refresh", false, "Should we refresh templates from disk?")
+	enableProfiling       = flag.Bool("enable-profiling", false, "")
+	enableTracing         = flag.Bool("enable-tracing", false, "")
+	enableMetrics         = flag.Bool("enable-metrics", false, "")
 )
 
 func main() {
@@ -36,6 +37,7 @@ func main() {
 	log.Printf("debug-listen: %q", *debugListen)
 	log.Printf("static-content-dir: %q", *staticContentDir)
 	log.Printf("template-dir: %q", *templateDir)
+	log.Printf("enable-template-refresh: %q", *enableTemplateRefresh)
 	log.Printf("enable-profiling: %q", *enableProfiling)
 	log.Printf("enable-tracing: %q", *enableTracing)
 	log.Printf("enable-metrics: %q", *enableMetrics)
@@ -89,7 +91,7 @@ func main() {
 	}
 	log.Printf("Running from: %s", dir)
 
-	site, err := site.New(*staticContentDir, *templateDir)
+	site, err := site.New(*staticContentDir, *templateDir, *enableTemplateRefresh)
 	if err != nil {
 		log.Fatalf("Error creating site: %v", err)
 	}
