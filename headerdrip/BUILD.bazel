@@ -5,7 +5,7 @@ go_library(
     srcs = ["main.go"],
     importpath = "row-major/headerdrip",
     visibility = ["//visibility:private"],
-    deps = ["//vendor/golang.org/x/time/rate:go_default_library"],
+    deps = ["@org_golang_x_time//rate:go_default_library"],
 )
 
 go_binary(

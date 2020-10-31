@@ -11,5 +11,5 @@ go_library(
     srcs = ["main.go"],
     importpath = "row-major/turbodefacer",
     visibility = ["//visibility:private"],
-    deps = ["//vendor/github.com/jlaffaye/ftp:go_default_library"],
+    deps = ["@com_github_jlaffaye_ftp//:go_default_library"],
 )

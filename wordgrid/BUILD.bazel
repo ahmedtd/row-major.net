@@ -18,5 +18,5 @@ go_test(
         "wordgrid_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/google/go-cmp/cmp:go_default_library"],
+    deps = ["@com_github_google_go_cmp//cmp:go_default_library"],
 )
