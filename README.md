@@ -2,6 +2,7 @@
 
     go mod tidy
     bazel run //:gazelle
+    bazel run //:gazelle -- update-repos -from_file=go.mod
 
 # CI
 
@@ -21,4 +22,4 @@ Update manifests/row-major-web.yaml with the tag.
 
 Run
 
-    kubectl kustomize manifests/ | kubectl apply -f -
+    kubectl kustomize manifests/production | kubectl apply -f -

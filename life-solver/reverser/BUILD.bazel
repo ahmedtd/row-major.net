@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["reverser.go"],
+    importpath = "row-major/life-solver/reverser",
+    visibility = ["//visibility:private"],
+    deps = ["//life-solver:go_default_library"],
+)
+
+go_binary(
+    name = "reverser",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

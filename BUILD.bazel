@@ -1,5 +1,4 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
 # gazelle:prefix row-major
-# gazelle:proto disable_global
 gazelle(name = "gazelle")

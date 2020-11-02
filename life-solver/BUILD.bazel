@@ -1,28 +1,14 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
-
-# gazelle:ignore
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
-    name = "life",
+    name = "go_default_library",
     srcs = ["life.go"],
-    importpath = "row-major/life-solver/life",
+    importpath = "row-major/life-solver",
+    visibility = ["//visibility:public"],
 )
 
 go_test(
-    name = "life_test",
+    name = "go_default_test",
     srcs = ["life_test.go"],
-    embed = [":life"],
-    importpath = "row-major/life-solver/life",
-)
-
-go_binary(
-    name = "life-reverser",
-    srcs = ["reverser-main.go"],
-    deps = [":life"],
-)
-
-go_binary(
-    name = "life-benchmarker",
-    srcs = ["benchmark-main.go"],
-    deps = [":life"],
+    embed = [":go_default_library"],
 )

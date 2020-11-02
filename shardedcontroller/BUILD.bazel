@@ -1,16 +1,40 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_push",
+)
 
 go_library(
     name = "go_default_library",
     srcs = ["shardedcontroller.go"],
     importpath = "row-major/shardedcontroller",
     visibility = ["//visibility:private"],
+    deps = [
+        "@io_k8s_api//core/v1:go_default_library",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
+        "@io_k8s_client_go//informers/core/v1:go_default_library",
+        "@io_k8s_client_go//kubernetes:go_default_library",
+        "@io_k8s_client_go//rest:go_default_library",
+        "@io_k8s_client_go//tools/cache:go_default_library",
+        "@io_k8s_client_go//util/workqueue:go_default_library",
+    ],
 )
 
-go_binary(
+go_image(
     name = "shardedcontroller",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
+)
+
+container_push(
+    name = "push",
+    format = "Docker",
+    image = ":shardedcontroller",
+    registry = "gcr.io",
+    repository = "bomsync-214520/shardedcontroller",
+    tag = "{BUILD_TIMESTAMP}",
 )
 
 go_test(

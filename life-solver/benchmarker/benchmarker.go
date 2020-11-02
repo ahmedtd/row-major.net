@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"row-major/life-solver/life"
+	"row-major/life-solver"
 )
 
 func main() {

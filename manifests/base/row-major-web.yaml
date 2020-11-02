@@ -89,6 +89,7 @@ apiVersion: networking.gke.io/v1beta1
 kind: ManagedCertificate
 metadata:
   name: www-row-major-net
+  namespace: row-major-web
 spec:
   domains:
     - www.row-major.net
@@ -97,6 +98,7 @@ apiVersion: networking.gke.io/v1beta1
 kind: ManagedCertificate
 metadata:
   name: row-major-net
+  namespace: row-major-web
 spec:
   domains:
     - row-major.net

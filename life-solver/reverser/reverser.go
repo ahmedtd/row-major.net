@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"row-major/life-solver/life"
+	"row-major/life-solver"
 )
 
 var (
