@@ -77,7 +77,7 @@ metadata:
   namespace: sharded-controller
   name: sharded-controller-is-a-configmap-writer
 roleRef:
-  apiGroup: rbac.authoriztaion.k8s.io
+  apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: configmap-writer
 subjects:
