@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:2a1bc26a133179a544e333e213b74086b5aa7461
+          image: gcr.io/bomsync-214520/webalator:6cf518abe957830b275cea98fc59a3331bc2cae7
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -21,4 +21,4 @@ spec:
     spec:
       containers:
         - name: sharded-controller
-          image: gcr.io/bomsync-214520/shardedcontroller:2a1bc26a133179a544e333e213b74086b5aa7461
+          image: gcr.io/bomsync-214520/shardedcontroller:6cf518abe957830b275cea98fc59a3331bc2cae7
