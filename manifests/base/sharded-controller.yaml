@@ -36,7 +36,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["configmaps"]
-  verbs: ["put", "patch"]
+  verbs: ["update", "patch"]
 
 ---
 

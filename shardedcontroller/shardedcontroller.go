@@ -233,6 +233,7 @@ func (c *ShardedConfigMapWatcher) processNextWorkItem(ctx context.Context) bool 
 	_, err = c.kc.CoreV1().ConfigMaps(c.namespace).Update(ctx, cmCopy, metav1.UpdateOptions{})
 	if err != nil {
 		log.Printf("Error while annotating configmap %q: %v", key.(string), err)
+		return true
 	}
 
 	// Processed this item successfully.  Remove from queue.
