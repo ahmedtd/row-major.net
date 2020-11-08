@@ -22,9 +22,10 @@ import (
 )
 
 var (
-	shardNamespace = flag.String("shard_namespace", "", "The Kubernetes namespace where we will find our other processing shards.")
-	shardSelector  = flag.String("shard_selector", "", "A Kubernetes label selector to find the pods that form our processing shards.")
-	selfPodName    = flag.String("self_pod_name", "", "The name of the pod we are currently running as.")
+	shardNamespace     = flag.String("shard_namespace", "", "The Kubernetes namespace where we will find our other processing shards.")
+	shardSelector      = flag.String("shard_selector", "", "A Kubernetes label selector to find the pods that form our processing shards.")
+	selfPodName        = flag.String("self_pod_name", "", "The name of the pod we are currently running as.")
+	configMapNamespace = flag.String("config_map_namespace", "", "The controller will annotate all configmaps in this namespace.")
 )
 
 // rendezvous selects a shard from shards to handle item.
@@ -114,19 +115,23 @@ type ShardedConfigMapWatcher struct {
 
 	sharder *Sharder
 
+	namespace string
+
 	cmInformer cache.SharedIndexInformer
 	queue      workqueue.RateLimitingInterface
 }
 
-func NewShardedConfigMapWatcher(kc *kubernetes.Clientset, sharder *Sharder) *ShardedConfigMapWatcher {
+func NewShardedConfigMapWatcher(kc *kubernetes.Clientset, sharder *Sharder, namespace string) *ShardedConfigMapWatcher {
 	c := &ShardedConfigMapWatcher{
 		kc:      kc,
 		sharder: sharder,
+
+		namespace: namespace,
 	}
 
 	c.cmInformer = coreinformersv1.NewConfigMapInformer(
 		kc,
-		corev1.NamespaceAll,
+		namespace,
 		24*time.Hour,
 		cache.Indexers{
 			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
@@ -221,8 +226,11 @@ func (c *ShardedConfigMapWatcher) processNextWorkItem(ctx context.Context) bool 
 	// Add the annotation.  Make a deep copy first, because the object kept in
 	// the informer cache is shared.
 	cmCopy := cm.DeepCopy()
+	if cmCopy.ObjectMeta.Annotations == nil {
+		cmCopy.ObjectMeta.Annotations = map[string]string{}
+	}
 	cmCopy.ObjectMeta.Annotations["sharding.row-major.net/processed"] = "true"
-	_, err = c.kc.CoreV1().ConfigMaps(corev1.NamespaceAll).Update(ctx, cmCopy, metav1.UpdateOptions{})
+	_, err = c.kc.CoreV1().ConfigMaps(c.namespace).Update(ctx, cmCopy, metav1.UpdateOptions{})
 	if err != nil {
 		log.Printf("Error while annotating configmap %q: %v", key.(string), err)
 	}
@@ -239,6 +247,7 @@ func main() {
 	log.Printf("--shard_namespace=%v", *shardNamespace)
 	log.Printf("--shard_selector=%v", *shardSelector)
 	log.Printf("--self_pod_name=%v", *selfPodName)
+	log.Printf("--config_map_namespace=%v", *configMapNamespace)
 
 	kconfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -252,7 +261,7 @@ func main() {
 
 	sharder := NewSharder(*shardNamespace, *shardSelector, *selfPodName, kc)
 
-	cmWatcher := NewShardedConfigMapWatcher(kc, sharder)
+	cmWatcher := NewShardedConfigMapWatcher(kc, sharder, *configMapNamespace)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
