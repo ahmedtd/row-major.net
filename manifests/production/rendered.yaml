@@ -17,6 +17,20 @@ metadata:
   namespace: row-major-web
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: configmap-writer
+  namespace: sharded-controller
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - put
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: configmap-watcher
@@ -43,6 +57,21 @@ rules:
   - get
   - watch
   - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sharded-controller-is-a-configmap-writer
+  namespace: sharded-controller
+roleRef:
+  apiGroup: rbac.authoriztaion.k8s.io
+  kind: Role
+  name: configmap-writer
+  namespace: sharded-controller
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: sharded-controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -120,7 +149,7 @@ spec:
         - --enable-profiling
         - --enable-tracing
         - --enable-metrics
-        image: gcr.io/bomsync-214520/webalator:6cf518abe957830b275cea98fc59a3331bc2cae7
+        image: gcr.io/bomsync-214520/webalator:e570c5cc8eb8ce935a3660bc0cf88155da3c2a64
         livenessProbe:
           httpGet:
             path: /healthz
@@ -170,7 +199,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: gcr.io/bomsync-214520/shardedcontroller:6cf518abe957830b275cea98fc59a3331bc2cae7
+        image: gcr.io/bomsync-214520/shardedcontroller:e570c5cc8eb8ce935a3660bc0cf88155da3c2a64
         name: sharded-controller
 ---
 apiVersion: extensions/v1beta1
