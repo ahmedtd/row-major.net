@@ -1,12 +1,17 @@
 steps:
 - name: 'gcr.io/cloud-marketplace-containers/google/bazel'
   entrypoint: 'bazel'
-  args: ['test', '--', '//...']
+  args:
+  - 'test'
+  - '--remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net'
+  - '--google_default_credentials'
+  - '--'
+  - '//...'
 
 # Build and tag webalator
 - name: 'gcr.io/cloud-marketplace-containers/google/bazel'
   entrypoint: 'bazel'
-  args: ['run', '//webalator:webalator_image', '--', '--norun']
+  args: ['run', '--remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net', '--google_default_credentials', '//webalator:webalator_image', '--', '--norun']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator:latest']
 - name: 'gcr.io/cloud-builders/docker'
@@ -15,7 +20,7 @@ steps:
 # Build and tag shardedcontroller image
 - name: 'gcr.io/cloud-marketplace-containers/google/bazel'
   entrypoint: 'bazel'
-  args: ['run', '//shardedcontroller:shardedcontroller', '--', '--norun']
+  args: ['run', '--remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net', '--google_default_credentials', '//shardedcontroller:shardedcontroller', '--', '--norun']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel/shardedcontroller:shardedcontroller', 'gcr.io/$PROJECT_ID/shardedcontroller:latest']
 - name: 'gcr.io/cloud-builders/docker'
