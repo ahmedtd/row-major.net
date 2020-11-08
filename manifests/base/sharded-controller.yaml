@@ -79,7 +79,6 @@ metadata:
 roleRef:
   apiGroup: rbac.authoriztaion.k8s.io
   kind: Role
-  namespace: sharded-controller
   name: configmap-writer
 subjects:
 - kind: ServiceAccount
