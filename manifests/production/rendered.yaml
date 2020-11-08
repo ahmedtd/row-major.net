@@ -120,7 +120,7 @@ spec:
         - --enable-profiling
         - --enable-tracing
         - --enable-metrics
-        image: gcr.io/bomsync-214520/webalator:161bc697225f7dd8ef2571e6ffd0eff197941c1c
+        image: gcr.io/bomsync-214520/webalator:2a1bc26a133179a544e333e213b74086b5aa7461
         livenessProbe:
           httpGet:
             path: /healthz
@@ -160,6 +160,7 @@ spec:
         - --shard_namespace=$(POD_NAMESPACE)
         - --shard_selector=app=sharded-controller
         - --self_pod_name=$(POD_NAME)
+        - --config_map_namespace=$(POD_NAMESPACE)
         env:
         - name: POD_NAME
           valueFrom:
@@ -169,7 +170,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: gcr.io/bomsync-214520/shardedcontroller:161bc697225f7dd8ef2571e6ffd0eff197941c1c
+        image: gcr.io/bomsync-214520/shardedcontroller:2a1bc26a133179a544e333e213b74086b5aa7461
         name: sharded-controller
 ---
 apiVersion: extensions/v1beta1
