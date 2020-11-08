@@ -188,8 +188,43 @@ func (c *ShardedConfigMapWatcher) processNextWorkItem(ctx context.Context) bool 
 
 	defer c.queue.Done(key)
 
-	if c.sharder.DoIOwnItem(key.(string)) {
-		log.Printf("ShardedConfigMapWatcher owns configmap %q", key.(string))
+	cmObj, exists, err := c.cmInformer.GetStore().GetByKey(key.(string))
+	if err != nil {
+		log.Printf("Error while processing configmap %q: %v", key.(string), err)
+		return true
+	}
+	if !exists {
+		// If this happens, we have already processed the deletion
+		// message for the key in the store, so we can just treat it
+		// as a retryable error.  Once the deletion message reaches
+		// the workqueue, this key will be dropped.
+		log.Printf("Error while processing configmap %q: not found in informer cache (in-flight deletion)", key.(string))
+		return true
+	}
+
+	cm := cmObj.(*corev1.ConfigMap)
+	if val, ok := cm.ObjectMeta.Annotations["sharding.row-major.net/processed"]; ok && val == "true" {
+		// This configmap has already been processed.  Remove it from the queue
+		c.queue.Forget(key)
+		return true
+	}
+
+	if !c.sharder.DoIOwnItem(key.(string)) {
+		// We are not currently assigned to process this item.  We need to
+		// retain it in our because a re-sharding could result in it being
+		// assigned to us.
+		return true
+	}
+
+	log.Printf("ShardedConfigMapWatcher owns configmap %q", key.(string))
+
+	// Add the annotation.  Make a deep copy first, because the object kept in
+	// the informer cache is shared.
+	cmCopy := cm.DeepCopy()
+	cmCopy.ObjectMeta.Annotations["sharding.row-major.net/processed"] = "true"
+	_, err = c.kc.CoreV1().ConfigMaps(corev1.NamespaceAll).Update(ctx, cmCopy, metav1.UpdateOptions{})
+	if err != nil {
+		log.Printf("Error while annotating configmap %q: %v", key.(string), err)
 	}
 
 	// Processed this item successfully.  Remove from queue.

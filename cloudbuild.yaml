@@ -3,18 +3,28 @@ steps:
   entrypoint: 'bazel'
   args: ['test', '--', '//...']
 
-# Load our built webalator image into the local Docker cache.
+# Build and tag webalator
 - name: 'gcr.io/cloud-marketplace-containers/google/bazel'
   entrypoint: 'bazel'
   args: ['run', '//webalator:webalator_image', '--', '--norun']
-
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator:latest']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel/webalator:webalator_image', 'gcr.io/$PROJECT_ID/webalator:${COMMIT_SHA}']
 
+# Build and tag shardedcontroller image
+- name: 'gcr.io/cloud-marketplace-containers/google/bazel'
+  entrypoint: 'bazel'
+  args: ['run', '//shardedcontroller:shardedcontroller', '--', '--norun']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'bazel/shardedcontroller:shardedcontroller', 'gcr.io/$PROJECT_ID/shardedcontroller:latest']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'bazel/webalator:shardedcontroller', 'gcr.io/$PROJECT_ID/shardedcontroller:${COMMIT_SHA}']
+
 images:
   - 'gcr.io/$PROJECT_ID/webalator:latest'
   - 'gcr.io/$PROJECT_ID/webalator:${COMMIT_SHA}'
+  - 'gcr.io/$PROJECT_ID/shardedcontroller:latest'
+  - 'gcr.io/$PROJECT_ID/shardedcontroller:${COMMIT_SHA}'
 
 logsBucket: 'gs://cloud-build-logs.row-major.net'
