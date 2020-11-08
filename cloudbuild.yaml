@@ -19,7 +19,7 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel/shardedcontroller:shardedcontroller', 'gcr.io/$PROJECT_ID/shardedcontroller:latest']
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['tag', 'bazel/webalator:shardedcontroller', 'gcr.io/$PROJECT_ID/shardedcontroller:${COMMIT_SHA}']
+  args: ['tag', 'bazel/shardedcontroller:shardedcontroller', 'gcr.io/$PROJECT_ID/shardedcontroller:${COMMIT_SHA}']
 
 images:
   - 'gcr.io/$PROJECT_ID/webalator:latest'
