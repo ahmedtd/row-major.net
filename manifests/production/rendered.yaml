@@ -120,7 +120,7 @@ spec:
         - --enable-profiling
         - --enable-tracing
         - --enable-metrics
-        image: gcr.io/bomsync-214520/webalator:8d22f5762e436d175d2e6f72b6a755cfaa0b5bd1
+        image: gcr.io/bomsync-214520/webalator:161bc697225f7dd8ef2571e6ffd0eff197941c1c
         livenessProbe:
           httpGet:
             path: /healthz
@@ -169,7 +169,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: gcr.io/bomsync-214520/shardedcontroller:8d22f5762e436d175d2e6f72b6a755cfaa0b5bd1
+        image: gcr.io/bomsync-214520/shardedcontroller:161bc697225f7dd8ef2571e6ffd0eff197941c1c
         name: sharded-controller
 ---
 apiVersion: extensions/v1beta1
