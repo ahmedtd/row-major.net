@@ -4,12 +4,72 @@ metadata:
   name: row-major-web
 ---
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: sharded-controller
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   annotations:
     iam.gke.io/gcp-service-account: webalator@bomsync-214520.iam.gserviceaccount.com
   name: webalator
   namespace: row-major-web
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: configmap-watcher
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sharder
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sharded-controller-is-a-sharder
+  namespace: sharded-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sharder
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: sharded-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sharded-controller-is-a-configmap-watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: configmap-watcher
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: sharded-controller
 ---
 apiVersion: v1
 kind: Service
@@ -60,7 +120,7 @@ spec:
         - --enable-profiling
         - --enable-tracing
         - --enable-metrics
-        image: gcr.io/bomsync-214520/webalator:833924d514f75bbc2b8c6f18627de35756605167
+        image: gcr.io/bomsync-214520/webalator:8d22f5762e436d175d2e6f72b6a755cfaa0b5bd1
         livenessProbe:
           httpGet:
             path: /healthz
@@ -77,6 +137,40 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 10
       serviceAccountName: webalator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sharded-controller
+  name: sharded-controller
+  namespace: sharded-controller
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sharded-controller
+  template:
+    metadata:
+      labels:
+        app: sharded-controller
+    spec:
+      containers:
+      - args:
+        - --shard_namespace=$(POD_NAMESPACE)
+        - --shard_selector=app=sharded-controller
+        - --self_pod_name=$(POD_NAME)
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: gcr.io/bomsync-214520/shardedcontroller:8d22f5762e436d175d2e6f72b6a755cfaa0b5bd1
+        name: sharded-controller
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
