@@ -195,7 +195,7 @@ vec2 gradientOfDivergenceAt(sampler2D field, ivec2 cellCC) {
     fieldEE = texelFetch(field, cellEE, 0).xy;
     fieldNE = texelFetch(field, cellNE, 0).xy;
     fieldSW = vec2(fieldWW.x, 0.0);
-    fieldSS = vec2(fieldSS.x, 0.0);
+    fieldSS = vec2(fieldCC.x, 0.0);
     fieldSE = vec2(fieldEE.x, 0.0);
   } else if(cellCC.x == size.x-1) {
     fieldSW = texelFetch(field, cellSW, 0).xy;
@@ -259,7 +259,7 @@ void main() {
   // In this shader, our fragment coordinates are cell centers.
   vec2 gradient = gradientOfDivergenceAt(oldVelocity, ivec2(gl_FragCoord.xy));
 
-  newVelocity = texelFetch(oldVelocity, ivec2(gl_FragCoord.xy), 0).xy + 0.9 * gradient;
+  newVelocity = texelFetch(oldVelocity, ivec2(gl_FragCoord.xy), 0).xy + 0.5 * gradient;
 }
 `
 
@@ -386,7 +386,7 @@ class Grid {
 
 	this.stirrerX = 0.0;
 	this.stirrerY = 0.0;
-	this.stirrerRadius = 10.0;
+	this.stirrerRadius = 3.0;
 
 	this.numParticles = cols-2;
 	this.particlePosX = new Float32Array(this.numParticles);
@@ -517,7 +517,7 @@ class Grid {
 	this.gl.bindTexture(this.gl.TEXTURE_2D, this.oldVelocityTexture);
 
 	this.gl.uniform2f(this.boundaryConditionStirrerPosLoc, this.stirrerX, this.stirrerY);
-	this.gl.uniform1f(this.boundaryConditionStirrerRadiusLoc, 10.0);
+	this.gl.uniform1f(this.boundaryConditionStirrerRadiusLoc, this.stirrerRadius);
 
 	this.gl.uniform1f(this.boundaryConditionMetersPerCellLoc, this.gridScale);
 
@@ -654,8 +654,9 @@ class Grid {
 		  this.swapVelocityTextures();
 		}
 
+
 		this.stirrerX = this.cols / 2.0 + this.cols / 2.0 * Math.cos(physicsCurTime / 10.0);
-		this.stirrerY = 5;
+		this.stirrerY = this.rows / 2.0;
 
 		physicsCurTime += physicsDT;
 	  }
@@ -672,6 +673,6 @@ class Grid {
 
 self.onmessage = (msg) => {
   let canvas = msg.data.canvas;
-  let grid = new Grid(1.0, 20, 20, canvas);
+  let grid = new Grid(1.0, 50, 50, canvas);
   grid.run();
 }
