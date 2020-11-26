@@ -1,8 +1,2 @@
-go mod tidy
-go mod vendor
-
-find vendor/ -type f -name BUILD -delete
-find vendor/ -type f -name BUILD.bazel -delete
-find vendor/ -type f -name '*.bzl' -delete
-
-bazel run //:gazelle
+go mod tidy || exit 1
+bazel run //:gazelle || exit 1
