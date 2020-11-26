@@ -30,7 +30,7 @@ void main() {
   // In this shader, our fragment coordinates are cell centers.
   if(length(gl_FragCoord.xy - stirrerPos) < stirrerRadius) {
     newVelocity.x = 0.0;
-    newVelocity.y = 1.0 / metersPerCell;
+    newVelocity.y = 1.0 / metersPerCell; // Shaders deal in velocity as cells / second.
     return;
   }
 
@@ -175,7 +175,7 @@ vec2 gradientOfDivergenceAt(sampler2D field, ivec2 cellCC) {
     fieldNW = vec2(fieldWW.x, 0.0);
     fieldNN = vec2(fieldCC.x, 0.0);
     fieldSE = vec2(0.0, fieldSS.y);
-    fieldEE = vec2(0.0, fieldEE.y);
+    fieldEE = vec2(0.0, fieldCC.y);
     fieldNE = vec2(0.0, 0.0);
   } else if(cellCC.x == 0) {
     fieldSS = texelFetch(field, cellSS, 0).xy;
@@ -204,7 +204,7 @@ vec2 gradientOfDivergenceAt(sampler2D field, ivec2 cellCC) {
     fieldSS = texelFetch(field, cellSS, 0).xy;
     fieldCC = texelFetch(field, cellCC, 0).xy;
     fieldNN = texelFetch(field, cellNN, 0).xy;
-    fieldSE = vec2(0.0, fieldSE.y);
+    fieldSE = vec2(0.0, fieldSS.y);
     fieldEE = vec2(0.0, fieldCC.y);
     fieldNE = vec2(0.0, fieldNN.y);
   } else if(cellCC.y == size.y-1) {
@@ -379,8 +379,8 @@ class Grid {
 	this.newVelBuf = new Float32Array(rows * cols * 2);
 	for(let cx = 0; cx < this.cols; cx++) {
 	  for(let cy = 0; cy < this.rows; cy++) {
-		this.oldVelBuf[cy * this.cols * 2 + cx * 2 + 0] = cx / this.cols;
-		this.oldVelBuf[cy * this.cols * 2 + cx * 2 + 1] = cy / this.rows;
+		this.oldVelBuf[cy * this.cols * 2 + cx * 2 + 0] = 0.0;
+		this.oldVelBuf[cy * this.cols * 2 + cx * 2 + 1] = 0.0;
 	  }
 	}
 
@@ -640,6 +640,13 @@ class Grid {
 
 	  let physicsTargetTime = physicsCurTime + dt;
 	  while(physicsCurTime < physicsTargetTime) {
+		this.stirrerRadius = 4;
+		this.stirrerX = this.cols / 2.0;
+		//this.stirrerX = this.cols / 2.0 + this.cols / 2.0 * Math.cos(physicsCurTime / 10.0);
+		this.stirrerY = this.rows / 2.0;
+
+		physicsCurTime += physicsDT;
+
 		this.runBoundaryConditionProgram();
 		this.swapVelocityTextures();
 
@@ -653,12 +660,6 @@ class Grid {
 		  this.runRemoveDivergenceProgram();
 		  this.swapVelocityTextures();
 		}
-
-
-		this.stirrerX = this.cols / 2.0 + this.cols / 2.0 * Math.cos(physicsCurTime / 10.0);
-		this.stirrerY = this.rows / 2.0;
-
-		physicsCurTime += physicsDT;
 	  }
 
 	  this.runRenderProgram();
@@ -673,6 +674,6 @@ class Grid {
 
 self.onmessage = (msg) => {
   let canvas = msg.data.canvas;
-  let grid = new Grid(1.0, 50, 50, canvas);
+  let grid = new Grid(1.0, 20, 20, canvas);
   grid.run();
 }
