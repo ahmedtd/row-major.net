@@ -148,7 +148,7 @@ spec:
         - --enable-profiling
         - --enable-tracing
         - --enable-metrics
-        image: gcr.io/bomsync-214520/webalator:9d32df2db6da34b803607597727a76be763aee67
+        image: gcr.io/bomsync-214520/webalator:7be3e1fc424190225f0444cd63aaf7bff2643439
         livenessProbe:
           httpGet:
             path: /healthz
@@ -198,7 +198,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: gcr.io/bomsync-214520/shardedcontroller:9d32df2db6da34b803607597727a76be763aee67
+        image: gcr.io/bomsync-214520/shardedcontroller:7be3e1fc424190225f0444cd63aaf7bff2643439
         name: sharded-controller
 ---
 apiVersion: extensions/v1beta1
@@ -222,6 +222,7 @@ apiVersion: networking.gke.io/v1beta1
 kind: FrontendConfig
 metadata:
   name: row-major-web
+  namespace: row-major-web
 spec:
   redirectToHttps:
     enabled: true
