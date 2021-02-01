@@ -106,6 +106,7 @@ spec:
 apiVersion: networking.gke.io/v1beta1
 kind: FrontendConfig
 metadata:
+  namespace: row-major-web
   name: row-major-web
 spec:
   redirectToHttps:
