@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
 	"os"
 	"row-major/webalator/healthz"
 	"row-major/webalator/httpmetrics"
+	"row-major/webalator/imgalator"
 	"row-major/webalator/mdredir"
 	"row-major/webalator/site"
 	"time"
@@ -27,6 +29,8 @@ var (
 	enableProfiling       = flag.Bool("enable-profiling", false, "")
 	enableTracing         = flag.Bool("enable-tracing", false, "")
 	enableMetrics         = flag.Bool("enable-metrics", false, "")
+
+	imgalatorBucket = flag.String("imgalator-bucket", "", "Bucket to access using imgalator")
 )
 
 func main() {
@@ -41,6 +45,8 @@ func main() {
 	log.Printf("enable-profiling: %q", *enableProfiling)
 	log.Printf("enable-tracing: %q", *enableTracing)
 	log.Printf("enable-metrics: %q", *enableMetrics)
+
+	log.Printf("imgalator-bucket: %q", *imgalatorBucket)
 
 	if metadata.OnGCE() {
 		sa, err := metadata.Email("")
@@ -96,6 +102,11 @@ func main() {
 		log.Fatalf("Error creating site: %v", err)
 	}
 
+	imgalator, err := imgalator.New(context.Background(), "/imgalator", *imgalatorBucket)
+	if err != nil {
+		log.Fatalf("Error creating imgalator: %v", err)
+	}
+
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
 	debugServer := &http.Server{
@@ -114,6 +125,7 @@ func main() {
 
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/", site.Mux)
+	serveMux.Handle("/imgalator/", imgalator)
 	serveMux.Handle("/metadata-redirect", mdredir.New())
 	serveMux.Handle("/healthz", healthz.New())
 	serveMux.Handle("/readyz", healthz.New())
