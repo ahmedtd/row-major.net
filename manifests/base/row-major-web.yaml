@@ -103,6 +103,15 @@ spec:
   domains:
     - row-major.net
 ---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: row-major-web
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: FOUND
+---
 kind: Ingress
 apiVersion: extensions/v1beta1
 metadata:
@@ -113,13 +122,8 @@ metadata:
     component: ingress
   annotations:
     networking.gke.io/managed-certificates: www-row-major-net,row-major-net
-    kubernetes.io/ingress.global-static-ip-name: "row-major-web"
-    # This doesn't work yet.  Watch
-    # https://github.com/kubernetes/ingress-gce/issues/51 and
-    # https://issuetracker.google.com/issues/35904733
-    #
-    #kubernetes.io/ingress.allow-http: "false"
-    #ingress.kubernetes.io/force-ssl-redirect: "true"
+    kubernetes.io/ingress.global-static-ip-name: row-major-web
+    networking.gke.io/v1beta1.FrontendConfig: row-major-web
 spec:
   backend:
     serviceName: row-major-web-content-service
