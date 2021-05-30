@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
 - row-major-web.yaml
 - sharded-controller.yaml
+- rumor-mill.yaml

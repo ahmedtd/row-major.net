@@ -26,10 +26,21 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel/shardedcontroller:shardedcontroller', 'gcr.io/$PROJECT_ID/shardedcontroller:${COMMIT_SHA}']
 
+# Build and tag rumor-mill
+- name: 'gcr.io/cloud-marketplace-containers/google/bazel'
+  entrypoint: 'bazel'
+  args: ['run', '--remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net', '--google_default_credentials', '//rumor-mill:rumor-mill_image', '--', '--norun']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'bazel/rumor-mill:rumor-mill_image', 'gcr.io/$PROJECT_ID/rumor-mill:latest']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'bazel/rumor-mill:rumor-mill_image', 'gcr.io/$PROJECT_ID/rumor-mill:${COMMIT_SHA}']
+
 images:
   - 'gcr.io/$PROJECT_ID/webalator:latest'
   - 'gcr.io/$PROJECT_ID/webalator:${COMMIT_SHA}'
   - 'gcr.io/$PROJECT_ID/shardedcontroller:latest'
   - 'gcr.io/$PROJECT_ID/shardedcontroller:${COMMIT_SHA}'
+  - 'gcr.io/$PROJECT_ID/rumor-mill:latest'
+  - 'gcr.io/$PROJECT_ID/rumor-mill:${COMMIT_SHA}'
 
 logsBucket: 'gs://cloud-build-logs.row-major.net'

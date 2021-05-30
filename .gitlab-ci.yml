@@ -44,6 +44,18 @@ Update Manifest:
             containers:
               - name: sharded-controller
                 image: gcr.io/bomsync-214520/shardedcontroller:${CI_COMMIT_SHA}
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: rumor-mill
+        namespace: rumor-mill
+      spec:
+        template:
+          spec:
+            containers:
+            - name: main
+              image: gcr.io/bomsync-214520/rumor-mill:${CI_COMMIT_SHA}
       EOF
     - |
       cat <<EOF >commit-message.txt

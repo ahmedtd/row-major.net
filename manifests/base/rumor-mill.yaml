@@ -1,0 +1,47 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: rumor-mill
+
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: rumor-mill
+  namespace: rumor-mill
+  labels:
+    app: rumor-mill
+spec:
+  selector:
+    matchLabels:
+      app: rumor-mill
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: rumor-mill
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: main
+        image: gcr.io/bomsync-214520/rumor-mill:latest
+        ports:
+        - containerPort: 8001
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        command:
+        - /app/rumor-mill/rumor-mill
+        - --debug-listen=0.0.0.0:8001
+        - --logtostderr=true
+        

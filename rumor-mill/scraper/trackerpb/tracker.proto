@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+enum TrackerState {
+  UNTRACKED = 0;
+  INTERESTED = 1;
+  NOT_INTERESTED = 2;
+}
+
+message TrackedArticle {
+  uint64 id = 1;
+
+  TrackerState cur_tracker_state = 2;
+  int64 first_seen_time = 3;
+  int64 latest_seen_time = 4;
+  bool fetch_required = 5;
+  bool reap_allowed = 6;
+
+  repeated uint64 interested_watch_configs = 7;
+
+  int64 rank = 8;
+
+  string title = 9;
+  string submitter = 10;
+}
