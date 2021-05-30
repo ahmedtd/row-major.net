@@ -11,7 +11,10 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/jlaffaye/ftp v0.0.0-20200422224957-b9f3ade29122
 	go.opencensus.io v0.23.0
+	golang.org/x/net v0.0.0-20210525063256-abc453219eb5 // indirect
+	golang.org/x/sys v0.0.0-20210525143221-35b2ab0089ea // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/tools v0.1.2 // indirect
 	google.golang.org/api v0.47.0
 	k8s.io/api v0.19.3
 	k8s.io/apimachinery v0.19.3

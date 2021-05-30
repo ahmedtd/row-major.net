@@ -66,9 +66,9 @@ func (o *Oracle) loginWithIdentityToken(ctx context.Context, token string) (*log
 	}
 
 	o.logins[cookie] = &loginDetails{
-		cookie:         cookie,
-		principal:      p.Claims["email"],
-		expirationTime: time.Now().Add(18 * time.Hour),
+		cookie:    cookie,
+		principal: p.Claims["email"].(string),
+		expiresAt: time.Now().Add(18 * time.Hour),
 	}
 
 	return o.logins[cookie], nil
@@ -125,7 +125,7 @@ func (h *Handler) serveExchangeToken(w http.ResponseWriter, r *http.Request) {
 	}
 	idToken := r.Form["id-token"][0]
 
-	details, err := h.oracle.LoginWithIdentityToken(idToken)
+	details, err := h.oracle.loginWithIdentityToken(r.Context(), idToken)
 	if err != nil {
 		log.Printf("login: serveExchangeToken: error while logging in: %v", err)
 		http.Error(w, "", http.StatusInternalServerError)
@@ -134,8 +134,8 @@ func (h *Handler) serveExchangeToken(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, &http.Cookie{
 		Name:    "auth-token",
-		Value:   details.Cookie,
-		Expires: details.ExpiresAt,
+		Value:   details.cookie,
+		Expires: details.expiresAt,
 	})
 	w.Write([]byte("Logged In"))
 }
