@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:7be3e1fc424190225f0444cd63aaf7bff2643439
+          image: gcr.io/bomsync-214520/webalator:aab2efb5946ad186270f1de7020c1ced148087ae
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -21,4 +21,16 @@ spec:
     spec:
       containers:
         - name: sharded-controller
-          image: gcr.io/bomsync-214520/shardedcontroller:7be3e1fc424190225f0444cd63aaf7bff2643439
+          image: gcr.io/bomsync-214520/shardedcontroller:aab2efb5946ad186270f1de7020c1ced148087ae
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rumor-mill
+  namespace: rumor-mill
+spec:
+  template:
+    spec:
+      containers:
+      - name: main
+        image: gcr.io/bomsync-214520/rumor-mill:aab2efb5946ad186270f1de7020c1ced148087ae
