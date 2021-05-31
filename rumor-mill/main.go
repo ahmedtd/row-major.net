@@ -47,6 +47,7 @@ func main() {
 
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
+	debugServeMux.Handle("/readyz", healthz.New())
 	debugServer := &http.Server{
 		Addr:    *debugListen,
 		Handler: debugServeMux,
