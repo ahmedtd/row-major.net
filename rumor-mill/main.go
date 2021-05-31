@@ -16,13 +16,18 @@ import (
 	"row-major/rumor-mill/scraper"
 	"row-major/webalator/healthz"
 
+	cloudmetrics "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
+	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"github.com/golang/glog"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 var (
-	debugListen = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
-	stateDir    = flag.String("state-dir", "", "GCS prefix for holding state.")
-	userAgent   = flag.String("user-agent", "row-major.net/rumor-mill", "User-Agent to use for all scraping operations.")
+	debugListen          = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
+	stateDir             = flag.String("state-dir", "", "GCS prefix for holding state.")
+	userAgent            = flag.String("user-agent", "row-major.net/rumor-mill", "User-Agent to use for all scraping operations.")
+	monitoring           = flag.Bool("monitoring", false, "Enable monitoring?")
+	monitoringTraceRatio = flag.Float64("monitoring-trace-ratio", 0.0001, "What ratio of traces should be exported?")
 )
 
 var (
@@ -41,6 +46,24 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if *monitoring {
+		traceOpts := []sdktrace.TracerProviderOption{
+			sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)),
+		}
+
+		_, traceShutdown, err := cloudtrace.InstallNewPipeline(nil, traceOpts...)
+		if err != nil {
+			glog.Fatalf("Failed to install Cloud Trace OpenTelemetry trace pipeline: %v", err)
+		}
+		defer traceShutdown()
+
+		pusher, err := cloudmetrics.InstallNewPipeline(nil)
+		if err != nil {
+			glog.Fatalf("Failed to install Cloud Metrics OpenTelemetry meter pipeline: %v", err)
+		}
+		defer pusher.Stop(ctx)
+	}
 
 	httpClient := &http.Client{}
 	hn := hackernews.New(httpClient, "hacker-news.firebaseio.com")

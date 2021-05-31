@@ -17,6 +17,8 @@ import (
 	trackerpb "row-major/rumor-mill/scraper/trackerpb"
 
 	"github.com/golang/glog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type trackerState int
@@ -117,6 +119,11 @@ func (s *Scraper) Run(ctx context.Context) {
 }
 
 func (s *Scraper) scraperPass(ctx context.Context) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Scraper Pass")
+	defer span.End()
+
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
@@ -145,6 +152,11 @@ func (s *Scraper) scraperPass(ctx context.Context) error {
 }
 
 func (s *Scraper) ingestTopStories(ctx context.Context) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Ingest Top Stories")
+	defer span.End()
+
 	topStories, err := s.hn.TopStories(ctx)
 	if err != nil {
 		return fmt.Errorf("while querying for top stories: %w", err)

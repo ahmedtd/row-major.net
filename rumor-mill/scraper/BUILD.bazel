@@ -9,5 +9,7 @@ go_library(
         "//rumor-mill/hackernews:go_default_library",
         "//rumor-mill/scraper/trackerpb:go_default_library",
         "@com_github_golang_glog//:go_default_library",
+        "@io_opentelemetry_go_otel//:go_default_library",
+        "@io_opentelemetry_go_otel_trace//:go_default_library",
     ],
 )

@@ -44,4 +44,6 @@ spec:
         - /app/rumor-mill/rumor-mill
         - --debug-listen=0.0.0.0:8001
         - --logtostderr=true
+        - --monitoring=true
+        - --monitoring-trace-ratio=1.0
         

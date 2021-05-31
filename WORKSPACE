@@ -31,6 +31,47 @@ http_archive(
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
+# TODO: Remove this pinned dependency after bumping rules_go.  Rules_go bundles
+# an older version of this dependency.  Sigh.
+http_archive(
+    name = "org_golang_google_genproto",
+    patch_args = ["-p1"],
+    patches = [
+        # gazelle args: -repo_root . -go_prefix google.golang.org/genproto -go_naming_convention import_alias -proto disable_global
+        "//bazel-patches:org_golang_google_genproto-gazelle.patch",
+    ],
+    sha256 = "c06065ed15510483aaaf3e79fa3d387f7cedd48f984586374cab44bbf4edcf88",
+    strip_prefix = "go-genproto-669157292da34ccd2ff7ebc3af406854a79d61ce",
+    # master, as of 2021-05-30
+    urls = [
+        "https://github.com/googleapis/go-genproto/archive/669157292da34ccd2ff7ebc3af406854a79d61ce.zip",
+    ],
+)
+
+# TODO: Remove this pinned dependency after bumping rules_go.  Rules_go bundles
+# an older version of this dependency.  Sigh.
+http_archive(
+    name = "go_googleapis",
+    patch_args = [
+        "-E",
+        "-p1",
+    ],
+    patches = [
+        # find . -name BUILD.bazel -delete
+        "//bazel-patches:go_googleapis-deletebuild.patch",
+        # set gazelle directives; change workspace name
+        "//bazel-patches:go_googleapis-directives.patch",
+        # gazelle args: -repo_root .
+        "//bazel-patches:go_googleapis-gazelle.patch",
+    ],
+    sha256 = "e93e2c2217257e42b11717927d96d5799548619fbbb78cca9fa5051c39d90114",
+    strip_prefix = "googleapis-1c20dcfd8052a2bea026bda36875e5b7606028db",
+    # master, as of 2021-05-31
+    urls = [
+        "https://github.com/googleapis/googleapis/archive/1c20dcfd8052a2bea026bda36875e5b7606028db.zip",
+    ],
+)
+
 go_rules_dependencies()
 
 go_register_toolchains(version = "1.15")
@@ -45,6 +86,104 @@ http_archive(
 )
 
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+
+go_repository(
+    name = "com_github_benbjohnson_clock",
+    importpath = "github.com/benbjohnson/clock",
+    sum = "h1:vkLuvpK4fmtSCuo60+yC63p7y0BmQ8gm5ZXGuBCJyXg=",
+    version = "v1.0.3",
+)
+
+go_repository(
+    name = "com_github_felixge_httpsnoop",
+    importpath = "github.com/felixge/httpsnoop",
+    sum = "h1:lvB5Jl89CsZtGIWuTcDM1E/vkVs49/Ml7JJe07l8SPQ=",
+    version = "v1.0.1",
+)
+
+go_repository(
+    name = "com_github_googlecloudplatform_opentelemetry_operations_go_exporter_metric",
+    importpath = "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric",
+    sum = "h1:K6M7F6qeNMgUERKXMOeS/aRdCrpAY8t219iELV0dc0o=",
+    version = "v0.20.1",
+)
+
+go_repository(
+    name = "com_github_googlecloudplatform_opentelemetry_operations_go_exporter_trace",
+    importpath = "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace",
+    sum = "h1:b+IF0z5KKs9pEXtPb3gic80fTotTOdiTzg+EfsKv7l4=",
+    version = "v0.20.1",
+)
+
+go_repository(
+    name = "com_github_googleinterns_cloud_operations_api_mock",
+    importpath = "github.com/googleinterns/cloud-operations-api-mock",
+    sum = "h1:eHv/jVY/JNop1xg2J9cBb4EzyMpWZoNCP1BslSAIkOI=",
+    version = "v0.0.0-20200709193332-a1e58c29bdd3",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_contrib",
+    importpath = "go.opentelemetry.io/contrib",
+    sum = "h1:ubFQUn0VCZ0gPwIoJfBJVpeBlyRMxu8Mm/huKWYd9p0=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_contrib_instrumentation_net_http_otelhttp",
+    importpath = "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+    sum = "h1:Q3C9yzW6I9jqEc8sawxzxZmY48fs9u220KXq6d5s3XU=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_otel",
+    importpath = "go.opentelemetry.io/otel",
+    sum = "h1:eaP0Fqu7SXHwvjiqDq83zImeehOHX8doTvU9AwXON8g=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_otel_metric",
+    importpath = "go.opentelemetry.io/otel/metric",
+    sum = "h1:4kzhXFP+btKm4jwxpjIqjs41A7MakRFUS86bqLHTIw8=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_otel_oteltest",
+    importpath = "go.opentelemetry.io/otel/oteltest",
+    sum = "h1:HiITxCawalo5vQzdHfKeZurV8x7ljcqAgiWzF6Vaeaw=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_otel_sdk",
+    importpath = "go.opentelemetry.io/otel/sdk",
+    sum = "h1:JsxtGXd06J8jrnya7fdI/U/MR6yXA5DtbZy+qoHQlr8=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_otel_sdk_export_metric",
+    importpath = "go.opentelemetry.io/otel/sdk/export/metric",
+    sum = "h1:c5VRjxCXdQlx1HjzwGdQHzZaVI82b5EbBgOu2ljD92g=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_otel_sdk_metric",
+    importpath = "go.opentelemetry.io/otel/sdk/metric",
+    sum = "h1:7ao1wpzHRVKf0OQ7GIxiQJA6X7DLX9o14gmVon7mMK8=",
+    version = "v0.20.0",
+)
+
+go_repository(
+    name = "io_opentelemetry_go_otel_trace",
+    importpath = "go.opentelemetry.io/otel/trace",
+    sum = "h1:1DL6EXUdcg95gukhuRRvLDO/4X5THh/5dIV52lqtnbw=",
+    version = "v0.20.0",
+)
 
 gazelle_dependencies()
 
@@ -236,8 +375,8 @@ go_repository(
 go_repository(
     name = "com_github_google_pprof",
     importpath = "github.com/google/pprof",
-    sum = "h1:zIaiqGYDQwa4HVx5wGRTXbx38Pqxjemn4BP98wpzpXo=",
-    version = "v0.0.0-20210226084205-cbba55b83ad5",
+    sum = "h1:jmAp/2PZAScNd62lTD3Mcb0Ey9FvIIJtLohPhtxZJ+Q=",
+    version = "v0.0.0-20210506205249-923b5ab0fc1a",
 )
 
 go_repository(
@@ -348,8 +487,8 @@ go_repository(
 go_repository(
     name = "com_github_stretchr_testify",
     importpath = "github.com/stretchr/testify",
-    sum = "h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=",
-    version = "v1.6.1",
+    sum = "h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=",
+    version = "v1.7.0",
 )
 
 go_repository(
@@ -362,8 +501,8 @@ go_repository(
 go_repository(
     name = "com_google_cloud_go",
     importpath = "cloud.google.com/go",
-    sum = "h1:at8Tk2zUz63cLPR0JPWm5vp77pEZmzxEQBEfRKn1VV8=",
-    version = "v0.81.0",
+    sum = "h1:FZ4B2YAzCzkwzGEOp1dqG8sAa3zNIvro1fHRTrB81RU=",
+    version = "v0.82.0",
 )
 
 go_repository(
@@ -469,13 +608,6 @@ go_repository(
     importpath = "google.golang.org/appengine",
     sum = "h1:FZR1q0exgwxzPzp/aF+VccGrSfxfPpkBqjIIEq3ru6c=",
     version = "v1.6.7",
-)
-
-go_repository(
-    name = "org_golang_google_genproto",
-    importpath = "google.golang.org/genproto",
-    sum = "h1:z+j74wi4yV+P7EtK9gPLGukOk7mFOy9wMQaC0wNb7eY=",
-    version = "v0.0.0-20210513213006-bf773b8c8384",
 )
 
 go_repository(
