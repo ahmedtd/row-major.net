@@ -9,6 +9,10 @@ go_library(
     data = [":sgb-words.txt"],
     importpath = "row-major/wordgrid",
     visibility = ["//visibility:public"],
+    deps = [
+        "@io_opentelemetry_go_otel//:go_default_library",
+        "@io_opentelemetry_go_otel_trace//:go_default_library",
+    ],
 )
 
 go_test(

@@ -1,15 +1,20 @@
 package site
 
 import (
+	"context"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"row-major/wordgrid"
 	"strings"
 	"sync"
+
+	"row-major/wordgrid"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Site struct {
@@ -54,14 +59,19 @@ func newTemplateHandler(templateDir string, inner http.Handler, rescan bool) (*t
 		templateDir: templateDir,
 		inner:       inner,
 	}
-	if err := th.doRescan(); err != nil {
+	if err := th.doRescan(context.Background()); err != nil {
 		return nil, err
 	}
 
 	return th, nil
 }
 
-func (h *templateHandler) doRescan() error {
+func (h *templateHandler) doRescan(ctx context.Context) error {
+	tracer := otel.Tracer("row-major/webalator/site")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Rescan Templates")
+	defer span.End()
+
 	baseTemplate := filepath.Join(h.templateDir, "base.html.tmpl")
 
 	return filepath.Walk(h.templateDir, func(path string, info os.FileInfo, err error) error {
@@ -86,8 +96,12 @@ func (h *templateHandler) doRescan() error {
 }
 
 func (h *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	tracer := otel.Tracer("row-major/webalator/site")
+	ctx, span := tracer.Start(r.Context(), "Webalator Site Serve HTTP")
+	defer span.End()
+
 	if h.rescan {
-		h.doRescan()
+		h.doRescan(ctx)
 	}
 
 	h.lock.Lock()
@@ -98,6 +112,10 @@ func (h *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.inner.ServeHTTP(w, r)
 		return
 	}
+
+	var tplExecuteSpan trace.Span
+	ctx, tplExecuteSpan = tracer.Start(ctx, "Execute Template")
+	defer tplExecuteSpan.End()
 
 	if err := tpl.Execute(w, nil); err != nil {
 		log.Printf("Error while writing http response: %v", err)

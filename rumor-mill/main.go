@@ -48,11 +48,7 @@ func main() {
 	defer cancel()
 
 	if *monitoring {
-		traceOpts := []sdktrace.TracerProviderOption{
-			sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)),
-		}
-
-		_, traceShutdown, err := cloudtrace.InstallNewPipeline(nil, traceOpts...)
+		_, traceShutdown, err := cloudtrace.InstallNewPipeline(nil, sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)))
 		if err != nil {
 			glog.Fatalf("Failed to install Cloud Trace OpenTelemetry trace pipeline: %v", err)
 		}

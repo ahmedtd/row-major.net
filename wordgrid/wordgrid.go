@@ -1,11 +1,15 @@
 package wordgrid
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type trieNode struct {
@@ -159,7 +163,12 @@ func (e *SubEvaluator) areAllRowsValidWordPrefixes() bool {
 	return true
 }
 
-func (e *SubEvaluator) Search() (ok bool) {
+func (e *SubEvaluator) Search(ctx context.Context) (ok bool) {
+	tracer := otel.Tracer("row-major/wordgrid")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "WordGrid SubEvaluator Search")
+	defer span.End()
+
 	for e.curCol != -1 {
 		e.ColAssignments[e.curCol] += 1
 

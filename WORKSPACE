@@ -38,7 +38,7 @@ http_archive(
     patch_args = ["-p1"],
     patches = [
         # gazelle args: -repo_root . -go_prefix google.golang.org/genproto -go_naming_convention import_alias -proto disable_global
-        "//bazel-patches:org_golang_google_genproto-gazelle.patch",
+        "//repo-tools/bazel-patches:org_golang_google_genproto-gazelle.patch",
     ],
     sha256 = "c06065ed15510483aaaf3e79fa3d387f7cedd48f984586374cab44bbf4edcf88",
     strip_prefix = "go-genproto-669157292da34ccd2ff7ebc3af406854a79d61ce",
@@ -58,11 +58,11 @@ http_archive(
     ],
     patches = [
         # find . -name BUILD.bazel -delete
-        "//bazel-patches:go_googleapis-deletebuild.patch",
+        "//repo-tools/bazel-patches:go_googleapis-deletebuild.patch",
         # set gazelle directives; change workspace name
-        "//bazel-patches:go_googleapis-directives.patch",
+        "//repo-tools/bazel-patches:go_googleapis-directives.patch",
         # gazelle args: -repo_root .
-        "//bazel-patches:go_googleapis-gazelle.patch",
+        "//repo-tools/bazel-patches:go_googleapis-gazelle.patch",
     ],
     sha256 = "e93e2c2217257e42b11717927d96d5799548619fbbb78cca9fa5051c39d90114",
     strip_prefix = "googleapis-1c20dcfd8052a2bea026bda36875e5b7606028db",

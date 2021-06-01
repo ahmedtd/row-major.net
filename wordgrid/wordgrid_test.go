@@ -1,6 +1,7 @@
 package wordgrid
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,7 +30,7 @@ func TestBasic(t *testing.T) {
 		"eabcd",
 	}
 	for i := 0; i < 5; i++ {
-		ok := e.Search()
+		ok := e.Search(context.Background())
 		if !ok {
 			t.Fatalf("Didn't yield a solution")
 		}
@@ -54,7 +55,7 @@ func TestBasic(t *testing.T) {
 		wantWords[4] = tmp
 	}
 
-	ok := e.Search()
+	ok := e.Search(context.Background())
 	if ok {
 		t.Fatalf("Yielded an extra solution %+v", e.SolutionAsGrid())
 	}
@@ -84,7 +85,7 @@ func TestRespectsConstraints(t *testing.T) {
 
 	e := evaluator.SubEvaluator(constraints)
 
-	ok := e.Search()
+	ok := e.Search(context.Background())
 	if !ok {
 		t.Fatalf("Didn't yield solution, but expected 1 solution")
 	}
@@ -102,7 +103,7 @@ func TestRespectsConstraints(t *testing.T) {
 		t.Fatalf("Bad solution, diff (-got +want)\n%s", diff)
 	}
 
-	ok = e.Search()
+	ok = e.Search(context.Background())
 	if ok {
 		t.Fatalf("Yielded too many solutions")
 	}
@@ -132,7 +133,7 @@ func TestOverConstrained(t *testing.T) {
 
 	e := evaluator.SubEvaluator(constraints)
 
-	ok := e.Search()
+	ok := e.Search(context.Background())
 	if ok {
 		t.Fatalf("Yielded solution %+v", e.SolutionAsGrid())
 	}

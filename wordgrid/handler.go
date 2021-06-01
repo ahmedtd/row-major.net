@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"go.opentelemetry.io/otel"
 )
 
 type Handler struct {
@@ -42,6 +44,10 @@ type solveResponse struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	tracer := otel.Tracer("row-major/rumor-mill/wordgrid")
+	ctx, span := tracer.Start(r.Context(), "WordGrid Serve HTTP")
+	defer span.End()
+
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -73,7 +79,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ConstraintGrid: constraintStrings,
 	}
 	e := h.evaluator.SubEvaluator(constraints)
-	ok := e.Search()
+	ok := e.Search(ctx)
 	if ok {
 		response.FoundSolution = true
 		response.Grid = e.SolutionAsGrid()

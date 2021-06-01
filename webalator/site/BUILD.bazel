@@ -5,5 +5,9 @@ go_library(
     srcs = ["site.go"],
     importpath = "row-major/webalator/site",
     visibility = ["//visibility:public"],
-    deps = ["//wordgrid:go_default_library"],
+    deps = [
+        "//wordgrid:go_default_library",
+        "@io_opentelemetry_go_otel//:go_default_library",
+        "@io_opentelemetry_go_otel_trace//:go_default_library",
+    ],
 )
