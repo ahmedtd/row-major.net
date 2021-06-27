@@ -155,7 +155,7 @@ spec:
         - --enable-tracing
         - --tracing-ratio=1.0
         - --enable-metrics
-        image: gcr.io/bomsync-214520/webalator:322da7fc5f4f536e6db951d4a4dd6ce498af7d6d
+        image: gcr.io/bomsync-214520/webalator:7eb69be41f0dad2f09cbe27c64012600c880210c
         livenessProbe:
           httpGet:
             path: /healthz
@@ -197,7 +197,7 @@ spec:
         - --logtostderr=true
         - --monitoring=true
         - --monitoring-trace-ratio=0.1
-        image: gcr.io/bomsync-214520/rumor-mill:322da7fc5f4f536e6db951d4a4dd6ce498af7d6d
+        image: gcr.io/bomsync-214520/rumor-mill:7eb69be41f0dad2f09cbe27c64012600c880210c
         livenessProbe:
           httpGet:
             path: /healthz
@@ -247,7 +247,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: gcr.io/bomsync-214520/shardedcontroller:322da7fc5f4f536e6db951d4a4dd6ce498af7d6d
+        image: gcr.io/bomsync-214520/shardedcontroller:7eb69be41f0dad2f09cbe27c64012600c880210c
         name: sharded-controller
 ---
 apiVersion: extensions/v1beta1
