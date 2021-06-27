@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guac-example
+  annotations:
+    client-library-federation-config.gke.io: |
+      {
+        "type": "external_account",
+        "audience": "identitynamespace:bomsync-214520.svc.id.goog:https://container.googleapis.com/v1/projects/bomsync-214520/locations/us-west1-a/clusters/taahm-primary-cluster",
+        "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/client-library-federation-test@bomsync-214520.iam.gserviceaccount.com:generateAccessToken",
+        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "credential_source": {
+          "file": "/var/run/secrets/google-client-library-federation/token"
+        }
+      }
+spec:
+  containers:
+  - image: gcr.io/bomsync-214520/service-account-probe # My own image, just prints out application default credentials
+    name: main
+    command:
+    - /app/service-account-probe/service-account-probe
+    - --logtostderr=true
+    env:
+    - name: GOOGLE_APPLICATION_CREDENTIALS
+      value: /var/run/secrets/google-client-library-federation/config.json
+    volumeMounts:
+    - name: google-client-library-federation
+      mountPath: /var/run/secrets/google-client-library-federation
+  serviceAccountName: default
+  volumes:
+  - name: google-client-library-federation
+    projected:
+      sources:
+      - downwardAPI:
+          items:
+          - path: config.json
+            fieldRef:
+              fieldPath: metadata.annotations['client-library-federation-config.gke.io']
+      - serviceAccountToken:
+          path: token
+          audience: bomsync-214520.svc.id.goog
+          expirationSeconds: 3600

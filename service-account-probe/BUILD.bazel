@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_push",
+)
+
+go_image(
+    name = "service-account-probe_image",
+    binary = ":service-account-probe",
+)
+
+container_push(
+    name = "service-account-probe_push",
+    format = "Docker",
+    image = ":service-account-probe_image",
+    registry = "gcr.io",
+    repository = "bomsync-214520/service-account-probe",
+    tag = "latest",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "row-major/service-account-probe",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_golang_glog//:go_default_library",
+        "@org_golang_x_oauth2//google:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "service-account-probe",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
