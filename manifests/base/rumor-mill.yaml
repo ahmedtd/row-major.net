@@ -45,5 +45,5 @@ spec:
         - --debug-listen=0.0.0.0:8001
         - --logtostderr=true
         - --monitoring=true
-        - --monitoring-trace-ratio=1.0
+        - --monitoring-trace-ratio=0.1
         - --data-dir=rumor-mill-state-prod-us-west1
