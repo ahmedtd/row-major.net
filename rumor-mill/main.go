@@ -21,6 +21,7 @@ import (
 	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"github.com/golang/glog"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	googleopt "google.golang.org/api/option"
 )
 
 var (
@@ -85,7 +86,7 @@ func main() {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	gcs, err := storage.NewClient(ctx)
+	gcs, err := storage.NewClient(ctx, googleopt.WithGRPCConnectionPool(1))
 	if err != nil {
 		glog.Fatalf("Failed to create new GCS client: %v", err)
 	}
