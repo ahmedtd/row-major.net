@@ -16,6 +16,7 @@ import (
 	"row-major/rumor-mill/scraper"
 	"row-major/webalator/healthz"
 
+	"cloud.google.com/go/storage"
 	cloudmetrics "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
 	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"github.com/golang/glog"
@@ -24,9 +25,10 @@ import (
 
 var (
 	debugListen          = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
-	stateDir             = flag.String("state-dir", "", "GCS prefix for holding state.")
+	dataDir              = flag.String("data-dir", "", "GCS bucket for database")
 	userAgent            = flag.String("user-agent", "row-major.net/rumor-mill", "User-Agent to use for all scraping operations.")
 	monitoring           = flag.Bool("monitoring", false, "Enable monitoring?")
+	monitoringProject    = flag.String("monitoring-project", "", "Override project used for monitoring integration.  If not specified, the project associated with Application Default Credentials is used.")
 	monitoringTraceRatio = flag.Float64("monitoring-trace-ratio", 0.0001, "What ratio of traces should be exported?")
 )
 
@@ -41,20 +43,27 @@ func main() {
 
 	glog.Infof("flags:")
 	glog.Infof("debug-listen: %q", *debugListen)
-	glog.Infof("state-dir: %q", *stateDir)
+	glog.Infof("data-dir: %q", *dataDir)
 	glog.Infof("user-agent: %q", *userAgent)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if *monitoring {
-		_, traceShutdown, err := cloudtrace.InstallNewPipeline(nil, sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)))
+		metricsOpts := []cloudmetrics.Option{}
+		traceOpts := []cloudtrace.Option{}
+		if *monitoringProject != "" {
+			metricsOpts = append(metricsOpts, cloudmetrics.WithProjectID(*monitoringProject))
+			traceOpts = append(traceOpts, cloudtrace.WithProjectID(*monitoringProject))
+		}
+
+		_, traceShutdown, err := cloudtrace.InstallNewPipeline(traceOpts, sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)))
 		if err != nil {
 			glog.Fatalf("Failed to install Cloud Trace OpenTelemetry trace pipeline: %v", err)
 		}
 		defer traceShutdown()
 
-		pusher, err := cloudmetrics.InstallNewPipeline(nil)
+		pusher, err := cloudmetrics.InstallNewPipeline(metricsOpts)
 		if err != nil {
 			glog.Fatalf("Failed to install Cloud Metrics OpenTelemetry meter pipeline: %v", err)
 		}
@@ -76,19 +85,21 @@ func main() {
 		MaxHeaderBytes: 1 << 20,
 	}
 
+	gcs, err := storage.NewClient(ctx)
+	if err != nil {
+		glog.Fatalf("Failed to create new GCS client: %v", err)
+	}
+
+	trackedArticles := scraper.NewTrackedArticleTable(gcs, *dataDir)
+
 	scr := scraper.New(
 		hn,
+		trackedArticles,
 		scraper.WithWatchConfig(&scraper.WatchConfig{
-			ID:          1,
-			TopicRegexp: topicRegexp,
-			NotifyAddresses: []string{
-				"rumor-mill-gke@google.com",
-				// Since the emails come from me, Gmail doesn't display them to me, even
-				// though I am subscribed to rumor-mill-gke.
-				"taahm@google.com",
-			},
+			ID:              1,
+			TopicRegexp:     topicRegexp,
+			NotifyAddresses: []string{},
 		}),
-		scraper.WithGCSCheckpointFile(*stateDir),
 	)
 	scr.RegisterDebugHandlers(debugServeMux)
 

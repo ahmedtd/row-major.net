@@ -4,21 +4,29 @@ package scraper
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
 	"row-major/rumor-mill/hackernews"
 	trackerpb "row-major/rumor-mill/scraper/trackerpb"
 
+	"cloud.google.com/go/storage"
 	"github.com/golang/glog"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/api/iterator"
+	"google.golang.org/protobuf/proto"
 )
 
 type trackerState int
@@ -33,24 +41,215 @@ type hnClient interface {
 	Items(context.Context, []uint64) ([]*hackernews.Item, error)
 }
 
+const trackedArticleKeyPrefix = "hackernews-tracked-articles/"
+
+type TrackedArticleTable struct {
+	gcs    *storage.Client
+	bucket string
+}
+
+func NewTrackedArticleTable(gcs *storage.Client, bucket string) *TrackedArticleTable {
+	return &TrackedArticleTable{
+		gcs:    gcs,
+		bucket: bucket,
+	}
+}
+
+func (t *TrackedArticleTable) gcsPathForID(id uint64) string {
+	return path.Join(trackedArticleKeyPrefix, strconv.FormatUint(id, 10))
+}
+
+func (t *TrackedArticleTable) idFromGCSName(name string) (uint64, error) {
+	return strconv.ParseUint(strings.TrimPrefix(name, trackedArticleKeyPrefix), 10, 64)
+}
+
+// Get gets the TrackedArticle with the given ID from GCS.
+//
+// Returns the TrackedArticle, a "found" indicator, and an error.
+func (t *TrackedArticleTable) Get(ctx context.Context, id uint64) (*trackerpb.TrackedArticle, bool, error) {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "TrackedArticleTable.Get")
+	defer span.End()
+
+	span.SetAttributes(attribute.Int64("id", int64(id)))
+
+	obj := t.gcs.Bucket(t.bucket).Object(t.gcsPathForID(id))
+
+	r, err := obj.NewReader(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			span.SetStatus(codes.Ok, "")
+			return nil, false, nil
+		}
+
+		err := fmt.Errorf("while opening reader for object: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, false, err
+	}
+	defer r.Close()
+
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		err := fmt.Errorf("while reading from object: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, false, err
+	}
+
+	ta := &trackerpb.TrackedArticle{}
+	if err := proto.Unmarshal(data, ta); err != nil {
+		err := fmt.Errorf("while unmarshaling TrackedArticle proto: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, false, err
+	}
+
+	if id != ta.Id {
+		err := fmt.Errorf("ID mismatch in TrackedArticle")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, false, err
+	}
+
+	ta.Generation = r.Attrs.Generation
+	ta.Metageneration = r.Attrs.Metageneration
+
+	span.SetStatus(codes.Ok, "")
+
+	return ta, true, nil
+}
+
+func (t *TrackedArticleTable) Create(ctx context.Context, ta *trackerpb.TrackedArticle) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "TrackedArticleTable.Create")
+	defer span.End()
+
+	obj := t.gcs.Bucket(t.bucket).Object(t.gcsPathForID(ta.Id))
+
+	// Make sure that the GCS-specific metadata is zeroed out before writing the
+	// object to storage.
+	savedGeneration := ta.Generation
+	savedMetageneration := ta.Metageneration
+	ta.Generation = 0
+	ta.Metageneration = 0
+	defer func() {
+		ta.Generation = savedGeneration
+		ta.Metageneration = savedMetageneration
+	}()
+
+	data, err := proto.Marshal(ta)
+	if err != nil {
+		return fmt.Errorf("while marshaling TrackedArticle proto: %w", err)
+	}
+
+	// Create condition: object does not currently exist.
+	w := obj.If(storage.Conditions{DoesNotExist: true}).NewWriter(ctx)
+
+	if _, err := w.Write(data); err != nil {
+		return fmt.Errorf("while writing TrackedArticle to object writer: %w", err)
+	}
+
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("while closing object writer: %w", err)
+	}
+
+	return nil
+}
+
+func (t *TrackedArticleTable) Update(ctx context.Context, ta *trackerpb.TrackedArticle) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "TrackedArticleTable.Update")
+	defer span.End()
+
+	obj := t.gcs.Bucket(t.bucket).Object(t.gcsPathForID(ta.Id))
+
+	// Make sure that the GCS-specific metadata is zeroed out before writing the
+	// object back to storage.
+	savedGeneration := ta.Generation
+	savedMetageneration := ta.Metageneration
+	ta.Generation = 0
+	ta.Metageneration = 0
+	defer func() {
+		ta.Generation = savedGeneration
+		ta.Metageneration = savedMetageneration
+	}()
+
+	data, err := proto.Marshal(ta)
+	if err != nil {
+		return fmt.Errorf("while marshaling TrackedArticle proto: %w", err)
+	}
+
+	// Update condition: object exists at the generation we're working from.
+	w := obj.If(storage.Conditions{GenerationMatch: savedGeneration}).NewWriter(ctx)
+
+	if _, err := w.Write(data); err != nil {
+		return fmt.Errorf("while writing TrackedArticle to object writer: %w", err)
+	}
+
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("while closing object writer: %w", err)
+	}
+
+	return nil
+}
+
+type TrackedArticleIterator struct {
+	table *TrackedArticleTable
+	inner *storage.ObjectIterator
+}
+
+func (it *TrackedArticleIterator) Next(ctx context.Context) (*trackerpb.TrackedArticle, error) {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "TrackedArticleIterator.Next")
+	defer span.End()
+
+	for {
+		attr, err := it.inner.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		id, err := it.table.idFromGCSName(attr.Name)
+		if err != nil {
+			return nil, fmt.Errorf("while parsing ID: %w", err)
+		}
+
+		ta, ok, err := it.table.Get(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("while reading tracked article: %w", err)
+		}
+
+		if !ok {
+			// Object was deleted during list.
+			continue
+		}
+
+		return ta, nil
+	}
+}
+
+func (t *TrackedArticleTable) List(ctx context.Context) *TrackedArticleIterator {
+	return &TrackedArticleIterator{
+		table: t,
+		inner: t.gcs.Bucket(t.bucket).Objects(ctx, &storage.Query{Prefix: trackedArticleKeyPrefix}),
+	}
+}
+
 // Scraper checks data sources for articles matching the specified topic regexp.
 type Scraper struct {
-	stateLock         sync.Mutex
-	hn                hnClient
-	hnTrackedArticles map[uint64]*trackerpb.TrackedArticle
+	hn hnClient
+
+	trackedArticles *TrackedArticleTable
 
 	watchConfigs map[uint64]*WatchConfig
-
-	checkpointWrite   func(context.Context, *Scraper) error
-	checkpointRestore func(context.Context, *Scraper) error
 }
 
 type ScraperOpt func(*Scraper)
-
-func WithGCSCheckpointFile(path string) ScraperOpt {
-	return func(s *Scraper) {
-	}
-}
 
 // WatchConfig binds together a set of data source configurations and a set of
 // notification targets.
@@ -67,19 +266,11 @@ func WithWatchConfig(wc *WatchConfig) ScraperOpt {
 }
 
 // New creates a new Scraper
-func New(hn hnClient, opts ...ScraperOpt) *Scraper {
+func New(hn hnClient, trackedArticles *TrackedArticleTable, opts ...ScraperOpt) *Scraper {
 	scraper := &Scraper{
-		hn:                hn,
-		hnTrackedArticles: map[uint64]*trackerpb.TrackedArticle{},
-
-		watchConfigs: map[uint64]*WatchConfig{},
-
-		checkpointWrite: func(ctx context.Context, s *Scraper) error {
-			return nil
-		},
-		checkpointRestore: func(ctx context.Context, s *Scraper) error {
-			return nil
-		},
+		hn:              hn,
+		trackedArticles: trackedArticles,
+		watchConfigs:    map[uint64]*WatchConfig{},
 	}
 
 	for _, opt := range opts {
@@ -93,11 +284,6 @@ func New(hn hnClient, opts ...ScraperOpt) *Scraper {
 
 // Run starts the Scraper's loop.
 func (s *Scraper) Run(ctx context.Context) {
-	s.stateLock.Lock()
-	if err := s.checkpointRestore(ctx, s); err != nil {
-		glog.Errorf("Error while restoring from checkpoint: %v", err)
-	}
-	s.stateLock.Unlock()
 
 	// Scrape right away
 	if err := s.scraperPass(ctx); err != nil {
@@ -121,31 +307,15 @@ func (s *Scraper) Run(ctx context.Context) {
 func (s *Scraper) scraperPass(ctx context.Context) error {
 	tracer := otel.Tracer("row-major/rumor-mill/scraper")
 	var span trace.Span
-	ctx, span = tracer.Start(ctx, "Scraper Pass")
+	ctx, span = tracer.Start(ctx, "Scraper.scraperPass")
 	defer span.End()
-
-	s.stateLock.Lock()
-	defer s.stateLock.Unlock()
 
 	if err := s.ingestTopStories(ctx); err != nil {
 		return fmt.Errorf("while scraping: %w", err)
 	}
 
-	alerts, err := s.tickStates(ctx)
-	if err != nil {
-		return fmt.Errorf("while ticking states of tracked articles: %w", err)
-	}
-
-	if err := s.sendAlerts(ctx, alerts); err != nil {
+	if err := s.sendAlerts(ctx); err != nil {
 		return fmt.Errorf("while sending alerts: %w", err)
-	}
-
-	s.reapArticles()
-
-	s.updateMetrics(ctx)
-
-	if err := s.checkpointWrite(ctx, s); err != nil {
-		return fmt.Errorf("while writing checkpoint: %w", err)
 	}
 
 	return nil
@@ -154,7 +324,7 @@ func (s *Scraper) scraperPass(ctx context.Context) error {
 func (s *Scraper) ingestTopStories(ctx context.Context) error {
 	tracer := otel.Tracer("row-major/rumor-mill/scraper")
 	var span trace.Span
-	ctx, span = tracer.Start(ctx, "Ingest Top Stories")
+	ctx, span = tracer.Start(ctx, "Scraper.ingestTopStories")
 	defer span.End()
 
 	topStories, err := s.hn.TopStories(ctx)
@@ -162,159 +332,101 @@ func (s *Scraper) ingestTopStories(ctx context.Context) error {
 		return fmt.Errorf("while querying for top stories: %w", err)
 	}
 
-	// Set all articles to have a sentinel rank.  A later step will move all
-	// articles with the sentinel rank into TrackerStateToReap.
-	for _, ta := range s.hnTrackedArticles {
-		ta.ReapAllowed = true
-	}
+	// TODO(ahmedtd): Retry loop for conflicts on each article
 
-	// Fill in real ranks, transparently creating new articles as necessary
 	for rank, id := range topStories {
-		ta, ok := s.hnTrackedArticles[id]
-
-		if !ok {
-			// We don't know about this article
-			ta = &trackerpb.TrackedArticle{
-				Id:              id,
-				FetchRequired:   true,
-				CurTrackerState: trackerpb.TrackerState_UNTRACKED,
-				FirstSeenTime:   time.Now().UnixNano(),
-			}
-			s.hnTrackedArticles[id] = ta
-		}
-
-		ta.LatestSeenTime = time.Now().UnixNano()
-		ta.Rank = int64(rank) + 1
-		ta.ReapAllowed = false
-	}
-
-	// We need to fetch articles that that have FetchRequired set
-	idsToFetch := []uint64{}
-	for id, ta := range s.hnTrackedArticles {
-		if ta.FetchRequired {
-			idsToFetch = append(idsToFetch, id)
+		if err := s.ingestTopStory(ctx, rank, id); err != nil {
+			return fmt.Errorf("while ingesting top story id=%d rank=%d: %w", id, rank, err)
 		}
 	}
 
-	items, err := s.hn.Items(ctx, idsToFetch)
+	return nil
+}
+
+func (s *Scraper) ingestTopStory(ctx context.Context, rank int, id uint64) error {
+	now := time.Now().UnixNano()
+
+	ta, ok, err := s.trackedArticles.Get(ctx, id)
 	if err != nil {
-		return fmt.Errorf("while fetching story items: %w", err)
+		return fmt.Errorf("while loading TrackedArticle id=%d: %w", id, err)
+	}
+	if !ok {
+		item, err := s.hn.Item(ctx, id)
+		if err != nil {
+			return fmt.Errorf("while fetching item %d from HN: %w", id, err)
+		}
+
+		ta = &trackerpb.TrackedArticle{
+			Id:             id,
+			FirstSeenTime:  now,
+			LatestSeenTime: now,
+			LatestRank:     int64(rank) + 1,
+			Title:          item.Title,
+			Submitter:      item.By,
+		}
+
+		if err := s.trackedArticles.Create(ctx, ta); err != nil {
+			return fmt.Errorf("while creating tracked article: %w", err)
+		}
+
+		return nil
 	}
 
-	for _, item := range items {
-		ta := s.hnTrackedArticles[item.ID]
+	ta.LatestSeenTime = now
+	ta.LatestRank = int64(rank) + 1
 
-		ta.Title = item.Title
-		ta.Submitter = item.By
-		ta.FetchRequired = false
+	if err := s.trackedArticles.Update(ctx, ta); err != nil {
+		return fmt.Errorf("while updating tracked article: %w", err)
 	}
 
 	return nil
 }
 
-type alertType int
+func (s *Scraper) sendAlerts(ctx context.Context) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Scraper.sendAlerts")
+	defer span.End()
 
-const (
-	alertTypeNew alertType = iota
-)
-
-type alertEvent struct {
-	id            uint64
-	at            alertType
-	watchConfigID uint64
-}
-
-func (s *Scraper) tickStates(ctx context.Context) ([]alertEvent, error) {
-	alerts := []alertEvent{}
-	for id, ta := range s.hnTrackedArticles {
-		switch ta.CurTrackerState {
-		case trackerpb.TrackerState_UNTRACKED:
-			if ta.GetFetchRequired() == false { // We can only make a decision once the article has actually been fetched.
-				for _, wc := range s.watchConfigs {
-					if wc.TopicRegexp.MatchString(strings.ToLower(ta.Title)) {
-						ta.InterestedWatchConfigs = append(ta.InterestedWatchConfigs, wc.ID)
-						alerts = append(alerts, alertEvent{id: id, at: alertTypeNew, watchConfigID: wc.ID})
-					}
-				}
-			}
-
-			if len(ta.InterestedWatchConfigs) > 0 {
-				ta.CurTrackerState = trackerpb.TrackerState_INTERESTED
-			} else {
-				ta.CurTrackerState = trackerpb.TrackerState_NOT_INTERESTED
-			}
-		case trackerpb.TrackerState_INTERESTED:
-		case trackerpb.TrackerState_NOT_INTERESTED:
-			// Do nothing.
-		default:
-			panic(fmt.Sprintf("unhandled TrackerState %d", ta.CurTrackerState))
+	it := s.trackedArticles.List(ctx)
+	for {
+		ta, err := it.Next(ctx)
+		if err == iterator.Done {
+			break
 		}
-	}
+		if err != nil {
+			return fmt.Errorf("while advancing article iterator: %w", err)
+		}
 
-	return alerts, nil
-}
+		for _, wc := range s.watchConfigs {
+			if ta.LatestRank < 500 && wc.TopicRegexp.MatchString(strings.ToLower(ta.Title)) {
+				// Send alert
 
-func (s *Scraper) updateMetrics(ctx context.Context) {
-	// trackedArticles.RemoveAll()
-	// trackedArticleRanks.RemoveAll()
-	// for id, ta := range s.hnTrackedArticles {
-	// 	trackedArticles.Set(1, int(id), ta.GetTitle(), ta.GetCurTrackerState().String())
-	// 	trackedArticleRanks.Set(ta.GetRank(), int(id), ta.GetTitle(), ta.GetCurTrackerState().String())
-	// }
-}
-
-func (s *Scraper) sendAlerts(ctx context.Context, alerts []alertEvent) error {
-	for _, ev := range alerts {
-		ta := s.hnTrackedArticles[ev.id]
-
-		if ev.at == alertTypeNew {
-			glog.Infof("New interesting top story: %d %q https://news.ycombinator.com/item?id=%d", ta.GetRank(), ta.GetTitle(), ta.GetId())
-
-			wc, ok := s.watchConfigs[ev.watchConfigID]
-			if !ok {
-				return fmt.Errorf("invalid watch config ID %d", ev.watchConfigID)
+				// Record that this watchconfig has alerted.
 			}
-
-			// TODO: Notify wc.NotifyAddresses about `ta`.
-			glog.Infof("I would have notified %v about %v", wc.NotifyAddresses, ta)
 		}
 	}
 
 	return nil
-}
-
-func (s *Scraper) reapArticles() {
-	for id, ta := range s.hnTrackedArticles {
-		if ta.ReapAllowed {
-			delete(s.hnTrackedArticles, id)
-		}
-	}
 }
 
 const articlesHTML = `
 <!DOCTYPE html>
 <head>
-	<title>Help</title>
+	<title>HN Article State</title>
 </head>
-
-<h1>Untracked Articles</h1>
-<ul>
-{{range .UntrackedArticles}}
-<li>({{.Rank}}) <a href="{{.URL}}">{{.Title}}</a>; submitted by {{.Submitter}}</li>
-{{end}}
-</ul>
 
 <h1>Interested Articles</h1>
 <ul>
 {{range .InterestedArticles}}
-<li>({{.Rank}}) <a href="{{.URL}}">{{.Title}}</a>; submitted by {{.Submitter}}</li>
+<li>({{.LatestRank}}) <a href="{{.URL}}">{{.Title}}</a>; submitted by {{.Submitter}}</li>
 {{end}}
 </ul>
 
 <h1>Not Interested Articles</h1>
 <ul>
 {{range .NotInterestedArticles}}
-<li>({{.Rank}}) <a href="{{.URL}}">{{.Title}}</a>; submitted by {{.Submitter}}</li>
+<li>({{.LatestRank}}) <a href="{{.URL}}">{{.Title}}</a>; submitted by {{.Submitter}}</li>
 {{end}}
 </ul>
 
@@ -323,53 +435,58 @@ const articlesHTML = `
 var articlesTemplate = template.Must(template.New("articles").Parse(articlesHTML))
 
 func (s *Scraper) RegisterDebugHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("/rumor_mill/articles", func(w http.ResponseWriter, req *http.Request) {
-		type TmplArticle struct {
-			Rank      int64
-			Title     string
-			Submitter string
-			URL       string
-			State     string
-		}
-		type TmplData struct {
-			UntrackedArticles     []TmplArticle
-			InterestedArticles    []TmplArticle
-			NotInterestedArticles []TmplArticle
-			ToReapArticles        []TmplArticle
-		}
-		tmplData := TmplData{}
-		for _, ta := range s.hnTrackedArticles {
-			article := TmplArticle{
-				Rank:      ta.Rank,
-				Title:     ta.Title,
-				Submitter: ta.Submitter,
-				URL:       hnURL(ta),
-				State:     ta.CurTrackerState.String(),
-			}
+	mux.HandleFunc("/rumor_mill/articles", s.debugHandlerArticles)
+}
 
-			switch ta.CurTrackerState {
-			case trackerpb.TrackerState_UNTRACKED:
-				tmplData.UntrackedArticles = append(tmplData.UntrackedArticles, article)
-			case trackerpb.TrackerState_INTERESTED:
-				tmplData.InterestedArticles = append(tmplData.InterestedArticles, article)
-			case trackerpb.TrackerState_NOT_INTERESTED:
-				tmplData.NotInterestedArticles = append(tmplData.NotInterestedArticles, article)
-			}
+func (s *Scraper) debugHandlerArticles(w http.ResponseWriter, req *http.Request) {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	ctx, span := tracer.Start(req.Context(), "Scraper.DebugHandlerArticles")
+	defer span.End()
 
-			sort.Slice(tmplData.UntrackedArticles, func(i, j int) bool {
-				return tmplData.UntrackedArticles[i].Rank < tmplData.UntrackedArticles[j].Rank
-			})
-			sort.Slice(tmplData.InterestedArticles, func(i, j int) bool {
-				return tmplData.InterestedArticles[i].Rank < tmplData.InterestedArticles[j].Rank
-			})
-			sort.Slice(tmplData.NotInterestedArticles, func(i, j int) bool {
-				return tmplData.NotInterestedArticles[i].Rank < tmplData.NotInterestedArticles[j].Rank
-			})
-			sort.Slice(tmplData.ToReapArticles, func(i, j int) bool {
-				return tmplData.ToReapArticles[i].Rank < tmplData.ToReapArticles[j].Rank
-			})
+	type TmplArticle struct {
+		LatestRank int64
+		Title      string
+		Submitter  string
+		URL        string
+	}
+	type TmplData struct {
+		InterestedArticles    []TmplArticle
+		NotInterestedArticles []TmplArticle
+	}
+	tmplData := TmplData{}
+
+	it := s.trackedArticles.List(ctx)
+	for {
+		ta, err := it.Next(ctx)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			glog.Errorf("Error while advancing article iterator: %v", err)
+			http.Error(w, "Failed to list articles", http.StatusInternalServerError)
+			return
 		}
 
-		articlesTemplate.Execute(w, tmplData)
-	})
+		tmplArticle := TmplArticle{
+			LatestRank: ta.LatestRank,
+			Title:      ta.Title,
+			Submitter:  ta.Submitter,
+			URL:        hnURL(ta),
+		}
+
+		if len(ta.FiredWatchConfigs) != 0 {
+			tmplData.InterestedArticles = append(tmplData.InterestedArticles, tmplArticle)
+		} else {
+			tmplData.NotInterestedArticles = append(tmplData.NotInterestedArticles, tmplArticle)
+		}
+
+		sort.Slice(tmplData.InterestedArticles, func(i, j int) bool {
+			return tmplData.InterestedArticles[i].LatestRank < tmplData.InterestedArticles[j].LatestRank
+		})
+		sort.Slice(tmplData.NotInterestedArticles, func(i, j int) bool {
+			return tmplData.NotInterestedArticles[i].LatestRank < tmplData.NotInterestedArticles[j].LatestRank
+		})
+	}
+
+	articlesTemplate.Execute(w, tmplData)
 }

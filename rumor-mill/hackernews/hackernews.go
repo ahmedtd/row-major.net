@@ -10,6 +10,9 @@ import (
 	"net/url"
 	"path"
 	"sync"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Client provides functions for interacting with the Hacker News API.
@@ -96,6 +99,11 @@ type Item struct {
 
 // Item pulls a specific item from the /v0/item collection.
 func (c *Client) Item(ctx context.Context, id uint64) (*Item, error) {
+	tracer := otel.Tracer("row-major/rumor-mill/hackernews")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Client.Item")
+	defer span.End()
+
 	url := &url.URL{
 		Scheme: "https",
 		Host:   c.Host,

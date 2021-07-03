@@ -5,4 +5,8 @@ go_library(
     srcs = ["hackernews.go"],
     importpath = "row-major/rumor-mill/hackernews",
     visibility = ["//visibility:public"],
+    deps = [
+        "@io_opentelemetry_go_otel//:go_default_library",
+        "@io_opentelemetry_go_otel_trace//:go_default_library",
+    ],
 )
