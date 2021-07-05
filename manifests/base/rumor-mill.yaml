@@ -16,7 +16,7 @@ spec:
   selector:
     matchLabels:
       app: rumor-mill
-  replicas: 1
+  replicas: 0
   template:
     metadata:
       labels:
