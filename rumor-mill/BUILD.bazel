@@ -27,6 +27,7 @@ go_library(
     deps = [
         "//rumor-mill/hackernews:go_default_library",
         "//rumor-mill/scraper:go_default_library",
+        "//rumor-mill/table:go_default_library",
         "//webalator/healthz:go_default_library",
         "@com_github_golang_glog//:go_default_library",
         "@com_github_googlecloudplatform_opentelemetry_operations_go_exporter_metric//:go_default_library",

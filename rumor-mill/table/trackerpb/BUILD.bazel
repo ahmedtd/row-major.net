@@ -10,7 +10,7 @@ proto_library(
 
 go_proto_library(
     name = "tracker_go_proto",
-    importpath = "row-major/rumor-mill/scraper/trackerpb",
+    importpath = "row-major/rumor-mill/table/trackerpb",
     proto = ":tracker_proto",
     visibility = ["//visibility:public"],
 )
@@ -19,6 +19,6 @@ go_library(
     name = "go_default_library",
     srcs = ["empty.go"],
     embed = [":tracker_go_proto"],
-    importpath = "row-major/rumor-mill/scraper/trackerpb",
+    importpath = "row-major/rumor-mill/table/trackerpb",
     visibility = ["//visibility:public"],
 )

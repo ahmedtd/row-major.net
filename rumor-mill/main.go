@@ -14,6 +14,7 @@ import (
 
 	"row-major/rumor-mill/hackernews"
 	"row-major/rumor-mill/scraper"
+	"row-major/rumor-mill/table"
 	"row-major/webalator/healthz"
 
 	"cloud.google.com/go/storage"
@@ -91,7 +92,7 @@ func main() {
 		glog.Fatalf("Failed to create new GCS client: %v", err)
 	}
 
-	trackedArticles := scraper.NewTrackedArticleTable(gcs, *dataDir)
+	trackedArticles := table.NewTrackedArticleTable(gcs, *dataDir)
 
 	scr := scraper.New(
 		hn,
