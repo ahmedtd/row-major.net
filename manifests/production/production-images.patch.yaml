@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:6ffd2a348c0e27e98db53cc3c34f9b776bf23781
+          image: gcr.io/bomsync-214520/webalator:77c095fbae4d8079fc60ec1bbd382697490755e8
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: sharded-controller
-          image: gcr.io/bomsync-214520/shardedcontroller:6ffd2a348c0e27e98db53cc3c34f9b776bf23781
+          image: gcr.io/bomsync-214520/shardedcontroller:77c095fbae4d8079fc60ec1bbd382697490755e8
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -33,4 +33,4 @@ spec:
     spec:
       containers:
       - name: main
-        image: gcr.io/bomsync-214520/rumor-mill:6ffd2a348c0e27e98db53cc3c34f9b776bf23781
+        image: gcr.io/bomsync-214520/rumor-mill:77c095fbae4d8079fc60ec1bbd382697490755e8
