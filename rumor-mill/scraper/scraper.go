@@ -49,6 +49,8 @@ type Scraper struct {
 	trackedArticles *table.TrackedArticleTable
 
 	watchConfigs map[uint64]*WatchConfig
+
+	scrapePeriod time.Duration
 }
 
 type ScraperOpt func(*Scraper)
@@ -67,12 +69,19 @@ func WithWatchConfig(wc *WatchConfig) ScraperOpt {
 	}
 }
 
+func WithScrapePeriod(period time.Duration) ScraperOpt {
+	return func(s *Scraper) {
+		s.scrapePeriod = period
+	}
+}
+
 // New creates a new Scraper
 func New(hn hnClient, trackedArticles *table.TrackedArticleTable, opts ...ScraperOpt) *Scraper {
 	scraper := &Scraper{
 		hn:              hn,
 		trackedArticles: trackedArticles,
 		watchConfigs:    map[uint64]*WatchConfig{},
+		scrapePeriod:    30 * time.Minute,
 	}
 
 	for _, opt := range opts {
@@ -92,7 +101,7 @@ func (s *Scraper) Run(ctx context.Context) {
 		glog.Errorf("Error while running scraper pass: %v", err)
 	}
 
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(s.scrapePeriod)
 	for {
 		select {
 		case <-ctx.Done():

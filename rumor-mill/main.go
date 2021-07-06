@@ -29,6 +29,7 @@ var (
 	debugListen          = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
 	dataDir              = flag.String("data-dir", "", "GCS bucket for database")
 	userAgent            = flag.String("user-agent", "row-major.net/rumor-mill", "User-Agent to use for all scraping operations.")
+	scrapePeriod         = flag.Duration("scrape-period", 30*time.Minute, "Time between scraper passes.")
 	monitoring           = flag.Bool("monitoring", false, "Enable monitoring?")
 	monitoringProject    = flag.String("monitoring-project", "", "Override project used for monitoring integration.  If not specified, the project associated with Application Default Credentials is used.")
 	monitoringTraceRatio = flag.Float64("monitoring-trace-ratio", 0.0001, "What ratio of traces should be exported?")
@@ -47,6 +48,10 @@ func main() {
 	glog.Infof("debug-listen: %q", *debugListen)
 	glog.Infof("data-dir: %q", *dataDir)
 	glog.Infof("user-agent: %q", *userAgent)
+	glog.Infof("scrape-period: %v", *scrapePeriod)
+	glog.Infof("monitoring: %v", *monitoring)
+	glog.Infof("monitoring-project: %v", *monitoringProject)
+	glog.Infof("monitoring-trace-ratio: %v", *monitoringTraceRatio)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -102,6 +107,7 @@ func main() {
 			TopicRegexp:     topicRegexp,
 			NotifyAddresses: []string{},
 		}),
+		scraper.WithScrapePeriod(*scrapePeriod),
 	)
 	scr.RegisterDebugHandlers(debugServeMux)
 
