@@ -119,6 +119,10 @@ func (s *Scraper) scraperPass(ctx context.Context) error {
 		return fmt.Errorf("while scraping: %w", err)
 	}
 
+	if err := s.sweepOldStories(ctx); err != nil {
+		return fmt.Errorf("while sweeping old stories: %w", err)
+	}
+
 	if err := s.sendAlerts(ctx); err != nil {
 		return fmt.Errorf("while sending alerts: %w", err)
 	}
@@ -220,6 +224,87 @@ readModifyWrite:
 		}
 
 		return nil
+	}
+}
+
+// sweepOldStories does a table scan of the tracked articles table, moving older
+// stories to the stale tracked articles table.
+func (s *Scraper) sweepOldStories(ctx context.Context) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Scraper.sweepOldStories")
+	defer span.End()
+
+	// Use errgroup and semaphore to limit concurrency.
+	eg, ctx := errgroup.WithContext(ctx)
+	sem := semaphore.NewWeighted(500)
+
+	it := s.trackedArticles.ListIDs(ctx)
+	for {
+		id, err := it.Next(ctx)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("while advancing tracked article ID iterator: %w", err)
+		}
+
+		if err := sem.Acquire(ctx, 1); err != nil {
+			return fmt.Errorf("while acquiring concurrency limiter semaphore: %w", err)
+		}
+
+		eg.Go(func() error {
+			defer sem.Release(1)
+			if err := s.sweepOldStory(ctx, id); err != nil {
+				return fmt.Errorf("while sweeping story story id=%d: %w", id, err)
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return fmt.Errorf("while waiting for completion of errgroup: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Scraper) sweepOldStory(ctx context.Context, id uint64) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Scraper.sweepOldStory")
+	defer span.End()
+
+readModifyWrite:
+	for {
+		ta, ok, err := s.trackedArticles.Get(ctx, id)
+		if err != nil {
+			return fmt.Errorf("while loading TrackedArticle id=%d: %w", id, err)
+		}
+		if !ok {
+			// Article removed during list.
+			return nil
+		}
+
+		// If article appeared within the top 500 articles in the last 30
+		// minutes, leave it alone.
+		if time.Now().Sub(time.Unix(0, ta.GetLatestSeenTime())) <= 30*time.Minute {
+			return nil
+		}
+
+		// Article is old.  Delete it.
+		//
+		// TODO(ahmedtd): Sweep to stale tracked article table.
+		if err := s.trackedArticles.Delete(ctx, ta); err != nil {
+			var gErr *googleapi.Error
+			if errors.As(err, &gErr) {
+				if gErr.Code == 412 {
+					// Bad precondition, retry.
+					continue readModifyWrite
+				}
+			}
+			return fmt.Errorf("while deleting original tracked article: %w", err)
+		}
 	}
 }
 

@@ -1,4 +1,3 @@
-// Package table houses the logic for interacting with GCS.
 package table
 
 import (
@@ -20,36 +19,40 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const trackedArticleKeyPrefix = "tables/hackernews-tracked-articles/"
+const staleTrackedArticleKeyPrefix = "tables/stale-hackernews-tracked-articles/"
 
-// TrackedArticleTable fronts the hackernews-tracked-articles table in GCS
-type TrackedArticleTable struct {
+// StaleTrackedArticleTable fronts the stale-hackernews-tracked-articles table
+// in GCS.
+//
+// We sweep old articles into this table to minimize the number of entries that
+// the scraper has to process during the alert join.
+type StaleTrackedArticleTable struct {
 	gcs    *storage.Client
 	bucket string
 }
 
-func NewTrackedArticleTable(gcs *storage.Client, bucket string) *TrackedArticleTable {
-	return &TrackedArticleTable{
+func NewStaleTrackedArticleTable(gcs *storage.Client, bucket string) *StaleTrackedArticleTable {
+	return &StaleTrackedArticleTable{
 		gcs:    gcs,
 		bucket: bucket,
 	}
 }
 
-func (t *TrackedArticleTable) gcsPathForID(id uint64) string {
-	return path.Join(trackedArticleKeyPrefix, strconv.FormatUint(id, 10))
+func (t *StaleTrackedArticleTable) gcsPathForID(id uint64) string {
+	return path.Join(staleTrackedArticleKeyPrefix, strconv.FormatUint(id, 10))
 }
 
-func (t *TrackedArticleTable) idFromGCSName(name string) (uint64, error) {
-	return strconv.ParseUint(strings.TrimPrefix(name, trackedArticleKeyPrefix), 10, 64)
+func (t *StaleTrackedArticleTable) idFromGCSName(name string) (uint64, error) {
+	return strconv.ParseUint(strings.TrimPrefix(name, staleTrackedArticleKeyPrefix), 10, 64)
 }
 
 // Get gets the TrackedArticle with the given ID from GCS.
 //
 // Returns the TrackedArticle, a "found" indicator, and an error.
-func (t *TrackedArticleTable) Get(ctx context.Context, id uint64) (*trackerpb.TrackedArticle, bool, error) {
+func (t *StaleTrackedArticleTable) Get(ctx context.Context, id uint64) (*trackerpb.TrackedArticle, bool, error) {
 	tracer := otel.Tracer("row-major/rumor-mill/table")
 	var span trace.Span
-	ctx, span = tracer.Start(ctx, "TrackedArticleTable.Get")
+	ctx, span = tracer.Start(ctx, "StaleTrackedArticleTable.Get")
 	defer span.End()
 
 	span.SetAttributes(attribute.Int64("id", int64(id)))
@@ -101,10 +104,10 @@ func (t *TrackedArticleTable) Get(ctx context.Context, id uint64) (*trackerpb.Tr
 	return ta, true, nil
 }
 
-func (t *TrackedArticleTable) Create(ctx context.Context, in *trackerpb.TrackedArticle) error {
+func (t *StaleTrackedArticleTable) Create(ctx context.Context, in *trackerpb.TrackedArticle) error {
 	tracer := otel.Tracer("row-major/rumor-mill/table")
 	var span trace.Span
-	ctx, span = tracer.Start(ctx, "TrackedArticleTable.Create")
+	ctx, span = tracer.Start(ctx, "StaleTrackedArticleTable.Create")
 	defer span.End()
 
 	obj := t.gcs.Bucket(t.bucket).Object(t.gcsPathForID(in.Id))
@@ -134,10 +137,10 @@ func (t *TrackedArticleTable) Create(ctx context.Context, in *trackerpb.TrackedA
 	return nil
 }
 
-func (t *TrackedArticleTable) Update(ctx context.Context, in *trackerpb.TrackedArticle) error {
+func (t *StaleTrackedArticleTable) Update(ctx context.Context, in *trackerpb.TrackedArticle) error {
 	tracer := otel.Tracer("row-major/rumor-mill/table")
 	var span trace.Span
-	ctx, span = tracer.Start(ctx, "TrackedArticleTable.Update")
+	ctx, span = tracer.Start(ctx, "StaleTrackedArticleTable.Update")
 	defer span.End()
 
 	obj := t.gcs.Bucket(t.bucket).Object(t.gcsPathForID(in.Id))
@@ -167,10 +170,10 @@ func (t *TrackedArticleTable) Update(ctx context.Context, in *trackerpb.TrackedA
 	return nil
 }
 
-func (t *TrackedArticleTable) Delete(ctx context.Context, in *trackerpb.TrackedArticle) error {
+func (t *StaleTrackedArticleTable) Delete(ctx context.Context, in *trackerpb.TrackedArticle) error {
 	tracer := otel.Tracer("row-major/rumor-mill/table")
 	var span trace.Span
-	ctx, span = tracer.Start(ctx, "TrackedArticleTable.Delete")
+	ctx, span = tracer.Start(ctx, "StaleTrackedArticleTable.Delete")
 	defer span.End()
 
 	obj := t.gcs.Bucket(t.bucket).Object(t.gcsPathForID(in.Id))
@@ -182,80 +185,4 @@ func (t *TrackedArticleTable) Delete(ctx context.Context, in *trackerpb.TrackedA
 	}
 
 	return nil
-}
-
-type TrackedArticleIterator struct {
-	table *TrackedArticleTable
-	inner *storage.ObjectIterator
-}
-
-func (it *TrackedArticleIterator) Next(ctx context.Context) (*trackerpb.TrackedArticle, error) {
-	tracer := otel.Tracer("row-major/rumor-mill/table")
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "TrackedArticleIterator.Next")
-	defer span.End()
-
-	for {
-		attr, err := it.inner.Next()
-		if err != nil {
-			return nil, err
-		}
-
-		id, err := it.table.idFromGCSName(attr.Name)
-		if err != nil {
-			return nil, fmt.Errorf("while parsing ID: %w", err)
-		}
-
-		ta, ok, err := it.table.Get(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("while reading tracked article: %w", err)
-		}
-
-		if !ok {
-			// Object was deleted during list.
-			continue
-		}
-
-		return ta, nil
-	}
-}
-
-func (t *TrackedArticleTable) List(ctx context.Context) *TrackedArticleIterator {
-	return &TrackedArticleIterator{
-		table: t,
-		inner: t.gcs.Bucket(t.bucket).Objects(ctx, &storage.Query{Prefix: trackedArticleKeyPrefix}),
-	}
-}
-
-type TrackedArticleIDIterator struct {
-	table *TrackedArticleTable
-	inner *storage.ObjectIterator
-}
-
-func (it *TrackedArticleIDIterator) Next(ctx context.Context) (uint64, error) {
-	tracer := otel.Tracer("row-major/rumor-mill/table")
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "TrackedArticleIDIterator.Next")
-	defer span.End()
-
-	for {
-		attr, err := it.inner.Next()
-		if err != nil {
-			return 0, err
-		}
-
-		id, err := it.table.idFromGCSName(attr.Name)
-		if err != nil {
-			return 0, fmt.Errorf("while parsing ID: %w", err)
-		}
-
-		return id, nil
-	}
-}
-
-func (t *TrackedArticleTable) ListIDs(ctx context.Context) *TrackedArticleIDIterator {
-	return &TrackedArticleIDIterator{
-		table: t,
-		inner: t.gcs.Bucket(t.bucket).Objects(ctx, &storage.Query{Prefix: trackedArticleKeyPrefix}),
-	}
 }
