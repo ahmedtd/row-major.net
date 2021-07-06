@@ -16,7 +16,7 @@ spec:
   selector:
     matchLabels:
       app: rumor-mill
-  replicas: 0
+  replicas: 1
   template:
     metadata:
       labels:
@@ -47,3 +47,4 @@ spec:
         - --monitoring=true
         - --monitoring-trace-ratio=0.1
         - --data-dir=rumor-mill-state-prod-us-west1
+        - --scrape-period=30m
