@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"regexp"
@@ -53,12 +54,12 @@ func main() {
 	glog.CopyStandardLogTo("INFO")
 
 	glog.Infof("flags:")
-	glog.Infof("debug-listen: %q", *debugListen)
-	glog.Infof("user-agent: %q", *userAgent)
+	glog.Infof("debug-listen: %v", *debugListen)
+	glog.Infof("user-agent: %v", *userAgent)
 	glog.Infof("scrape-period: %v", *scrapePeriod)
 
 	glog.Infof("data-project: %v", *dataProject)
-	glog.Infof("data-dir: %q", *dataDir)
+	glog.Infof("data-dir: %v", *dataDir)
 	glog.Infof("sendgrid-key-secret: %v", *sendgridKeySecret)
 
 	glog.Infof("monitoring: %v", *monitoring)
@@ -95,6 +96,11 @@ func main() {
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
 	debugServeMux.Handle("/readyz", healthz.New())
+	debugServeMux.HandleFunc("/debug/pprof/", pprof.Index)
+	debugServeMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	debugServeMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	debugServeMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	debugServeMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	debugServer := &http.Server{
 		Addr:    *debugListen,
 		Handler: debugServeMux,
