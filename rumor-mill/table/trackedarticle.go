@@ -123,6 +123,10 @@ func (t *TrackedArticleTable) Create(ctx context.Context, in *trackerpb.TrackedA
 	// Create condition: object does not currently exist.
 	w := obj.If(storage.Conditions{DoesNotExist: true}).NewWriter(ctx)
 
+	// Disable chunking.  This will expose more transient server errors to
+	// calling code, but significantly reduces memory usage.
+	w.ChunkSize = 0
+
 	if _, err := w.Write(data); err != nil {
 		return fmt.Errorf("while writing TrackedArticle to object writer: %w", err)
 	}
@@ -159,6 +163,10 @@ func (t *TrackedArticleTable) Update(ctx context.Context, in *trackerpb.TrackedA
 
 	// Update condition: object exists at the generation we're working from.
 	w := obj.If(storage.Conditions{GenerationMatch: in.Generation, MetagenerationMatch: in.Metageneration}).NewWriter(ctx)
+
+	// Disable chunking.  This will expose more transient server errors to
+	// calling code, but significantly reduces memory usage.
+	w.ChunkSize = 0
 
 	if _, err := w.Write(data); err != nil {
 		return fmt.Errorf("while writing TrackedArticle to object writer: %w", err)
