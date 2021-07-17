@@ -3,9 +3,11 @@
 package scraper
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
 	"path"
 	"regexp"
@@ -13,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"text/template"
+	texttemplate "text/template"
 	"time"
 
 	"row-major/rumor-mill/hackernews"
@@ -21,6 +23,8 @@ import (
 	trackerpb "row-major/rumor-mill/table/trackerpb"
 
 	"github.com/golang/glog"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -45,6 +49,7 @@ type hnClient interface {
 // Scraper checks data sources for articles matching the specified topic regexp.
 type Scraper struct {
 	hn hnClient
+	sg *sendgrid.Client
 
 	trackedArticles *table.TrackedArticleTable
 
@@ -59,6 +64,7 @@ type ScraperOpt func(*Scraper)
 // notification targets.
 type WatchConfig struct {
 	ID              uint64
+	Description     string
 	TopicRegexp     *regexp.Regexp
 	NotifyAddresses []string
 }
@@ -76,9 +82,10 @@ func WithScrapePeriod(period time.Duration) ScraperOpt {
 }
 
 // New creates a new Scraper
-func New(hn hnClient, trackedArticles *table.TrackedArticleTable, opts ...ScraperOpt) *Scraper {
+func New(hn hnClient, sg *sendgrid.Client, trackedArticles *table.TrackedArticleTable, opts ...ScraperOpt) *Scraper {
 	scraper := &Scraper{
 		hn:              hn,
+		sg:              sg,
 		trackedArticles: trackedArticles,
 		watchConfigs:    map[uint64]*WatchConfig{},
 		scrapePeriod:    30 * time.Minute,
@@ -344,22 +351,10 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 		eg.Go(func() error {
 			defer sem.Release(1)
 
-			ta, ok, err := s.trackedArticles.Get(ctx, id)
-			if err != nil {
-				return fmt.Errorf("while fetching article id=%d: %w", id, err)
-			}
-			if !ok {
-				// Article deleted during scan.
-				return nil
+			if err := s.sendAlertsForArticle(ctx, id); err != nil {
+				return fmt.Errorf("while sending alerts for article id=%d: %w", id, err)
 			}
 
-			for _, wc := range s.watchConfigs {
-				if ta.LatestRank < 500 && wc.TopicRegexp.MatchString(strings.ToLower(ta.Title)) {
-					// Send alert
-
-					// Record that this watchconfig has alerted.
-				}
-			}
 			return nil
 		})
 	}
@@ -367,6 +362,111 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("while waiting for completion of errgroup: %w", err)
 	}
+
+	return nil
+}
+
+func (s *Scraper) sendAlertsForArticle(ctx context.Context, id uint64) error {
+	tracer := otel.Tracer("row-major/rumor-mill/scraper")
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "Scraper.sendAlertsForArticle")
+	defer span.End()
+
+readModifyWrite:
+	for {
+		ta, ok, err := s.trackedArticles.Get(ctx, id)
+		if err != nil {
+			return fmt.Errorf("while fetching article id=%d: %w", id, err)
+		}
+		if !ok {
+			// Article deleted during scan.
+			return nil
+		}
+
+		for _, wc := range s.watchConfigs {
+			if err := s.sendAlertForArticleAndWatchConfig(ctx, ta, wc); err != nil {
+				return fmt.Errorf("while checking article %d against watchconfig %d: %w", id, wc.ID, err)
+			}
+		}
+
+		if err := s.trackedArticles.Update(ctx, ta); err != nil {
+			var gErr *googleapi.Error
+			if errors.As(err, &gErr) {
+				if gErr.Code == 412 {
+					// Bad precondition, retry.
+					continue readModifyWrite
+				}
+			}
+			return fmt.Errorf("while updating tracked article: %w", err)
+		}
+
+		return nil
+	}
+}
+
+const emailPlain = `There's a new Hacker News article matching your watch config:
+* Article: {{.ArticleTitle}}
+* Link: {{.ArticleLink}}
+* Watch Config: {{.WatchConfigDescription}}
+`
+
+var emailPlainTemplate = texttemplate.Must(texttemplate.New("email").Parse(emailPlain))
+
+func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *trackerpb.TrackedArticle, wc *WatchConfig) error {
+	// Have we already fired an alert for this watch config?
+	for _, wcID := range ta.FiredWatchConfigs {
+		if wcID == wc.ID {
+			return nil
+		}
+	}
+
+	if ta.LatestRank >= 500 {
+		return nil
+	}
+	if !wc.TopicRegexp.MatchString(strings.ToLower(ta.Title)) {
+		return nil
+	}
+
+	// The article is relevant to the watchconfig.
+
+	message := mail.NewV3Mail()
+	message.From = mail.NewEmail("Rumor Mill Bot", "bot@rumor-mill.dev")
+	message.Subject = fmt.Sprintf("New HackerNews Article: %s", ta.Title)
+
+	p := mail.NewPersonalization()
+	for _, addr := range wc.NotifyAddresses {
+		p.To = append(p.To, mail.NewEmail("", addr))
+	}
+	message.Personalizations = append(message.Personalizations, p)
+
+	params := &struct {
+		ArticleTitle           string
+		ArticleLink            string
+		WatchConfigDescription string
+	}{
+		ArticleTitle:           ta.Title,
+		ArticleLink:            hnURL(ta),
+		WatchConfigDescription: wc.Description,
+	}
+
+	textContent := &bytes.Buffer{}
+	err := emailPlainTemplate.Execute(textContent, params)
+	if err != nil {
+		return fmt.Errorf("while templating plain-text email content: %w", err)
+	}
+
+	message.Content = append(message.Content, mail.NewContent("text/plain", string(textContent.Bytes())))
+
+	resp, err := s.sg.SendWithContext(ctx, message)
+	if err != nil {
+		return fmt.Errorf("while sending mail through SendGrid: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("non-2xx response while sending mail through SendGrid: %d %q", resp.StatusCode, resp.Body)
+	}
+
+	ta.FiredWatchConfigs = append(ta.FiredWatchConfigs, wc.ID)
 
 	return nil
 }

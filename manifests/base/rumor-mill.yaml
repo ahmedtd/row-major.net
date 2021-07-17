@@ -44,7 +44,10 @@ spec:
         - /app/rumor-mill/rumor-mill
         - --debug-listen=0.0.0.0:8001
         - --logtostderr=true
+        - --v=9
         - --monitoring=true
+        - --monitoring-project=bomsync-214520
         - --monitoring-trace-ratio=0.1
+        - --data-project=rumor-mill-prod
         - --data-dir=rumor-mill-state-prod-us-west1
         - --scrape-period=30m

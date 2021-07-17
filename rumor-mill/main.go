@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,19 +18,26 @@ import (
 	"row-major/rumor-mill/table"
 	"row-major/webalator/healthz"
 
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
 	cloudmetrics "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
 	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"github.com/golang/glog"
+	"github.com/sendgrid/sendgrid-go"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	googleopt "google.golang.org/api/option"
+	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
 
 var (
-	debugListen          = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
-	dataDir              = flag.String("data-dir", "", "GCS bucket for database")
-	userAgent            = flag.String("user-agent", "row-major.net/rumor-mill", "User-Agent to use for all scraping operations.")
-	scrapePeriod         = flag.Duration("scrape-period", 30*time.Minute, "Time between scraper passes.")
+	debugListen  = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
+	userAgent    = flag.String("user-agent", "row-major.net/rumor-mill", "User-Agent to use for all scraping operations.")
+	scrapePeriod = flag.Duration("scrape-period", 30*time.Minute, "Time between scraper passes.")
+
+	dataProject       = flag.String("data-project", "", "GCP project for cloud resources.")
+	dataDir           = flag.String("data-dir", "", "GCS bucket for database")
+	sendgridKeySecret = flag.String("sendgrid-key-secret", "sendgrid-api-key", "GCP Secret Manager secret name containing SendGrid API key.")
+
 	monitoring           = flag.Bool("monitoring", false, "Enable monitoring?")
 	monitoringProject    = flag.String("monitoring-project", "", "Override project used for monitoring integration.  If not specified, the project associated with Application Default Credentials is used.")
 	monitoringTraceRatio = flag.Float64("monitoring-trace-ratio", 0.0001, "What ratio of traces should be exported?")
@@ -46,9 +54,13 @@ func main() {
 
 	glog.Infof("flags:")
 	glog.Infof("debug-listen: %q", *debugListen)
-	glog.Infof("data-dir: %q", *dataDir)
 	glog.Infof("user-agent: %q", *userAgent)
 	glog.Infof("scrape-period: %v", *scrapePeriod)
+
+	glog.Infof("data-project: %v", *dataProject)
+	glog.Infof("data-dir: %q", *dataDir)
+	glog.Infof("sendgrid-key-secret: %v", *sendgridKeySecret)
+
 	glog.Infof("monitoring: %v", *monitoring)
 	glog.Infof("monitoring-project: %v", *monitoringProject)
 	glog.Infof("monitoring-trace-ratio: %v", *monitoringTraceRatio)
@@ -92,6 +104,11 @@ func main() {
 		MaxHeaderBytes: 1 << 20,
 	}
 
+	sg, err := newSendgridClient(ctx)
+	if err != nil {
+		glog.Fatalf("Failed to create Sendgrid client: %v", err)
+	}
+
 	gcs, err := storage.NewClient(ctx, googleopt.WithGRPCConnectionPool(1))
 	if err != nil {
 		glog.Fatalf("Failed to create new GCS client: %v", err)
@@ -101,11 +118,13 @@ func main() {
 
 	scr := scraper.New(
 		hn,
+		sg,
 		trackedArticles,
 		scraper.WithWatchConfig(&scraper.WatchConfig{
 			ID:              1,
+			Description:     "Kubernetes and GKE Articles",
 			TopicRegexp:     topicRegexp,
-			NotifyAddresses: []string{},
+			NotifyAddresses: []string{"ahmed.taahir@gmail.com"},
 		}),
 		scraper.WithScrapePeriod(*scrapePeriod),
 	)
@@ -126,4 +145,24 @@ func main() {
 	<-signalCh
 
 	glog.Flush()
+}
+
+func newSendgridClient(ctx context.Context) (*sendgrid.Client, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	secretClient, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("while creating Secret Manager client: %w", err)
+	}
+	defer secretClient.Close()
+
+	resp, err := secretClient.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
+		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/latest", *dataProject, *sendgridKeySecret),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("while pulling secret: %w", err)
+	}
+
+	return sendgrid.NewSendClient(string(resp.GetPayload().GetData())), nil
 }

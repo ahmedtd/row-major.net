@@ -131,6 +131,10 @@ func (t *TrackedArticleTable) Create(ctx context.Context, in *trackerpb.TrackedA
 		return fmt.Errorf("while closing object writer: %w", err)
 	}
 
+	// Update with result of successful write.
+	in.Generation = w.Attrs().Generation
+	in.Metageneration = w.Attrs().Metageneration
+
 	return nil
 }
 
@@ -163,6 +167,10 @@ func (t *TrackedArticleTable) Update(ctx context.Context, in *trackerpb.TrackedA
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("while closing object writer: %w", err)
 	}
+
+	// Update with result of successful write.
+	in.Generation = w.Attrs().Generation
+	in.Metageneration = w.Attrs().Metageneration
 
 	return nil
 }

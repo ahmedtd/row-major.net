@@ -185,6 +185,20 @@ go_repository(
     version = "v0.20.0",
 )
 
+go_repository(
+    name = "com_github_sendgrid_rest",
+    importpath = "github.com/sendgrid/rest",
+    sum = "h1:lq6gAQxLwVBf3mVyCCSHI6mgF+NfaJFJHjT0kl6SSo8=",
+    version = "v2.6.4+incompatible",
+)
+
+go_repository(
+    name = "com_github_sendgrid_sendgrid_go",
+    importpath = "github.com/sendgrid/sendgrid-go",
+    sum = "h1:aSYyurHxEZSDy7kxhvZ4fH0inNkEEmRssZNbAmETR2c=",
+    version = "v3.10.0+incompatible",
+)
+
 gazelle_dependencies()
 
 # Download the rules_docker repository at release v0.14.4
