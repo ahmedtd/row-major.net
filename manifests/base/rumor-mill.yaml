@@ -28,6 +28,9 @@ spec:
         image: gcr.io/bomsync-214520/rumor-mill:latest
         ports:
         - containerPort: 8001
+        resources:
+          limits:
+            memory: 50Mi
         livenessProbe:
           httpGet:
             path: /healthz
