@@ -20,5 +20,22 @@ message TrackedArticle {
   string submitter = 8;
 
   repeated uint64 fired_watch_configs = 9;
+}
 
+message WatchConfig {
+  uint64 id = 1;
+
+  // Generation is always 0 in a stored object.  During loading, it
+  // will be filled out with the GCS generation of the object.
+  int64 generation = 2;
+  // Metageneration is always 0 in a stored object.  During loading,
+  // it will be filled out with the GCS metageneration of the object.
+  int64 metageneration = 3;
+
+  // A friendly descriptor for the watch config.  Appears in alert emails.
+  string description = 4;
+
+  string topic_regexp = 5;
+
+  repeated string notify_addresses = 6;
 }

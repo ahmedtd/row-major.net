@@ -10,7 +10,6 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/signal"
-	"regexp"
 	"syscall"
 	"time"
 
@@ -42,10 +41,6 @@ var (
 	monitoring           = flag.Bool("monitoring", false, "Enable monitoring?")
 	monitoringProject    = flag.String("monitoring-project", "", "Override project used for monitoring integration.  If not specified, the project associated with Application Default Credentials is used.")
 	monitoringTraceRatio = flag.Float64("monitoring-trace-ratio", 0.0001, "What ratio of traces should be exported?")
-)
-
-var (
-	topicRegexp = regexp.MustCompile(`kubernetes|k8s|gke|google ?kubernetes ?engine|google ?container ?engine|anthos|cloud ?run|kcc|nomos`)
 )
 
 func main() {
@@ -121,17 +116,13 @@ func main() {
 	}
 
 	trackedArticles := table.NewTrackedArticleTable(gcs, *dataDir)
+	watchConfigs := table.NewWatchConfigTable(gcs, *dataDir)
 
 	scr := scraper.New(
 		hn,
 		sg,
 		trackedArticles,
-		scraper.WithWatchConfig(&scraper.WatchConfig{
-			ID:              1,
-			Description:     "Kubernetes and GKE Articles",
-			TopicRegexp:     topicRegexp,
-			NotifyAddresses: []string{"ahmed.taahir@gmail.com"},
-		}),
+		watchConfigs,
 		scraper.WithScrapePeriod(*scrapePeriod),
 	)
 	scr.RegisterDebugHandlers(debugServeMux)

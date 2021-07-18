@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "stale-tracked-article.go",
         "trackedarticle.go",
+        "watchconfig.go",
     ],
     importpath = "row-major/rumor-mill/table",
     visibility = ["//visibility:public"],

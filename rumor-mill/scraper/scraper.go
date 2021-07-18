@@ -52,28 +52,12 @@ type Scraper struct {
 	sg *sendgrid.Client
 
 	trackedArticles *table.TrackedArticleTable
-
-	watchConfigs map[uint64]*WatchConfig
+	watchConfigs    *table.WatchConfigTable
 
 	scrapePeriod time.Duration
 }
 
 type ScraperOpt func(*Scraper)
-
-// WatchConfig binds together a set of data source configurations and a set of
-// notification targets.
-type WatchConfig struct {
-	ID              uint64
-	Description     string
-	TopicRegexp     *regexp.Regexp
-	NotifyAddresses []string
-}
-
-func WithWatchConfig(wc *WatchConfig) ScraperOpt {
-	return func(s *Scraper) {
-		s.watchConfigs[wc.ID] = wc
-	}
-}
 
 func WithScrapePeriod(period time.Duration) ScraperOpt {
 	return func(s *Scraper) {
@@ -82,12 +66,12 @@ func WithScrapePeriod(period time.Duration) ScraperOpt {
 }
 
 // New creates a new Scraper
-func New(hn hnClient, sg *sendgrid.Client, trackedArticles *table.TrackedArticleTable, opts ...ScraperOpt) *Scraper {
+func New(hn hnClient, sg *sendgrid.Client, trackedArticles *table.TrackedArticleTable, watchConfigs *table.WatchConfigTable, opts ...ScraperOpt) *Scraper {
 	scraper := &Scraper{
 		hn:              hn,
 		sg:              sg,
 		trackedArticles: trackedArticles,
-		watchConfigs:    map[uint64]*WatchConfig{},
+		watchConfigs:    watchConfigs,
 		scrapePeriod:    30 * time.Minute,
 	}
 
@@ -330,6 +314,21 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 	ctx, span = tracer.Start(ctx, "Scraper.sendAlerts")
 	defer span.End()
 
+	// Load all WatchConfigs.  We'll join them against articles in-memory.
+	wcs := []*trackerpb.WatchConfig{}
+	wcIt := s.watchConfigs.List(ctx)
+	for {
+		wc, err := wcIt.Next(ctx)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("while advancing WatchConfig iterator: %w", err)
+		}
+
+		wcs = append(wcs, wc)
+	}
+
 	// Use errgroup and semaphore to limit concurrency.
 	eg, ctx := errgroup.WithContext(ctx)
 	sem := semaphore.NewWeighted(500)
@@ -351,7 +350,7 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 		eg.Go(func() error {
 			defer sem.Release(1)
 
-			if err := s.sendAlertsForArticle(ctx, id); err != nil {
+			if err := s.sendAlertsForArticle(ctx, id, wcs); err != nil {
 				return fmt.Errorf("while sending alerts for article id=%d: %w", id, err)
 			}
 
@@ -366,7 +365,7 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 	return nil
 }
 
-func (s *Scraper) sendAlertsForArticle(ctx context.Context, id uint64) error {
+func (s *Scraper) sendAlertsForArticle(ctx context.Context, id uint64, wcs []*trackerpb.WatchConfig) error {
 	tracer := otel.Tracer("row-major/rumor-mill/scraper")
 	var span trace.Span
 	ctx, span = tracer.Start(ctx, "Scraper.sendAlertsForArticle")
@@ -383,9 +382,9 @@ readModifyWrite:
 			return nil
 		}
 
-		for _, wc := range s.watchConfigs {
+		for _, wc := range wcs {
 			if err := s.sendAlertForArticleAndWatchConfig(ctx, ta, wc); err != nil {
-				return fmt.Errorf("while checking article %d against watchconfig %d: %w", id, wc.ID, err)
+				return fmt.Errorf("while checking article %d against watchconfig %d: %w", id, wc.Id, err)
 			}
 		}
 
@@ -412,10 +411,10 @@ const emailPlain = `There's a new Hacker News article matching your watch config
 
 var emailPlainTemplate = texttemplate.Must(texttemplate.New("email").Parse(emailPlain))
 
-func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *trackerpb.TrackedArticle, wc *WatchConfig) error {
+func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *trackerpb.TrackedArticle, wc *trackerpb.WatchConfig) error {
 	// Have we already fired an alert for this watch config?
 	for _, wcID := range ta.FiredWatchConfigs {
-		if wcID == wc.ID {
+		if wcID == wc.Id {
 			return nil
 		}
 	}
@@ -423,7 +422,12 @@ func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *tra
 	if ta.LatestRank >= 500 {
 		return nil
 	}
-	if !wc.TopicRegexp.MatchString(strings.ToLower(ta.Title)) {
+
+	r, err := regexp.Compile(wc.TopicRegexp)
+	if err != nil {
+		return fmt.Errorf("while compiling WatchConfig regexp: %w", err)
+	}
+	if !r.MatchString(strings.ToLower(ta.Title)) {
 		return nil
 	}
 
@@ -450,8 +454,7 @@ func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *tra
 	}
 
 	textContent := &bytes.Buffer{}
-	err := emailPlainTemplate.Execute(textContent, params)
-	if err != nil {
+	if err := emailPlainTemplate.Execute(textContent, params); err != nil {
 		return fmt.Errorf("while templating plain-text email content: %w", err)
 	}
 
@@ -466,7 +469,7 @@ func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *tra
 		return fmt.Errorf("non-2xx response while sending mail through SendGrid: %d %q", resp.StatusCode, resp.Body)
 	}
 
-	ta.FiredWatchConfigs = append(ta.FiredWatchConfigs, wc.ID)
+	ta.FiredWatchConfigs = append(ta.FiredWatchConfigs, wc.Id)
 
 	return nil
 }
