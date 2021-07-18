@@ -34,9 +34,9 @@ func main() {
 	watchConfigTable := table.NewWatchConfigTable(gcs, *dataDir)
 
 	wc := &trackerpb.WatchConfig{
-		Id:              1,
-		Description:     "Kubernetes and GKE Articles",
-		TopicRegexp:     "kubernetes|k8s|gke|google ?kubernetes ?engine|google ?container ?engine|anthos|cloud ?run|kcc|config ?connector",
+		Id:              2,
+		Description:     "Crypto Crap",
+		TopicRegexp:     "bitcoin|ethereum",
 		NotifyAddresses: []string{"ahmed.taahir@gmail.com"},
 	}
 
