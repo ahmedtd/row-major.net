@@ -30,7 +30,7 @@ spec:
         - containerPort: 8001
         resources:
           limits:
-            memory: 50Mi
+            memory: 100Mi
         livenessProbe:
           httpGet:
             path: /healthz
