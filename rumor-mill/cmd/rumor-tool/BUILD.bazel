@@ -3,19 +3,22 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    importpath = "row-major/rumor-mill/cmd/rumor-mill-table-tool",
+    importpath = "row-major/rumor-mill/cmd/rumor-tool",
     visibility = ["//visibility:private"],
     deps = [
         "//rumor-mill/table:go_default_library",
         "//rumor-mill/table/trackerpb:go_default_library",
         "@com_github_golang_glog//:go_default_library",
+        "@com_github_spf13_cobra//:go_default_library",
         "@com_google_cloud_go_storage//:go_default_library",
+        "@org_golang_google_api//iterator:go_default_library",
         "@org_golang_google_api//option:go_default_library",
+        "@org_golang_google_protobuf//encoding/prototext:go_default_library",
     ],
 )
 
 go_binary(
-    name = "rumor-mill-table-tool",
+    name = "rumor-tool",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )
