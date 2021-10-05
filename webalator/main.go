@@ -10,6 +10,7 @@ import (
 	"row-major/webalator/httpmetrics"
 	"row-major/webalator/imgalator"
 	"row-major/webalator/mdredir"
+	"row-major/webalator/proxyipreflect"
 	"row-major/webalator/site"
 	"syscall"
 	"time"
@@ -124,6 +125,7 @@ func main() {
 	serveMux.Handle("/", site.Mux)
 	serveMux.Handle("/imgalator/", imgalator)
 	serveMux.Handle("/metadata-redirect", mdredir.New())
+	serveMux.Handle("/proxy-ip-reflect", proxyipreflect.New())
 	serveMux.Handle("/healthz", healthz.New())
 	serveMux.Handle("/readyz", healthz.New())
 
