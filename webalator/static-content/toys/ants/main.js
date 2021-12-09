@@ -1,9 +1,8 @@
 'use strict';
 
 let main = () => {
-  let offscreen = document.querySelector('#fluid-viewer').transferControlToOffscreen();
-
-  let worker = new Worker('./fluid.js');
+  let offscreen = document.querySelector('#viewer').transferControlToOffscreen()
+  let worker = new Worker('ants.js');
   worker.postMessage({canvas: offscreen}, [offscreen]);
 };
 

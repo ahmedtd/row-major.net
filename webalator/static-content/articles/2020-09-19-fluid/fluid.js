@@ -37,7 +37,6 @@ class Grid {
 
 	this.canvas = canvas;
 	this.context = canvas.getContext('2d');
-	this.gl = canvas.getContext('webgl2');
   }
 
   velX(x, y) {
@@ -406,4 +405,4 @@ self.onmessage = (msg) => {
   let canvas = msg.data.canvas;
   let grid = new Grid(0.1, 60, 60, canvas);
   grid.run();
-}
+};
