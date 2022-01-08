@@ -5836,11 +5836,6 @@ var Mouse = __webpack_require__(12);
 
         var render = Common.extend(defaults, options);
 
-        if (render.canvas) {
-            render.canvas.width = render.options.width || render.canvas.width;
-            render.canvas.height = render.options.height || render.canvas.height;
-        }
-
         render.mouse = options.mouse;
         render.engine = options.engine;
         render.canvas = render.canvas || _createCanvas(render.options.width, render.options.height);
@@ -5862,11 +5857,12 @@ var Mouse = __webpack_require__(12);
             Render.setPixelRatio(render, render.options.pixelRatio);
         }
 
-        if (Common.isElement(render.element)) {
-            render.element.appendChild(render.canvas);
-        } else if (!render.canvas.parentNode) {
-            Common.log('Render.create: options.element was undefined, render.canvas was created but not appended', 'warn');
-        }
+	    // TODO: OffscreenCanvas doesn't have parentNode and other DOM links.
+        // if (Common.isElement(render.element)) {
+        //     render.element.appendChild(render.canvas);
+        // } else if (!render.canvas.parentNode) {
+        //     Common.log('Render.create: options.element was undefined, render.canvas was created but not appended', 'warn');
+        // }
 
         return render;
     };
