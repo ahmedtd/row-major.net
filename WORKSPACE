@@ -89,12 +89,11 @@ load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
 gazelle_dependencies()
 
-# Download the rules_docker repository at release v0.14.4
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "4521794f0fba2e20f3bf15846ab5e01d5332e587e9ce81629c7f96c793bb7036",
-    strip_prefix = "rules_docker-0.14.4",
-    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.14.4/rules_docker-v0.14.4.tar.gz"],
+    sha256 = "85ffff62a4c22a74dbd98d05da6cf40f497344b3dbf1e1ab0a37ab2a1a6ca014",
+    strip_prefix = "rules_docker-0.23.0",
+    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.23.0/rules_docker-v0.23.0.tar.gz"],
 )
 
 load(
@@ -254,13 +253,6 @@ go_repository(
 )
 
 go_repository(
-    name = "com_github_armon_consul_api",
-    importpath = "github.com/armon/consul-api",
-    sum = "h1:G1bPvciwNyF7IUmKXNt9Ak3m6u9DE1rF+RmtIkBpVdA=",
-    version = "v0.0.0-20180202201655-eb2c6b5be1b6",
-)
-
-go_repository(
     name = "com_github_armon_go_metrics",
     importpath = "github.com/armon/go-metrics",
     sum = "h1:8GUt8eRujhVEGZFFEjBj46YV4rDjvGrNxb0KMWYkL2I=",
@@ -289,20 +281,6 @@ go_repository(
 )
 
 go_repository(
-    name = "com_github_coreos_etcd",
-    importpath = "github.com/coreos/etcd",
-    sum = "h1:jFneRYjIvLMLhDLCzuTuU4rSJUjRplcJQ7pD7MnhC04=",
-    version = "v3.3.10+incompatible",
-)
-
-go_repository(
-    name = "com_github_coreos_go_etcd",
-    importpath = "github.com/coreos/go-etcd",
-    sum = "h1:bXhRBIXoTm9BYHS3gE0TtQuyNZyeEMux2sDi4oo5YOo=",
-    version = "v2.0.0+incompatible",
-)
-
-go_repository(
     name = "com_github_coreos_go_semver",
     importpath = "github.com/coreos/go-semver",
     sum = "h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmfM=",
@@ -314,13 +292,6 @@ go_repository(
     importpath = "github.com/coreos/go-systemd/v22",
     sum = "h1:D9/bQk5vlXQFZ6Kwuu6zaiXJ9oTPe68++AzAJc1DzSI=",
     version = "v22.3.2",
-)
-
-go_repository(
-    name = "com_github_cpuguy83_go_md2man",
-    importpath = "github.com/cpuguy83/go-md2man",
-    sum = "h1:BSKMNlYxDvnunlTymqtgONjNnaRV1sTpcovwwjF22jk=",
-    version = "v1.0.10",
 )
 
 go_repository(
@@ -536,8 +507,8 @@ go_repository(
 go_repository(
     name = "com_github_mitchellh_go_homedir",
     importpath = "github.com/mitchellh/go-homedir",
-    sum = "h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=",
-    version = "v1.1.0",
+    sum = "h1:vKb8ShqSby24Yrqr/yDYkuFz8d0WUjys40rvnGC8aR0=",
+    version = "v1.0.0",
 )
 
 go_repository(
@@ -601,13 +572,6 @@ go_repository(
     importpath = "github.com/rogpeppe/fastuuid",
     sum = "h1:Ppwyp6VYCF1nvBTXL3trRso7mXMlRrw9ooo375wvi2s=",
     version = "v1.2.0",
-)
-
-go_repository(
-    name = "com_github_russross_blackfriday",
-    importpath = "github.com/russross/blackfriday",
-    sum = "h1:HyvC0ARfnZBqnXwABFeSZHpKvJHJJfPz81GNueLj0oo=",
-    version = "v1.5.2",
 )
 
 go_repository(
@@ -685,20 +649,6 @@ go_repository(
     importpath = "github.com/subosito/gotenv",
     sum = "h1:Slr1R9HxAlEKefgq5jn9U+DnETlIUa6HfgEzj0g5d7s=",
     version = "v1.2.0",
-)
-
-go_repository(
-    name = "com_github_ugorji_go_codec",
-    importpath = "github.com/ugorji/go/codec",
-    sum = "h1:3SVOIvH7Ae1KRYyQWRjXWJEA9sS/c/pjvH++55Gr648=",
-    version = "v0.0.0-20181204163529-d75b2dcb6bc8",
-)
-
-go_repository(
-    name = "com_github_xordataexchange_crypt",
-    importpath = "github.com/xordataexchange/crypt",
-    sum = "h1:ESFSdwYZvkeru3RtdrYueztKhOBCSAAzS4Gf+k0tEow=",
-    version = "v0.0.3-0.20170626215501-b2862e3d0a77",
 )
 
 go_repository(
@@ -1528,13 +1478,6 @@ go_repository(
     importpath = "k8s.io/gengo",
     sum = "h1:sAvhNk5RRuc6FNYGqe7Ygz3PSo/2wGWbulskmzRX8Vs=",
     version = "v0.0.0-20200413195148-3a45101e95ac",
-)
-
-go_repository(
-    name = "io_k8s_klog",
-    importpath = "k8s.io/klog",
-    sum = "h1:Pt+yjF5aB1xDSVbau4VsWe+dQNzA0qv1LlXdC2dF6Q8=",
-    version = "v1.0.0",
 )
 
 go_repository(
