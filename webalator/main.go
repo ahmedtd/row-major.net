@@ -43,17 +43,17 @@ func main() {
 	glog.CopyStandardLogTo("INFO")
 
 	glog.Infof("flags:")
-	glog.Infof("listen: %q", *listen)
-	glog.Infof("debug-listen: %q", *debugListen)
-	glog.Infof("static-content-dir: %q", *staticContentDir)
-	glog.Infof("template-dir: %q", *templateDir)
-	glog.Infof("enable-template-refresh: %q", *enableTemplateRefresh)
-	glog.Infof("enable-profiling: %q", *enableProfiling)
-	glog.Infof("enable-tracing: %q", *enableTracing)
-	glog.Infof("tracing-ratio: %q", *tracingRatio)
-	glog.Infof("enable-metrics: %q", *enableMetrics)
+	glog.Infof("listen: %v", *listen)
+	glog.Infof("debug-listen: %v", *debugListen)
+	glog.Infof("static-content-dir: %v", *staticContentDir)
+	glog.Infof("template-dir: %v", *templateDir)
+	glog.Infof("enable-template-refresh: %v", *enableTemplateRefresh)
+	glog.Infof("enable-profiling: %v", *enableProfiling)
+	glog.Infof("enable-tracing: %v", *enableTracing)
+	glog.Infof("tracing-ratio: %v", *tracingRatio)
+	glog.Infof("enable-metrics: %v", *enableMetrics)
 
-	glog.Infof("imgalator-bucket: %q", *imgalatorBucket)
+	glog.Infof("imgalator-bucket: %v", *imgalatorBucket)
 
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -87,7 +87,7 @@ func main() {
 			MonitoredResource: monitoredresource.Autodetect(),
 		})
 		if err != nil {
-			glog.Fatal("Error initializing tracing: %v", err)
+			glog.Fatalf("Error initializing tracing: %v", err)
 		}
 		exporter.StartMetricsExporter()
 		defer exporter.Flush()

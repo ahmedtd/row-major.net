@@ -7,9 +7,9 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 http_archive(
     name = "com_google_protobuf",
-    sha256 = "9748c0d90e54ea09e5e75fb7fac16edce15d2028d4356f32211cfa3c0e956564",
-    strip_prefix = "protobuf-3.11.4",
-    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.11.4.zip"],
+    sha256 = "25680843adf0c3302648d35f744e38cc3b6b05a6c77a927de5aea3e1c2e36106",
+    strip_prefix = "protobuf-3.19.4",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.19.4.zip"],
 )
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
@@ -22,70 +22,32 @@ protobuf_deps()
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "69de5c704a05ff37862f7e0f5534d4f479418afc21806c887db544a316f3cb6b",
+    sha256 = "d6b2513456fe2229811da7eb67a444be7785f5323c6708b38d851d2b51e54d83",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.27.0/rules_go-v0.27.0.tar.gz",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.27.0/rules_go-v0.27.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.30.0/rules_go-v0.30.0.zip",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.30.0/rules_go-v0.30.0.zip",
     ],
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
-# TODO: Remove this pinned dependency after bumping rules_go.  Rules_go bundles
-# an older version of this dependency.  Sigh.
-http_archive(
-    name = "org_golang_google_genproto",
-    patch_args = ["-p1"],
-    patches = [
-        # gazelle args: -repo_root . -go_prefix google.golang.org/genproto -go_naming_convention import_alias -proto disable_global
-        "//repo-tools/bazel-patches:org_golang_google_genproto-gazelle.patch",
-    ],
-    sha256 = "c06065ed15510483aaaf3e79fa3d387f7cedd48f984586374cab44bbf4edcf88",
-    strip_prefix = "go-genproto-669157292da34ccd2ff7ebc3af406854a79d61ce",
-    # master, as of 2021-05-30
-    urls = [
-        "https://github.com/googleapis/go-genproto/archive/669157292da34ccd2ff7ebc3af406854a79d61ce.zip",
-    ],
-)
-
-# TODO: Remove this pinned dependency after bumping rules_go.  Rules_go bundles
-# an older version of this dependency.  Sigh.
-http_archive(
-    name = "go_googleapis",
-    patch_args = [
-        "-E",
-        "-p1",
-    ],
-    patches = [
-        # find . -name BUILD.bazel -delete
-        "//repo-tools/bazel-patches:go_googleapis-deletebuild.patch",
-        # set gazelle directives; change workspace name
-        "//repo-tools/bazel-patches:go_googleapis-directives.patch",
-        # gazelle args: -repo_root .
-        "//repo-tools/bazel-patches:go_googleapis-gazelle.patch",
-    ],
-    sha256 = "e93e2c2217257e42b11717927d96d5799548619fbbb78cca9fa5051c39d90114",
-    strip_prefix = "googleapis-1c20dcfd8052a2bea026bda36875e5b7606028db",
-    # master, as of 2021-05-31
-    urls = [
-        "https://github.com/googleapis/googleapis/archive/1c20dcfd8052a2bea026bda36875e5b7606028db.zip",
-    ],
-)
-
 go_rules_dependencies()
 
-go_register_toolchains(version = "1.15")
+go_register_toolchains(
+    nogo = "@//repo-tools/nogo:my_nogo",
+    version = "1.18",
+)
 
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "62ca106be173579c0a167deb23358fdfe71ffa1e4cfdddf5582af26520f1c66f",
+    sha256 = "de69a09dc70417580aabf20a28619bb3ef60d038470c7cf8442fafcf627c21cb",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.23.0/bazel-gazelle-v0.23.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.23.0/bazel-gazelle-v0.23.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.24.0/bazel-gazelle-v0.24.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.24.0/bazel-gazelle-v0.24.0.tar.gz",
     ],
 )
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("//:go_dependencies.bzl", "go_dependencies")
 
 # gazelle:repository_macro go_dependencies.bzl%go_dependencies

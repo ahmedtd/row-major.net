@@ -20,7 +20,7 @@ func (t *trieNode) add(word []rune) error {
 	curNode := t
 	for _, r := range word {
 		if r < 'a' || r > 'z' {
-			return fmt.Errorf("rune %q is not lowercase ASCII")
+			return fmt.Errorf("rune %q is not lowercase ASCII", r)
 		}
 
 		if curNode.children[r-'a'] == nil {
@@ -84,7 +84,7 @@ func New(words []string) (*Evaluator, error) {
 func NewFromFile(wordsFile string) (*Evaluator, error) {
 	wordsData, err := ioutil.ReadFile(wordsFile)
 	if err != nil {
-		return nil, fmt.Errorf("while reading file %q: %w", err)
+		return nil, fmt.Errorf("while reading file %q: %w", wordsFile, err)
 	}
 
 	words := strings.Split(string(wordsData), "\n")

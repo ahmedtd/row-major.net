@@ -112,7 +112,7 @@ func (c *Client) Item(ctx context.Context, id uint64) (*Item, error) {
 
 	item := &Item{}
 	if err := c.doGet(ctx, url.String(), &item); err != nil {
-		return nil, fmt.Errorf("while getting item %s: %w", id, err)
+		return nil, fmt.Errorf("while getting item %d: %w", id, err)
 	}
 	return item, nil
 }

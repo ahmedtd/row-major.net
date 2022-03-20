@@ -521,13 +521,13 @@ func (s *Scraper) debugHandlerTrackedArticles(w http.ResponseWriter, req *http.R
 
 	tmplData, err := s.debugHandlerTrackedArticlesData(ctx)
 	if err != nil {
-		glog.Errorf("Error while retrieving tracked article data: %w", err)
+		glog.Errorf("Error while retrieving tracked article data: %v", err)
 		http.Error(w, "error retrieving tracked article data", http.StatusInternalServerError)
 		return
 	}
 
 	if err := articlesTemplate.Execute(w, tmplData); err != nil {
-		glog.Errorf("Error while executing template: %w", err)
+		glog.Errorf("Error while executing template: %v", err)
 		return
 	}
 }
@@ -623,14 +623,14 @@ func (s *Scraper) debugHandlerTrackedArticle(w http.ResponseWriter, req *http.Re
 
 	id, err := strconv.ParseUint(path.Base(req.URL.Path), 10, 64)
 	if err != nil {
-		glog.Errorf("Error while parsing ID: %w", err)
+		glog.Errorf("Error while parsing ID: %v", err)
 		http.Error(w, "error while parsing ID", http.StatusBadRequest)
 		return
 	}
 
 	ta, ok, err := s.trackedArticles.Get(ctx, id)
 	if err != nil {
-		glog.Errorf("Error while getting article: %w", err)
+		glog.Errorf("Error while getting article: %v", err)
 		http.Error(w, "error retrieving article", http.StatusInternalServerError)
 		return
 	}
@@ -643,7 +643,7 @@ func (s *Scraper) debugHandlerTrackedArticle(w http.ResponseWriter, req *http.Re
 	tmplData.TextProto = prototext.Format(ta)
 
 	if err := trackedArticleTemplate.Execute(w, tmplData); err != nil {
-		glog.Errorf("Error while executing template: %w", err)
+		glog.Errorf("Error while executing template: %v", err)
 		return
 	}
 }

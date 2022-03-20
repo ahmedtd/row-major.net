@@ -1,0 +1,56 @@
+{
+  "assign": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+    }
+  },
+  "composites": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+    }
+  },
+  "copylocks": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+     }
+  },
+  "formatted": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+     }
+  },
+  "nilness": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+    }
+  },
+  "shadow": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+    }
+  },
+  "stringintconv": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+    }
+  },
+  "unreachable": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+    }
+  },
+  "unsafeptr": {
+    "exclude_files": {
+      "bazel-out/.*": "Don't run this pass on generated files",
+      "external/.*": "Don't run this pass on external files"
+    }
+  }
+}

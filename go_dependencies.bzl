@@ -1,5 +1,7 @@
 load("@bazel_gazelle//:deps.bzl", "go_repository")
 
+# Regenerate me with `bazel run //:gazelle -- update-repos -from_file=go.mod -prune -to_macro=go_dependencies.bzl%go_dependencies`.
+
 def go_dependencies():
     go_repository(
         name = "co_honnef_go_tools",
@@ -106,7 +108,7 @@ def go_dependencies():
     go_repository(
         name = "com_github_census_instrumentation_opencensus_proto",
         importpath = "github.com/census-instrumentation/opencensus-proto",
-        build_extra_args = ["-exclude=src"], # keep, https://github.com/census-instrumentation/opencensus-proto/issues/200
+        build_extra_args = ["-exclude=src"],  # keep, https://github.com/census-instrumentation/opencensus-proto/issues/200
         sum = "h1:glEXhBS5PSLLv4IXzLA5yPRVX4bilULVyxxbrfOtDAk=",
         version = "v0.2.1",
     )
@@ -1006,14 +1008,12 @@ def go_dependencies():
     )
     go_repository(
         name = "io_k8s_api",
-        build_file_proto_mode = "disable",
         importpath = "k8s.io/api",
         sum = "h1:GN6ntFnv44Vptj/b+OnMW7FmzkpDoIDLZRvKX3XH9aU=",
         version = "v0.19.3",
     )
     go_repository(
         name = "io_k8s_apimachinery",
-        build_file_proto_mode = "disable",
         importpath = "k8s.io/apimachinery",
         sum = "h1:bpIQXlKjB4cB/oNpnNnV+BybGPR7iP5oYpsOTEJ4hgc=",
         version = "v0.19.3",
