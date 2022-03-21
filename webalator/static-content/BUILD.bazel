@@ -1,5 +1,8 @@
 filegroup(
     name = "all_deploy",
-    srcs = glob(include = ["**/*"]),
+    srcs = glob(
+        include = ["**/*"],
+        exclude = ["**/BUILD.bazel"],
+    ),
     visibility = ["//webalator:__subpackages__"],
 )

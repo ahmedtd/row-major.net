@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+message Manifest {
+  repeated StaticFile static_files = 1;
+  repeated Template templates = 2;
+}
+
+message StaticFile {
+  string path = 1;
+}
+
+message Template {
+  string path = 1;
+}
