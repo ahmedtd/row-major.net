@@ -6,8 +6,7 @@ go_library(
     importpath = "row-major/webalator/site",
     visibility = ["//visibility:public"],
     deps = [
+        "//webalator/contentpack:go_default_library",
         "//wordgrid:go_default_library",
-        "@io_opentelemetry_go_otel//:go_default_library",
-        "@io_opentelemetry_go_otel_trace//:go_default_library",
     ],
 )

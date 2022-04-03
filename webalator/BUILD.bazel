@@ -22,8 +22,7 @@ container_push(
 go_binary(
     name = "webalator",
     data = [
-        "//webalator/content:all_deploy",
-        "//webalator/static-content:all_deploy",
+        ":row_major_content",
     ],
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
@@ -35,6 +34,7 @@ go_library(
     importpath = "row-major/webalator",
     visibility = ["//visibility:private"],
     deps = [
+        "//webalator/contentpack:go_default_library",
         "//webalator/healthz:go_default_library",
         "//webalator/httpmetrics:go_default_library",
         "//webalator/imgalator:go_default_library",
@@ -48,4 +48,15 @@ go_library(
         "@io_opencensus_go_contrib_exporter_stackdriver//monitoredresource:go_default_library",
         "@io_opentelemetry_go_otel_sdk//trace:go_default_library",
     ],
+)
+
+load("@//webalator/packer:packer.bzl", "webalator_content_pack")
+
+webalator_content_pack(
+    name = "row_major_content",
+    static_file_trim_prefix = "webalator/static-content/",
+    static_files = ["//webalator/static-content:all_deploy"],
+    template_base_file = "//webalator/content:template_base",
+    template_file_trim_prefix = "webalator/content/",
+    template_files = ["//webalator/content:template_specializations"],
 )

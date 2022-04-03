@@ -1,14 +1,42 @@
 syntax = "proto3";
 
 message Manifest {
-  repeated StaticFile static_files = 1;
-  repeated Template templates = 2;
+  repeated Servable servables = 1;
 }
 
-message StaticFile {
-  string path = 1;
+message Servable {
+  oneof entry {
+    Static static = 1;
+    GoTemplate go_template = 2;
+    Redirect redirect = 3;
+  }
 }
 
-message Template {
-  string path = 1;
+// Static configures a static file.
+message Static {
+  string serving_path = 1;
+  string content_pack_path = 2;
+
+  string mime_type = 3;
+}
+
+// GoTemplate configures a Go HTML template.
+//
+// The Go templating system allows multiple templates to be loaded over one
+// another.  The first template defines all of the content, and all following
+// templates have to consist only of named sections that are then slotted into
+// the first template.
+//
+// For now, we support only one specialization template.
+message GoTemplate {
+  string serving_path = 1;
+
+  string base_content_pack_path = 2;
+  string specialization_content_pack_path = 3;
+}
+
+// Redirect configures a 301 redirect.
+message Redirect {
+  string serving_path = 1;
+  string location = 2;
 }

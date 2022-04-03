@@ -6,11 +6,12 @@ def _webalator_content_pack_impl(ctx):
     args.add_all(ctx.files.static_files, format_each='--static_file=%s')
     args.add("--static_file_trim_prefix", ctx.attr.static_file_trim_prefix)
     args.add_all(ctx.files.template_files, format_each='--template_file=%s')
+    args.add("--template_base_file", ctx.file.template_base_file)
     args.add("--template_file_trim_prefix", ctx.attr.template_file_trim_prefix)
 
     ctx.actions.run(
         outputs = [output_file],
-        inputs = depset(ctx.files.static_files + ctx.files.template_files),
+        inputs = depset(ctx.files.static_files + ctx.files.template_files + [ctx.file.template_base_file]),
         executable = ctx.executable._packer,
         arguments = [args],
         progress_message = "Packing {}".format(output_file.short_path),
@@ -28,6 +29,7 @@ webalator_content_pack = rule(
         "static_files": attr.label_list(allow_files = True),
         "static_file_trim_prefix": attr.string(),
         "template_files": attr.label_list(allow_files = True),
+        "template_base_file": attr.label(allow_single_file = True),
         "template_file_trim_prefix": attr.string(),
         "_packer": attr.label(
             default = Label("//webalator/packer:packer"),

@@ -1,15 +1,14 @@
 filegroup(
-    name = "all_deploy",
-    srcs = glob(include = ["**/*.html.tmpl"]),
+    name = "template_specializations",
+    srcs = glob(
+        include = ["**/*.html.tmpl"],
+        exclude = ["base.html.tmpl"],
+    ),
     visibility = ["//webalator:__subpackages__"],
 )
 
-load("@//webalator/packer:packer.bzl", "webalator_content_pack")
-
-webalator_content_pack(
-    name = "row_major_content",
-    static_file_trim_prefix = "webalator/static-content/",
-    static_files = ["//webalator/static-content:all_deploy"],
-    template_file_trim_prefix = "webalator/content/",
-    template_files = [":all_deploy"],
+filegroup(
+    name = "template_base",
+    srcs = ["base.html.tmpl"],
+    visibility = ["//webalator:__subpackages__"],
 )

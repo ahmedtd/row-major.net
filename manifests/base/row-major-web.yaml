@@ -76,8 +76,7 @@ spec:
             periodSeconds: 10
           command:
             - /app/webalator/webalator
-            - --static-content-dir=webalator/static-content
-            - --template-dir=webalator/content
+            - --content-pack=file://webalator/row_major_content.webalator.zip
             - --listen=0.0.0.0:8080
             - --debug-listen=0.0.0.0:8081
             - --logtostderr=true
