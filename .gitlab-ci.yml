@@ -1,7 +1,16 @@
 stages:
+  - test
   - upload-images
   - update-manifest
   - apply-manifest
+
+Test Everything:
+  stage: test
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+    - "curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64 > bazelisk"
+    - "chmod +x bazelisk"
+    - "./bazelisk test //..."
 
 Upload Images:
   stage: upload-images
@@ -10,7 +19,11 @@ Upload Images:
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
-    - "gcloud --project=bomsync-214520 builds submit ./ --config=cloudbuild.yaml --timeout=50m --substitutions=COMMIT_SHA=${CI_COMMIT_SHA}"
+    - "curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64 > bazelisk"
+    - "chmod +x bazelisk"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazelisk run //webalator:webalator_push"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazelisk run //shardedcontroller:push"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazelisk run //rumor-mill:rumor-mill_push"
 
 Update Manifest:
   stage: update-manifest
@@ -87,5 +100,5 @@ Apply Manifest:
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
-    - "gcloud --project=bomsync-214520 builds submit ./ --config=cloudbuild-deploy.yaml --timeout=10m"
-
+    - "gcloud container clusters get-credentials --project=bomsync-214520 --zone=us-west1-a taahm-primary-cluster"
+    - "kubectl apply -f manifests/production/rendered.yaml"
