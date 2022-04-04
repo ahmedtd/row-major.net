@@ -9,7 +9,7 @@ Print CI Token:
   stage: print-ci-token
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
-  - "cat ${CI_JOB_TOKEN} | base64"
+  - "echo ${CI_JOB_TOKEN} | base64"
 
 Test Everything:
   stage: test
