@@ -166,7 +166,7 @@ func TestGlider(t *testing.T) {
 
 		stepped := ForwardStep(sol)
 		if !stepped.Equals(glider2) {
-			t.Errorf("Solution is not a valid predecessor of the input\nsolution\n%sstep(solution)\n%s", sol, stepped)
+			t.Errorf("Solution is not a valid predecessor of the input\nsolution\n%vstep(solution)\n%v", sol, stepped)
 		}
 	}
 
@@ -204,7 +204,7 @@ func TestRandomSmallBoards(t *testing.T) {
 				}
 				stepped := ForwardStep(sol)
 				if !stepped.Equals(after) {
-					t.Errorf("Solution is not a valid predecessor of the input\nsolution\n%sstep(solution)\n%s", sol, stepped)
+					t.Errorf("Solution is not a valid predecessor of the input\nsolution\n%vstep(solution)\n%v", sol, stepped)
 				}
 
 				// Only find one solution.

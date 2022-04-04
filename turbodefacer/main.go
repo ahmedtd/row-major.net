@@ -39,7 +39,7 @@ func main() {
 
 	err = c.Login(user, pass)
 	if err != nil {
-		log.Fatalf("While logging in as %q: %v", err)
+		log.Fatalf("While logging in as %q: %v", user, err)
 	}
 
 	err = ensureBackup(c, "index.html")

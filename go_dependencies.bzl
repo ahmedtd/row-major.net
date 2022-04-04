@@ -372,6 +372,7 @@ def go_dependencies():
     )
     go_repository(
         name = "com_github_googleapis_gnostic",
+        build_file_proto_mode = "disable",
         importpath = "github.com/googleapis/gnostic",
         sum = "h1:DLJCy1n/vrD4HPjOvYcT8aYQXpPIzoRZONaYwyycI+I=",
         version = "v0.4.1",
@@ -1008,12 +1009,14 @@ def go_dependencies():
     )
     go_repository(
         name = "io_k8s_api",
+        build_file_proto_mode = "disable",
         importpath = "k8s.io/api",
         sum = "h1:GN6ntFnv44Vptj/b+OnMW7FmzkpDoIDLZRvKX3XH9aU=",
         version = "v0.19.3",
     )
     go_repository(
         name = "io_k8s_apimachinery",
+        build_file_proto_mode = "disable",
         importpath = "k8s.io/apimachinery",
         sum = "h1:bpIQXlKjB4cB/oNpnNnV+BybGPR7iP5oYpsOTEJ4hgc=",
         version = "v0.19.3",
