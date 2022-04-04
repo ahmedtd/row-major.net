@@ -82,7 +82,7 @@ Update Manifest:
     - kubectl kustomize manifests/production > manifests/production/rendered.yaml
     - |
       curl \
-        --fail-with-body \
+        --fail \
         --request POST \
         --header "PRIVATE-TOKEN:${GITLAB_API_TOKEN}" \
         --form "branch=master" \
