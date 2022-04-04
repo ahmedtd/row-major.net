@@ -11,7 +11,7 @@ Test Everything:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
     - "curl -L https://releases.bazel.build/5.1.0/release/bazel-5.1.0-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "./bazel test --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials -- //..."
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} ./bazel test --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials -- //..."
 
 Upload Images:
   stage: upload-images
@@ -23,9 +23,9 @@ Upload Images:
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/5.1.0/release/bazel-5.1.0-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //webalator:webalator_push"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //shardedcontroller:push"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //rumor-mill:rumor-mill_push"
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //webalator:webalator_push"
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //shardedcontroller:push"
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //rumor-mill:rumor-mill_push"
 
 Update Manifest:
   stage: update-manifest
