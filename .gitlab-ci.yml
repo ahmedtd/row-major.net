@@ -1,8 +1,15 @@
 stages:
+  - print-ci-token
   - test
   - upload-images
   - update-manifest
   - apply-manifest
+
+Print CI Token:
+  stage: print-ci-token
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+  - "echo ${CI_JOB_TOKEN}"
 
 Test Everything:
   stage: test
@@ -84,7 +91,7 @@ Update Manifest:
       curl \
         --fail \
         --request POST \
-        --header "PRIVATE-TOKEN:${GITLAB_API_TOKEN}" \
+        --header "PRIVATE-TOKEN:${CI_JOB_TOKEN}" \
         --form "branch=master" \
         --form "commit_message=<commit-message.txt" \
         --form "actions[][action]=update" \
