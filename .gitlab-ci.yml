@@ -1,15 +1,8 @@
 stages:
-  - print-ci-token
   - test
   - upload-images
   - update-manifest
   - apply-manifest
-
-Print CI Token:
-  stage: print-ci-token
-  image: gcr.io/google.com/cloudsdktool/cloud-sdk
-  script:
-  - "echo ${CI_JOB_TOKEN} | base64"
 
 Test Everything:
   stage: test
