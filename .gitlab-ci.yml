@@ -8,9 +8,9 @@ Test Everything:
   stage: test
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
-    - "curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64 > bazelisk"
-    - "chmod +x bazelisk"
-    - "./bazelisk test //..."
+    - "curl -L https://releases.bazel.build/5.1.0/release/bazel-5.1.0-linux-x86_64 > bazel"
+    - "chmod +x bazel"
+    - "./bazel test //..."
 
 Upload Images:
   stage: upload-images
@@ -19,11 +19,11 @@ Upload Images:
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
-    - "curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64 > bazelisk"
-    - "chmod +x bazelisk"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazelisk run //webalator:webalator_push"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazelisk run //shardedcontroller:push"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazelisk run //rumor-mill:rumor-mill_push"
+    - "curl -L https://releases.bazel.build/5.1.0/release/bazel-5.1.0-linux-x86_64 > bazel"
+    - "chmod +x bazel"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //webalator:webalator_push"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //shardedcontroller:push"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //rumor-mill:rumor-mill_push"
 
 Update Manifest:
   stage: update-manifest
