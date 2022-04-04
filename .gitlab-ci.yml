@@ -10,7 +10,7 @@ Test Everything:
   script:
     - "curl -L https://releases.bazel.build/5.1.0/release/bazel-5.1.0-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "./bazel --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials test //..."
+    - "./bazel test --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials -- //..."
 
 Upload Images:
   stage: upload-images
@@ -22,9 +22,9 @@ Upload Images:
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/5.1.0/release/bazel-5.1.0-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials run //webalator:webalator_push"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials run //shardedcontroller:push"
-    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials run //rumor-mill:rumor-mill_push"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //webalator:webalator_push"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //shardedcontroller:push"
+    - "IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run --remote_cache=https://storage.googleapis.com/bazel-cache.row-major.net --google_default_credentials //rumor-mill:rumor-mill_push"
 
 Update Manifest:
   stage: update-manifest
