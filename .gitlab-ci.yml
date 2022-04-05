@@ -10,10 +10,6 @@ stages:
 Test Everything:
   stage: test
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
-  cache:
-    key: "${BAZEL_VERSION}"
-    paths:
-      - "output"
   script:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
@@ -24,10 +20,6 @@ Upload Images:
   rules:
     - if: "$CI_COMMIT_MESSAGE !~ /^NO_UPLOAD_IMAGES=/m"
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
-  cache:
-    key: "${BAZEL_VERSION}"
-    paths:
-      - "output"
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
     - "gcloud auth configure-docker gcr.io"
