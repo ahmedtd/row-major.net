@@ -93,7 +93,6 @@ Update Manifest:
     - kubectl kustomize manifests/production > manifests/production/rendered.yaml
     - |
       curl \
-        --fail \
         --request POST \
         --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
         --form "branch=master" \
