@@ -86,7 +86,7 @@ Update Manifest:
     - |
       curl \
         --request POST \
-        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
         --form "branch=master" \
         --form "commit_message=<commit-message.txt" \
         --form "actions[][action]=update" \
