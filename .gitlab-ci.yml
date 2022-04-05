@@ -13,7 +13,7 @@ Test Everything:
   script:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "./bazel --output_base=output test -- //..."
+    - "./bazel test -- //..."
 
 Upload Images:
   stage: upload-images
