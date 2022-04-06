@@ -1,3 +1,8 @@
+# Note: Because of how Gitlab CI constructs the DAG, it's important that a job
+# is only defined if all of the jobs it depends on is defined.  In practice,
+# this means that the `rules` of a job needs to be a superset of the `rules` of
+# all of its dependencies.
+
 variables:
   BAZEL_VERSION: "5.1.0"
 
@@ -9,10 +14,10 @@ stages:
 
 test-everything:
   stage: test
-  # rules:
-  #   - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
-  #     when: never
-  #   - when: on_success
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - when: on_success
   needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
@@ -20,14 +25,16 @@ test-everything:
     - "chmod +x bazel"
     - "./bazel test -- //..."
 
-sharded-controller-upload-images:
+sharded-controller/upload-images:
   stage: upload-images
-  # rules:
-  #   - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
-  #     when: never
-  #   - changes:
-  #       - shardedcontroller/*
-  #     when: on_success
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
+    - changes:
+        - shardedcontroller/*
+      when: on_success
   needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
@@ -37,14 +44,16 @@ sharded-controller-upload-images:
     - "chmod +x bazel"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //shardedcontroller:push"
 
-rumor-mill-upload-images:
+rumor-mill/upload-images:
   stage: upload-images
-  # rules:
-  #   - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
-  #     when: never
-  #   - changes:
-  #       - rumor-mill/*
-  #     when: on_success
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
+    - changes:
+        - rumor-mill/*
+      when: on_success
   needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
@@ -54,14 +63,16 @@ rumor-mill-upload-images:
     - "chmod +x bazel"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //rumor-mill:rumor-mill_push"
 
-row-major-web-upload-images:
+row-major-web/upload-images:
   stage: upload-images
-  # rules:
-  #   - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
-  #     when: never
-  #   - changes:
-  #       - webalator/*
-  #     when: on_success
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
+    - changes:
+        - webalator/*
+      when: on_success
   needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
@@ -71,13 +82,19 @@ row-major-web-upload-images:
     - "chmod +x bazel"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //webalator:webalator_push"
 
-row-major-web-update-manifest:
+row-major-web/update-manifest:
   stage: update-manifest
   rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
-    - when: on_success
-  needs: ["row-major-web-upload-images"]
+    - changes:
+        - webalator/*
+      when: on_success
+  needs: ["row-major-web/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
@@ -119,13 +136,19 @@ row-major-web-update-manifest:
         --form "actions[][content]=<manifests/production/rendered.yaml" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
 
-rumor-mill-update-manifest:
+rumor-mill/update-manifest:
   stage: update-manifest
   rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
-    - when: on_success
-  needs: ["rumor-mill-upload-images"]
+    - changes:
+        - rumor-mill/*
+      when: on_success
+  needs: ["rumor-mill/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
@@ -167,13 +190,19 @@ rumor-mill-update-manifest:
         --form "actions[][content]=<manifests/production/rendered.yaml" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
 
-sharded-controller-update-manifest:
+sharded-controller/update-manifest:
   stage: update-manifest
   rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
-    - when: on_success
-  needs: ["sharded-controller-upload-images"]
+    - changes:
+        - shardedcontroller/*
+      when: on_success
+  needs: ["sharded-controller/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
