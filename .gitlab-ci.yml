@@ -9,11 +9,11 @@ stages:
 
 test-everything:
   stage: test
-  needs: []
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
       when: never
     - when: on_success
+  needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
@@ -22,13 +22,13 @@ test-everything:
 
 sharded-controller/upload-images:
   stage: upload-images
-  needs: ["test-everything"]
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
       when: never
     - changes:
         - shardedcontroller/*
       when: on_success
+  needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
@@ -39,13 +39,13 @@ sharded-controller/upload-images:
 
 rumor-mill/upload-images:
   stage: upload-images
-  needs: ["test-everything"]
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
       when: never
     - changes:
         - rumor-mill/*
       when: on_success
+  needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
@@ -56,13 +56,13 @@ rumor-mill/upload-images:
 
 row-major-web/upload-images:
   stage: upload-images
-  needs: ["test-everything"]
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
       when: never
     - changes:
         - webalator/*
       when: on_success
+  needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
@@ -73,11 +73,11 @@ row-major-web/upload-images:
 
 row-major-web/update-manifest:
   stage: update-manifest
-  needs: ["row-major-web/upload-images"]
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
     - when: on_success
+  needs: ["row-major-web/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
@@ -121,11 +121,11 @@ row-major-web/update-manifest:
 
 rumor-mill/update-manifest:
   stage: update-manifest
-  needs: ["rumor-mill/upload-images"]
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
     - when: on_success
+  needs: ["rumor-mill/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
@@ -169,11 +169,11 @@ rumor-mill/update-manifest:
 
 sharded-controller/update-manifest:
   stage: update-manifest
-  needs: ["sharded-controller/upload-images"]
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
     - when: on_success
+  needs: ["sharded-controller/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
@@ -217,7 +217,6 @@ sharded-controller/update-manifest:
         
 deploy-manifest:
   stage: deploy
-  needs: []
   environment:
     name: production
     url: https://row-major.net/
@@ -227,6 +226,7 @@ deploy-manifest:
     - changes:
         - manifests/*
       when: on_success
+  needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
