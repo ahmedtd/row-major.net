@@ -1,0 +1,12 @@
+# This file is overwritten by CI
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: row-major-web-content-deployment
+  namespace: row-major-web
+spec:
+  template:
+    spec:
+      containers:
+        - name: row-major-web-content
+          image: gcr.io/bomsync-214520/webalator:e9f598ff7a13970745099d27c5d1c3641491f7ee
