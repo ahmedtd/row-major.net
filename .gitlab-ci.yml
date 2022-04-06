@@ -9,16 +9,56 @@ stages:
 
 Test Everything:
   stage: test
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - when: on_success
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
     - "./bazel test -- //..."
 
-Upload Images:
+Upload Sharded Controller Images:
   stage: upload-images
   rules:
-    - if: "$CI_COMMIT_MESSAGE !~ /^NO_UPLOAD_IMAGES=/m"
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
+    - changes:
+        - shardedcontroller/*
+      when: on_success
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+    - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
+    - "gcloud auth configure-docker gcr.io"
+    - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
+    - "chmod +x bazel"
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //shardedcontroller:push"
+
+Upload Rumor Mill Image:
+  stage: upload-images
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
+    - changes:
+        - rumor-mill/*
+      when: on_success
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+    - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
+    - "gcloud auth configure-docker gcr.io"
+    - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
+    - "chmod +x bazel"
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //rumor-mill:rumor-mill_push"
+
+Upload Webalator Image:
+  stage: upload-images
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
+    - changes:
+        - webalator/*
+      when: on_success
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
@@ -26,13 +66,13 @@ Upload Images:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //webalator:webalator_push"
-    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //shardedcontroller:push"
-    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //rumor-mill:rumor-mill_push"
 
 Update Manifest:
   stage: update-manifest
   rules:
-    - if: "$CI_COMMIT_MESSAGE !~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
+      when: never
+    - when: on_success
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
@@ -78,6 +118,7 @@ Update Manifest:
       cat <<EOF >commit-message.txt
       Manifest update for ${CI_COMMIT_SHA}
 
+      NO_TEST=
       NO_UPLOAD_IMAGES=
       NO_UPDATE_IMAGES_IN_MANIFEST=
       APPLY_MANIFEST=
@@ -101,7 +142,11 @@ Update Manifest:
 Apply Manifest:
   stage: apply-manifest
   rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^APPLY_MANIFEST=/m"
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_APPLY_MANIFEST=/m"
+      when: never
+    - changes:
+        - manifests/*
+      when: on_success
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
