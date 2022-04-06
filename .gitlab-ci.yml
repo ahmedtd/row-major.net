@@ -5,7 +5,7 @@ stages:
   - test
   - upload-images
   - update-manifest
-  - apply-manifest
+  - deploy
 
 Test Everything:
   stage: test
@@ -140,7 +140,10 @@ Update Manifest:
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
 
 Apply Manifest:
-  stage: apply-manifest
+  stage: deploy
+  environment:
+    name: production
+    url: https://row-major.net/
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_APPLY_MANIFEST=/m"
       when: never
