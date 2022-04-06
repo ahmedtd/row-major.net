@@ -56,12 +56,12 @@ rumor-mill-upload-images:
 
 row-major-web-upload-images:
   stage: upload-images
-  rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
-      when: never
-    - changes:
-        - webalator/*
-      when: on_success
+  # rules:
+  #   - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+  #     when: never
+  #   - changes:
+  #       - webalator/*
+  #     when: on_success
   needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
