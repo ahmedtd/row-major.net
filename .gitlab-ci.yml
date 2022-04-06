@@ -129,8 +129,8 @@ row-major-web/update-manifest:
         --form "branch=master" \
         --form "commit_message=<commit-message.txt" \
         --form "actions[][action]=update" \
-        --form "actions[][file_path]=manifests/production/production-images.patch.yaml" \
-        --form "actions[][content]=<manifests/production/production-images.patch.yaml" \
+        --form "actions[][file_path]=manifests/production/row-major-web-production-images.patch.yaml" \
+        --form "actions[][content]=<manifests/production/row-major-web-production-images.patch.yaml" \
         --form "actions[][action]=update" \
         --form "actions[][file_path]=manifests/production/rendered.yaml" \
         --form "actions[][content]=<manifests/production/rendered.yaml" \
@@ -183,8 +183,8 @@ rumor-mill/update-manifest:
         --form "branch=master" \
         --form "commit_message=<commit-message.txt" \
         --form "actions[][action]=update" \
-        --form "actions[][file_path]=manifests/production/production-images.patch.yaml" \
-        --form "actions[][content]=<manifests/production/production-images.patch.yaml" \
+        --form "actions[][file_path]=manifests/production/rumor-mill-production-images.patch.yaml" \
+        --form "actions[][content]=<manifests/production/rumor-mill-production-images.patch.yaml" \
         --form "actions[][action]=update" \
         --form "actions[][file_path]=manifests/production/rendered.yaml" \
         --form "actions[][content]=<manifests/production/rendered.yaml" \
@@ -237,8 +237,8 @@ sharded-controller/update-manifest:
         --form "branch=master" \
         --form "commit_message=<commit-message.txt" \
         --form "actions[][action]=update" \
-        --form "actions[][file_path]=manifests/production/production-images.patch.yaml" \
-        --form "actions[][content]=<manifests/production/production-images.patch.yaml" \
+        --form "actions[][file_path]=manifests/production/sharded-controller-production-images.patch.yaml" \
+        --form "actions[][content]=<manifests/production/sharded-controller-production-images.patch.yaml" \
         --form "actions[][action]=update" \
         --form "actions[][file_path]=manifests/production/rendered.yaml" \
         --form "actions[][content]=<manifests/production/rendered.yaml" \
