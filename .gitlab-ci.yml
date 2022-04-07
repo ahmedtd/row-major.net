@@ -27,7 +27,7 @@ sharded-controller/upload-images-and-update-manifest:
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "./bazel test -- //shardedcontroller/..."
+    - "./bazel test -- //..."
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //shardedcontroller:push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
@@ -55,7 +55,7 @@ rumor-mill/upload-images-and-update-manifest:
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "./bazel test -- //rumor-mill/..."
+    - "./bazel test -- //..."
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //rumor-mill:rumor-mill_push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
@@ -83,7 +83,7 @@ row-major-web/upload-images-and-update-manifest:
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "./bazel test -- //webalator/..."
+    - "./bazel test -- //..."
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //webalator:webalator_push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
