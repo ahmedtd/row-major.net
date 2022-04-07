@@ -149,7 +149,7 @@ func (c *Command) Do(ctx context.Context) error {
 		},
 	})
 
-	apiURL := ciAPIV4URL + "projects/" + ciProjectID + "/repository/commits"
+	apiURL := ciAPIV4URL + "/projects/" + ciProjectID + "/repository/commits"
 
 	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
 	if err != nil {

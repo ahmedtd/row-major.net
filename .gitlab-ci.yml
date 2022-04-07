@@ -7,23 +7,8 @@ variables:
   BAZEL_VERSION: "5.1.0"
 
 stages:
-  - test
   - upload-images
-  - update-manifest
   - deploy
-
-test-everything:
-  stage: test
-  rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
-      when: never
-    - when: on_success
-  needs: []
-  image: gcr.io/google.com/cloudsdktool/cloud-sdk
-  script:
-    - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
-    - "chmod +x bazel"
-    - "./bazel test -- //..."
 
 sharded-controller/upload-images-and-update-manifest:
   stage: upload-images
@@ -35,13 +20,14 @@ sharded-controller/upload-images-and-update-manifest:
     - changes:
         - shardedcontroller/**/*
       when: on_success
-  needs: ["test-everything"]
+  needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
+    - "./bazel test -- //shardedcontroller/..."
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //shardedcontroller:push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
@@ -62,13 +48,14 @@ rumor-mill/upload-images-and-update-manifest:
     - changes:
         - rumor-mill/**/*
       when: on_success
-  needs: ["test-everything"]
+  needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
+    - "./bazel test -- //rumor-mill/..."
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //rumor-mill:rumor-mill_push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
@@ -89,13 +76,14 @@ row-major-web/upload-images-and-update-manifest:
     - changes:
         - webalator/**/*
       when: on_success
-  needs: ["test-everything"]
+  needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
+    - "./bazel test -- //webalator/..."
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //webalator:webalator_push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
