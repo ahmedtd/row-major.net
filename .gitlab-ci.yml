@@ -173,7 +173,6 @@ rumor-mill/update-manifest:
       NO_UPLOAD_IMAGES=
       NO_UPDATE_IMAGES_IN_MANIFEST=
       EOF
-    - kubectl kustomize manifests/production > manifests/production/rendered.yaml
     - |
       curl \
         --fail \
@@ -259,4 +258,4 @@ deploy-manifest:
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
     - "gcloud container clusters get-credentials --project=bomsync-214520 --zone=us-west1-a taahm-primary-cluster"
-    - "kubectl apply -f manifests/production/rendered.yaml"
+    - "kubectl apply --kustomize=manifests/production
