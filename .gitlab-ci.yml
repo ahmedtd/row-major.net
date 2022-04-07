@@ -25,7 +25,7 @@ test-everything:
     - "chmod +x bazel"
     - "./bazel test -- //..."
 
-sharded-controller/upload-images:
+sharded-controller/upload-images-and-update-manifest:
   stage: upload-images
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
@@ -43,8 +43,16 @@ sharded-controller/upload-images:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //shardedcontroller:push"
+    - |
+      ./bazel run //infra-tools/bump-manifest -- \
+        --merge-file=manifests/production/sharded-controller-production-images.merge.yaml \
+        --namespace=sharded-controller \
+        --name=sharded-controller \
+        --container-name=sharded-controller \
+        --container-image=gcr.io/bomsync-214520/shardedcontroller \
+        --container-image-tag=${CI_COMMIT_SHA}
 
-rumor-mill/upload-images:
+rumor-mill/upload-images-and-update-manifest:
   stage: upload-images
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
@@ -62,8 +70,16 @@ rumor-mill/upload-images:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //rumor-mill:rumor-mill_push"
+    - |
+      ./bazel run //infra-tools/bump-manifest -- \
+        --merge-file=manifests/production/rumor-mill-production-images.merge.yaml \
+        --namespace=rumor-mill \
+        --name=rumor-mill \
+        --container-name=main \
+        --container-image=gcr.io/bomsync-214520/rumor-mill \
+        --container-image-tag=${CI_COMMIT_SHA}
 
-row-major-web/upload-images:
+row-major-web/upload-images-and-update-manifest:
   stage: upload-images
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
@@ -81,156 +97,15 @@ row-major-web/upload-images:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //webalator:webalator_push"
+    - |
+      ./bazel run //infra-tools/bump-manifest -- \
+        --merge-file=manifests/production/row-major-web-production-images.merge.yaml \
+        --namespace=row-major-web \
+        --name=row-major-web-content-deployment \
+        --container-name=row-major-web-content \
+        --container-image=gcr.io/bomsync-214520/webalator \
+        --container-image-tag=${CI_COMMIT_SHA}
 
-row-major-web/update-manifest:
-  stage: update-manifest
-  rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
-      when: never
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
-      when: never
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
-      when: never
-    - changes:
-        - webalator/**/*
-      when: on_success
-  needs: ["row-major-web/upload-images"]
-  image: gcr.io/google.com/cloudsdktool/cloud-sdk
-  script:
-    - |
-      cat <<EOF >manifests/production/row-major-web-production-images.patch.yaml
-      # This file is overwritten by CI
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: row-major-web-content-deployment
-        namespace: row-major-web
-      spec:
-        template:
-          spec:
-            containers:
-              - name: row-major-web-content
-                image: gcr.io/bomsync-214520/webalator:${CI_COMMIT_SHA}
-      EOF
-    - |
-      cat <<EOF >commit-message.txt
-      Manifest update for row-major-web @ ${CI_COMMIT_SHA}
-
-      NO_TEST=
-      NO_UPLOAD_IMAGES=
-      NO_UPDATE_IMAGES_IN_MANIFEST=
-      EOF
-    - |
-      curl \
-        --request POST \
-        --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
-        --form "branch=master" \
-        --form "commit_message=<commit-message.txt" \
-        --form "actions[][action]=update" \
-        --form "actions[][file_path]=manifests/production/row-major-web-production-images.patch.yaml" \
-        --form "actions[][content]=<manifests/production/row-major-web-production-images.patch.yaml" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
-
-rumor-mill/update-manifest:
-  stage: update-manifest
-  rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
-      when: never
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
-      when: never
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
-      when: never
-    - changes:
-        - rumor-mill/**/*
-      when: on_success
-  needs: ["rumor-mill/upload-images"]
-  image: gcr.io/google.com/cloudsdktool/cloud-sdk
-  script:
-    - |
-      cat <<EOF >manifests/production/rumor-mill-production-images.patch.yaml
-      # This file is overwritten by CI
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: rumor-mill
-        namespace: rumor-mill
-      spec:
-        template:
-          spec:
-            containers:
-            - name: main
-              image: gcr.io/bomsync-214520/rumor-mill:${CI_COMMIT_SHA}
-      EOF
-    - |
-      cat <<EOF >commit-message.txt
-      Manifest update for rumor-mill @ ${CI_COMMIT_SHA}
-
-      NO_TEST=
-      NO_UPLOAD_IMAGES=
-      NO_UPDATE_IMAGES_IN_MANIFEST=
-      EOF
-    - |
-      curl \
-        --fail \
-        --request POST \
-        --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
-        --form "branch=master" \
-        --form "commit_message=<commit-message.txt" \
-        --form "actions[][action]=update" \
-        --form "actions[][file_path]=manifests/production/rumor-mill-production-images.patch.yaml" \
-        --form "actions[][content]=<manifests/production/rumor-mill-production-images.patch.yaml" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
-
-sharded-controller/update-manifest:
-  stage: update-manifest
-  rules:
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
-      when: never
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
-      when: never
-    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
-      when: never
-    - changes:
-        - shardedcontroller/**/*
-      when: on_success
-  needs: ["sharded-controller/upload-images"]
-  image: gcr.io/google.com/cloudsdktool/cloud-sdk
-  script:
-    - |
-      cat <<EOF >manifests/production/sharded-controller-production-images.patch.yaml
-      # This file is overwritten by CI
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: sharded-controller
-        namespace: sharded-controller
-      spec:
-        template:
-          spec:
-            containers:
-              - name: sharded-controller
-                image: gcr.io/bomsync-214520/shardedcontroller:${CI_COMMIT_SHA}
-      EOF
-    - |
-      cat <<EOF >commit-message.txt
-      Manifest update for sharded-controller @ ${CI_COMMIT_SHA}
-
-      NO_TEST=
-      NO_UPLOAD_IMAGES=
-      NO_UPDATE_IMAGES_IN_MANIFEST=
-      EOF
-    - |
-      curl \
-        --fail \
-        --request POST \
-        --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
-        --form "branch=master" \
-        --form "commit_message=<commit-message.txt" \
-        --form "actions[][action]=update" \
-        --form "actions[][file_path]=manifests/production/sharded-controller-production-images.patch.yaml" \
-        --form "actions[][content]=<manifests/production/sharded-controller-production-images.patch.yaml" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/commits"
-        
 deploy-manifest:
   stage: deploy
   environment:
