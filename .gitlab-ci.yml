@@ -123,7 +123,6 @@ row-major-web/update-manifest:
     - kubectl kustomize manifests/production > manifests/production/rendered.yaml
     - |
       curl \
-        --fail \
         --request POST \
         --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
         --form "branch=master" \
