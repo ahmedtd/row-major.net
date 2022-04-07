@@ -33,7 +33,7 @@ sharded-controller/upload-images:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
       when: never
     - changes:
-        - shardedcontroller/*
+        - shardedcontroller/**/*
       when: on_success
   needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -52,7 +52,7 @@ rumor-mill/upload-images:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
       when: never
     - changes:
-        - rumor-mill/*
+        - rumor-mill/**/*
       when: on_success
   needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -71,7 +71,7 @@ row-major-web/upload-images:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
       when: never
     - changes:
-        - webalator/*
+        - webalator/**/*
       when: on_success
   needs: ["test-everything"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -92,7 +92,7 @@ row-major-web/update-manifest:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
     - changes:
-        - webalator/*
+        - webalator/**/*
       when: on_success
   needs: ["row-major-web/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -141,7 +141,7 @@ rumor-mill/update-manifest:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
     - changes:
-        - rumor-mill/*
+        - rumor-mill/**/*
       when: on_success
   needs: ["rumor-mill/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -191,7 +191,7 @@ sharded-controller/update-manifest:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPDATE_IMAGES_IN_MANIFEST=/m"
       when: never
     - changes:
-        - shardedcontroller/*
+        - shardedcontroller/**/*
       when: on_success
   needs: ["sharded-controller/upload-images"]
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -240,7 +240,7 @@ deploy-manifest:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_APPLY_MANIFEST=/m"
       when: never
     - changes:
-        - manifests/*
+        - manifests/**/*
       when: on_success
   needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
