@@ -147,7 +147,7 @@ rumor-mill/update-manifest:
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
-      cat <<EOF >manifests/production/row-major-web-production-images.patch.yaml
+      cat <<EOF >manifests/production/rumor-mill-production-images.patch.yaml
       # This file is overwritten by CI
       apiVersion: apps/v1
       kind: Deployment
@@ -197,7 +197,7 @@ sharded-controller/update-manifest:
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - |
-      cat <<EOF >manifests/production/row-major-web-production-images.patch.yaml
+      cat <<EOF >manifests/production/sharded-controller-production-images.patch.yaml
       # This file is overwritten by CI
       apiVersion: apps/v1
       kind: Deployment
