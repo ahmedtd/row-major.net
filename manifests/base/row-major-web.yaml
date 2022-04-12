@@ -9,9 +9,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: webalator
-  namespace: row-major-web  
-  annotations:
-    iam.gke.io/gcp-service-account: webalator@bomsync-214520.iam.gserviceaccount.com
+  namespace: row-major-web
 
 ---
 
