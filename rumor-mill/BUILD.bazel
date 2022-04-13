@@ -16,7 +16,7 @@ container_push(
     image = ":rumor-mill_image",
     registry = "gcr.io",
     repository = "bomsync-214520/rumor-mill",
-    tag = "latest",
+    tag = "{STABLE_IMAGE_TAG}",
 )
 
 go_library(
