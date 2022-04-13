@@ -1,12 +1,14 @@
-# This file is overwritten by CI
+# This file is overwritten by CI.
+#
+# Refer to //infra-tools/bump-manifest to see how it is generated.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sharded-controller
   namespace: sharded-controller
+  name: sharded-controller
 spec:
   template:
     spec:
       containers:
-        - name: sharded-controller
-          image: gcr.io/bomsync-214520/shardedcontroller:e9f598ff7a13970745099d27c5d1c3641491f7ee
+      - name: sharded-controller
+        image: gcr.io/bomsync-214520/shardedcontroller:3a74542b8df3d7153a1a43000cd36cac182c70bc
