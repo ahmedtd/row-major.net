@@ -34,7 +34,7 @@ container_push(
     image = ":shardedcontroller",
     registry = "gcr.io",
     repository = "bomsync-214520/shardedcontroller",
-    tag = "{BUILD_TIMESTAMP}",
+    tag = "{STABLE_IMAGE_TAG}",
 )
 
 go_test(
