@@ -15,7 +15,7 @@ container_push(
     format = "Docker",
     image = ":rumor-mill_image",
     registry = "gcr.io",
-    repository = "bomsync-214520/webalator",
+    repository = "bomsync-214520/rumor-mill",
     tag = "latest",
 )
 
