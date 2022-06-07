@@ -10,6 +10,34 @@ stages:
   - upload-images
   - deploy
 
+medtracker/upload-images-and-update-manifest:
+  stage: upload-images
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_TEST=/m"
+      when: never
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_UPLOAD_IMAGES=/m"
+      when: never
+    - changes:
+        - medtracker/**/*
+      when: on_success
+  needs: []
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+    - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
+    - "gcloud auth configure-docker gcr.io"
+    - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
+    - "chmod +x bazel"
+    - "./bazel test -- //..."
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //medtracker/cmd/medtracker:medtracker_push"
+    - |
+      ./bazel run //infra-tools/bump-manifest -- \
+        --merge-file=manifests/production/medtracker-production-images.merge.yaml \
+        --namespace=medtracker \
+        --name=medtracker \
+        --container-name=main \
+        --container-image=gcr.io/bomsync-214520/medtracker \
+        --container-image-tag=${CI_COMMIT_SHA}
+  
 sharded-controller/upload-images-and-update-manifest:
   stage: upload-images
   rules:

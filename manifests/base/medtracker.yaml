@@ -1,0 +1,62 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: medtracker
+
+---
+
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  namespace: medtracker
+  name: default
+  annotations:
+    iam.gke.io/gcp-service-account: medtracker-prod@bomsync-214520.iam.gserviceaccount.com
+  
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: medtracker
+  namespace: medtracker
+  labels:
+    app: medtracker
+spec:
+  selector:
+    matchLabels:
+      app: medtracker
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: medtracker
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: main
+        image: gcr.io/bomsync-214520/medtracker:latest
+        ports:
+        - containerPort: 8001
+        resources:
+          limits:
+            memory: 100Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        command:
+        - /app/medtracker/cmd/medtracker/medtracker
+        - --debug-listen=0.0.0.0:8001
+        - --logtostderr=true
+        - --data-project=medtracker-314520-data-prod
+        - --sendgrid-key-secret=sendgrid-api-key
+        - --recheck-period=12h

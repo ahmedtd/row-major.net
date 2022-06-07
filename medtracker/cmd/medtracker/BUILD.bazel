@@ -1,0 +1,42 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_push",
+)
+
+go_image(
+    name = "medtracker_image",
+    binary = ":medtracker",
+)
+
+container_push(
+    name = "medtracker_push",
+    format = "Docker",
+    image = ":medtracker_image",
+    registry = "gcr.io",
+    repository = "bomsync-214520/medtracker",
+    tag = "{STABLE_IMAGE_TAG}",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "row-major/medtracker/cmd/medtracker",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//medtracker/poller:go_default_library",
+        "//webalator/healthz:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
+        "@com_github_sendgrid_sendgrid_go//:go_default_library",
+        "@com_google_cloud_go//secretmanager/apiv1:go_default_library",
+        "@com_google_cloud_go_firestore//:go_default_library",
+        "@go_googleapis//google/cloud/secretmanager/v1:secretmanager_go_proto",
+    ],
+)
+
+go_binary(
+    name = "medtracker",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
