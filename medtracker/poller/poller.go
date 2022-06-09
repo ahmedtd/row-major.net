@@ -34,12 +34,18 @@ type Patient struct {
 		RunwayAlertThreshold string `firestore:"runwayAlertThreshold"`
 
 		NextStockDecrementAt time.Time `firestore:"nextStockDecrementAt"`
+
+		PrescriptionLastFilledAt    time.Time `firestore:"prescriptionLastFilledAt"`
+		PrescriptionLengthDays      int64     `firestore:"prescriptionLengthDays"`
+		Prescription5DayWarningSent bool      `firestore:"prescription5DayWarningSent"`
+		Prescription2DayWarningSent bool      `firestore:"prescription2DayWarningSent"`
 	} `firestore:"medications"`
 }
 
 type MedicationAlert struct {
-	NotificationEmails []string
-	Entries            []MedicationAlertEntry
+	NotificationEmails       []string
+	Entries                  []MedicationAlertEntry
+	PrescriptionLengthAlerts []PrescriptionLengthAlert
 }
 
 type MedicationAlertEntry struct {
@@ -47,6 +53,13 @@ type MedicationAlertEntry struct {
 	StockCount int64
 	StockUnit  string
 	Runway     time.Duration
+}
+
+type PrescriptionLengthAlert struct {
+	Name                     string
+	Info                     string
+	PrescriptionLastFilledAt time.Time
+	PrescriptionLengthDays   int64
 }
 
 // Poller runs an infinite loop,
@@ -173,6 +186,29 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 					Runway:     runway,
 				})
 			}
+
+			// Send prescription length warnings.
+			durationSinceLastFilled := now.Sub(medication.PrescriptionLastFilledAt)
+			fiveDayWarningDuration := time.Duration(medication.PrescriptionLengthDays-5) * 24 * time.Hour
+			twoDayWarningDuration := time.Duration(medication.PrescriptionLengthDays-2) * 24 * time.Hour
+			if durationSinceLastFilled >= fiveDayWarningDuration && !medication.Prescription5DayWarningSent {
+				medicationAlert.PrescriptionLengthAlerts = append(medicationAlert.PrescriptionLengthAlerts, PrescriptionLengthAlert{
+					Name:                     medication.Name,
+					Info:                     "5 day warning",
+					PrescriptionLastFilledAt: medication.PrescriptionLastFilledAt,
+					PrescriptionLengthDays:   medication.PrescriptionLengthDays,
+				})
+				medication.Prescription5DayWarningSent = true
+			}
+			if durationSinceLastFilled >= twoDayWarningDuration && !medication.Prescription2DayWarningSent {
+				medicationAlert.PrescriptionLengthAlerts = append(medicationAlert.PrescriptionLengthAlerts, PrescriptionLengthAlert{
+					Name:                     medication.Name,
+					Info:                     "2 day warning",
+					PrescriptionLastFilledAt: medication.PrescriptionLastFilledAt,
+					PrescriptionLengthDays:   medication.PrescriptionLengthDays,
+				})
+				medication.Prescription2DayWarningSent = true
+			}
 		}
 
 		// Write back patient.
@@ -195,21 +231,31 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 }
 
 const emailPlain = `Medtracker low stock alert:
+{{if .PrescriptionLengthAlerts -}}
+The following prescriptions are ending soon:
+{{range .PrescriptionLengthAlerts -}}
+* {{.Name}}: {{.Info}}.  Last filled on {{.PrescriptionLastFilledAt}} for {{.PrescriptionLengthDays}} days.
+{{end}}
+{{end}}
+
+{{if .Entries -}}
+The following medications have low stock:
 {{range .Entries -}}
 * {{.Name}}: {{.StockCount}} {{.StockUnit}} (Runway {{.Runway}})
+{{end}}
 {{end}}
 `
 
 var emailPlainTemplate = template.Must(template.New("email").Parse(emailPlain))
 
 func (p *Poller) sendAlert(ctx context.Context, alert *MedicationAlert) error {
-	if len(alert.Entries) == 0 {
+	if len(alert.Entries) == 0 && len(alert.PrescriptionLengthAlerts) == 0 {
 		return nil
 	}
 
 	message := mail.NewV3Mail()
 	message.From = mail.NewEmail("MedTracker Bot", "bot@medtracker.dev")
-	message.Subject = fmt.Sprintf("Medtracker Low Stock Alert")
+	message.Subject = fmt.Sprintf("Medtracker Alert")
 
 	personalization := mail.NewPersonalization()
 	for _, addr := range alert.NotificationEmails {
