@@ -17,29 +17,31 @@ import (
 type Patient struct {
 	NotificationEmails []string `firestore:"notificationEmails"`
 
-	Medications []*struct {
-		Name string `firestore:"name"`
+	Medications []*Medication `firestore:"medications"`
+}
 
-		// The current count of stock.
-		//
-		// For split pills, track the count of half-pills.
-		StockCount int64 `firestore:"stockCount"`
+type Medication struct {
+	Name string `firestore:"name"`
 
-		// A display name for the unit of medicine.  "Pill", "Half-pill", etc.
-		StockUnit string `firestore:"stockUnit"`
+	// The current count of stock.
+	//
+	// For split pills, track the count of half-pills.
+	StockCount int64 `firestore:"stockCount"`
 
-		StockDecrementCount  int64  `firestore:"stockDecrementCount"`
-		StockDecrementPeriod string `firestore:"stockDecrementPeriod"`
+	// A display name for the unit of medicine.  "Pill", "Half-pill", etc.
+	StockUnit string `firestore:"stockUnit"`
 
-		RunwayAlertThreshold string `firestore:"runwayAlertThreshold"`
+	StockDecrementCount  int64  `firestore:"stockDecrementCount"`
+	StockDecrementPeriod string `firestore:"stockDecrementPeriod"`
 
-		NextStockDecrementAt time.Time `firestore:"nextStockDecrementAt"`
+	RunwayAlertThreshold string `firestore:"runwayAlertThreshold"`
 
-		PrescriptionLastFilledAt    time.Time `firestore:"prescriptionLastFilledAt"`
-		PrescriptionLengthDays      int64     `firestore:"prescriptionLengthDays"`
-		Prescription5DayWarningSent bool      `firestore:"prescription5DayWarningSent"`
-		Prescription2DayWarningSent bool      `firestore:"prescription2DayWarningSent"`
-	} `firestore:"medications"`
+	NextStockDecrementAt time.Time `firestore:"nextStockDecrementAt"`
+
+	PrescriptionLastFilledAt    time.Time `firestore:"prescriptionLastFilledAt"`
+	PrescriptionLengthDays      int64     `firestore:"prescriptionLengthDays"`
+	Prescription5DayWarningSent bool      `firestore:"prescription5DayWarningSent"`
+	Prescription2DayWarningSent bool      `firestore:"prescription2DayWarningSent"`
 }
 
 type MedicationAlert struct {
