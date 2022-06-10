@@ -46,15 +46,7 @@ type Medication struct {
 
 type MedicationAlert struct {
 	NotificationEmails       []string
-	Entries                  []MedicationAlertEntry
 	PrescriptionLengthAlerts []PrescriptionLengthAlert
-}
-
-type MedicationAlertEntry struct {
-	Name       string
-	StockCount int64
-	StockUnit  string
-	Runway     time.Duration
 }
 
 type PrescriptionLengthAlert struct {
@@ -82,8 +74,6 @@ func New(firestoreClient *firestore.Client, sendgridClient *sendgrid.Client, rec
 func (p *Poller) Run(ctx context.Context) error {
 	ticker := time.NewTicker(p.recheckPeriod)
 	defer ticker.Stop()
-
-	glog.Infof("Poller.Run")
 
 	// Poll once right away --- ticker doesn't fire until the tick period has
 	// elapsed.
@@ -155,40 +145,6 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 		}
 
 		for _, medication := range patient.Medications {
-			decrementPeriod, err := time.ParseDuration(medication.StockDecrementPeriod)
-			if err != nil {
-				return fmt.Errorf("while parsing stock decrement period: %w", err)
-			}
-
-			runwayAlertThreshold, err := time.ParseDuration(medication.RunwayAlertThreshold)
-			if err != nil {
-				return fmt.Errorf("while parsing runway alert threshold: %w", err)
-			}
-
-			for now.After(medication.NextStockDecrementAt) {
-				if medication.StockCount < medication.StockDecrementCount {
-					// Don't go below 0.
-					medication.StockCount = 0
-				} else {
-					medication.StockCount -= medication.StockDecrementCount
-				}
-				medication.NextStockDecrementAt = medication.NextStockDecrementAt.Add(decrementPeriod)
-			}
-
-			// Now the medication's stock is current.  Check if the medication
-			// needs to be alerted on.
-
-			runway := time.Duration(medication.StockCount) * decrementPeriod
-
-			if runway < runwayAlertThreshold {
-				medicationAlert.Entries = append(medicationAlert.Entries, MedicationAlertEntry{
-					Name:       medication.Name,
-					StockCount: medication.StockCount,
-					StockUnit:  medication.StockUnit,
-					Runway:     runway,
-				})
-			}
-
 			// Send prescription length warnings.
 			durationSinceLastFilled := now.Sub(medication.PrescriptionLastFilledAt)
 			fiveDayWarningDuration := time.Duration(medication.PrescriptionLengthDays-5) * 24 * time.Hour
@@ -232,18 +188,11 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 	return nil
 }
 
-const emailPlain = `Medtracker low stock alert:
-{{if .PrescriptionLengthAlerts -}}
+const emailPlain = `
+{{- if .PrescriptionLengthAlerts -}}
 The following prescriptions are ending soon:
 {{range .PrescriptionLengthAlerts -}}
 * {{.Name}}: {{.Info}}.  Last filled on {{.PrescriptionLastFilledAt}} for {{.PrescriptionLengthDays}} days.
-{{end}}
-{{end}}
-
-{{if .Entries -}}
-The following medications have low stock:
-{{range .Entries -}}
-* {{.Name}}: {{.StockCount}} {{.StockUnit}} (Runway {{.Runway}})
 {{end}}
 {{end}}
 `
@@ -251,7 +200,7 @@ The following medications have low stock:
 var emailPlainTemplate = template.Must(template.New("email").Parse(emailPlain))
 
 func (p *Poller) sendAlert(ctx context.Context, alert *MedicationAlert) error {
-	if len(alert.Entries) == 0 && len(alert.PrescriptionLengthAlerts) == 0 {
+	if len(alert.PrescriptionLengthAlerts) == 0 {
 		return nil
 	}
 
