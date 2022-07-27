@@ -18,6 +18,7 @@ import (
 	"row-major/rumor-mill/table"
 	"row-major/webalator/healthz"
 
+	"cloud.google.com/go/firestore"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
 	cloudmetrics "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
@@ -110,6 +111,11 @@ func main() {
 		glog.Fatalf("Failed to create Sendgrid client: %v", err)
 	}
 
+	fstore, err := firestore.NewClient(ctx, *dataProject)
+	if err != nil {
+		glog.Fatalf("Failed to create FireStore client: %v", err)
+	}
+
 	gcs, err := storage.NewClient(ctx, googleopt.WithGRPCConnectionPool(1))
 	if err != nil {
 		glog.Fatalf("Failed to create new GCS client: %v", err)
@@ -121,6 +127,7 @@ func main() {
 	scr := scraper.New(
 		hn,
 		sg,
+		fstore,
 		trackedArticles,
 		watchConfigs,
 		scraper.WithScrapePeriod(*scrapePeriod),

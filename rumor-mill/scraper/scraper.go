@@ -22,6 +22,7 @@ import (
 	"row-major/rumor-mill/table"
 	trackerpb "row-major/rumor-mill/table/trackerpb"
 
+	"cloud.google.com/go/firestore"
 	"github.com/golang/glog"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -31,10 +32,34 @@ import (
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
-type trackerState int
+type TrackedArticle struct {
+	// A Hacker News ID.
+	HackerNewsID uint64 `firestore:"hackerNewsID"`
+
+	FirstSeenTime  time.Time `firestore:"firstSeenTime"`
+	LatestSeenTime time.Time `firestore:"latestSeenTime"`
+
+	LatestRank int64 `firestore:"latestRank"`
+
+	Title     string `firestore:"title"`
+	Submitter string `firestore:"submitter"`
+
+	FiredWatchConfigs []*firestore.DocumentRef `firestore:"firedWatchConfigs"`
+}
+
+type WatchConfig struct {
+	// A friendly descriptor for the watch config.  Appears in alert emails.
+	Description string `firestore:"description"`
+
+	TopicRegexp string `firestore:"topicRegexp"`
+
+	NotifyAddresses []string `firestore:"notifyAddresses"`
+}
 
 func hnURL(t *trackerpb.TrackedArticle) string {
 	return fmt.Sprintf("https://news.ycombinator.com/item?id=%d", t.GetId())
@@ -51,6 +76,8 @@ type Scraper struct {
 	hn hnClient
 	sg *sendgrid.Client
 
+	firestoreClient *firestore.Client
+
 	trackedArticles *table.TrackedArticleTable
 	watchConfigs    *table.WatchConfigTable
 
@@ -66,10 +93,11 @@ func WithScrapePeriod(period time.Duration) ScraperOpt {
 }
 
 // New creates a new Scraper
-func New(hn hnClient, sg *sendgrid.Client, trackedArticles *table.TrackedArticleTable, watchConfigs *table.WatchConfigTable, opts ...ScraperOpt) *Scraper {
+func New(hn hnClient, sg *sendgrid.Client, firestoreClient *firestore.Client, trackedArticles *table.TrackedArticleTable, watchConfigs *table.WatchConfigTable, opts ...ScraperOpt) *Scraper {
 	scraper := &Scraper{
 		hn:              hn,
 		sg:              sg,
+		firestoreClient: firestoreClient,
 		trackedArticles: trackedArticles,
 		watchConfigs:    watchConfigs,
 		scrapePeriod:    30 * time.Minute,
@@ -176,22 +204,21 @@ func (s *Scraper) ingestTopStory(ctx context.Context, rank int, id uint64) error
 	ctx, span = tracer.Start(ctx, "Scraper.ingestTopStory")
 	defer span.End()
 
-readModifyWrite:
-	for {
-		now := time.Now().UnixNano()
+	err := s.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txn *firestore.Transaction) error {
+		now := time.Now()
 
-		ta, ok, err := s.trackedArticles.Get(ctx, id)
-		if err != nil {
-			return fmt.Errorf("while loading TrackedArticle id=%d: %w", id, err)
-		}
-		if !ok {
+		trackedArticleRef := s.firestoreClient.Document(fmt.Sprintf("TrackedArticles/%d", id))
+		trackedArticleSnap, err := txn.Get(trackedArticleRef)
+		if status.Code(err) == codes.NotFound {
+			// Not found in DB.  Create.
+
 			item, err := s.hn.Item(ctx, id)
 			if err != nil {
 				return fmt.Errorf("while fetching item %d from HN: %w", id, err)
 			}
 
-			ta = &trackerpb.TrackedArticle{
-				Id:             id,
+			trackedArticle := &TrackedArticle{
+				HackerNewsID:   id,
 				FirstSeenTime:  now,
 				LatestSeenTime: now,
 				LatestRank:     int64(rank) + 1,
@@ -199,112 +226,33 @@ readModifyWrite:
 				Submitter:      item.By,
 			}
 
-			if err := s.trackedArticles.Create(ctx, ta); err != nil {
-				return fmt.Errorf("while creating tracked article: %w", err)
+			if err := txn.Create(trackedArticleRef, trackedArticle); err != nil {
+				return fmt.Errorf("while writing new tracked article: %w", err)
 			}
 
 			return nil
+		} else if err != nil {
+			return fmt.Errorf("while reading tracked article: %w", err)
 		}
 
-		ta.LatestSeenTime = now
-		ta.LatestRank = int64(rank) + 1
+		// Found in DB. Update.
 
-		if err := s.trackedArticles.Update(ctx, ta); err != nil {
-			var gErr *googleapi.Error
-			if errors.As(err, &gErr) {
-				if gErr.Code == 412 {
-					// Bad precondition, retry.
-					continue readModifyWrite
-					// TODO(ahmedtd): This retry loop ends up clobbering with
-					// stale rank.  To be correct, we need to re-read current
-					// rank.
-				}
-			}
-			return fmt.Errorf("while updating tracked article: %w", err)
+		trackedArticle := &TrackedArticle{}
+		if err := trackedArticleSnap.DataTo(trackedArticle); err != nil {
+			return fmt.Errorf("while deserializing tracked article: %w", err)
+		}
+
+		trackedArticle.LatestSeenTime = now
+		trackedArticle.LatestRank = int64(rank) + 1
+
+		if err := txn.Set(trackedArticleRef, trackedArticle); err != nil {
+			return fmt.Errorf("while writing back tracked article: %w", err)
 		}
 
 		return nil
-	}
-}
-
-// sweepOldStories does a table scan of the tracked articles table, moving older
-// stories to the stale tracked articles table.
-func (s *Scraper) sweepOldStories(ctx context.Context) error {
-	tracer := otel.Tracer("row-major/rumor-mill/scraper")
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "Scraper.sweepOldStories")
-	defer span.End()
-
-	// Use errgroup and semaphore to limit concurrency.
-	eg, ctx := errgroup.WithContext(ctx)
-	sem := semaphore.NewWeighted(500)
-
-	it := s.trackedArticles.ListIDs(ctx)
-	for {
-		id, err := it.Next(ctx)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("while advancing tracked article ID iterator: %w", err)
-		}
-
-		if err := sem.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("while acquiring concurrency limiter semaphore: %w", err)
-		}
-
-		eg.Go(func() error {
-			defer sem.Release(1)
-			if err := s.sweepOldStory(ctx, id); err != nil {
-				return fmt.Errorf("while sweeping story story id=%d: %w", id, err)
-			}
-			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return fmt.Errorf("while waiting for completion of errgroup: %w", err)
-	}
-
-	return nil
-}
-
-func (s *Scraper) sweepOldStory(ctx context.Context, id uint64) error {
-	tracer := otel.Tracer("row-major/rumor-mill/scraper")
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "Scraper.sweepOldStory")
-	defer span.End()
-
-readModifyWrite:
-	for {
-		ta, ok, err := s.trackedArticles.Get(ctx, id)
-		if err != nil {
-			return fmt.Errorf("while loading TrackedArticle id=%d: %w", id, err)
-		}
-		if !ok {
-			// Article removed during list.
-			return nil
-		}
-
-		// If article appeared within the top 500 articles in the last 30
-		// minutes, leave it alone.
-		if time.Now().Sub(time.Unix(0, ta.GetLatestSeenTime())) <= 30*time.Minute {
-			return nil
-		}
-
-		// Article is old.  Delete it.
-		//
-		// TODO(ahmedtd): Sweep to stale tracked article table.
-		if err := s.trackedArticles.Delete(ctx, ta); err != nil {
-			var gErr *googleapi.Error
-			if errors.As(err, &gErr) {
-				if gErr.Code == 412 {
-					// Bad precondition, retry.
-					continue readModifyWrite
-				}
-			}
-			return fmt.Errorf("while deleting original tracked article: %w", err)
-		}
+	})
+	if err != nil {
+		return fmt.Errorf("while running Firestore transaction: %w", err)
 	}
 }
 
