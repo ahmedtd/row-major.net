@@ -143,17 +143,17 @@ func (s *Scraper) scraperPass(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	if err := s.ingestTopStories(ctx); err != nil {
-		return fmt.Errorf("while scraping: %w", err)
-	}
+	// TODO: Complete migration to firestore.
 
-	if err := s.sweepOldStories(ctx); err != nil {
-		return fmt.Errorf("while sweeping old stories: %w", err)
-	}
+	// if err := s.ingestTopStories(ctx); err != nil {
+	// 	return fmt.Errorf("while scraping: %w", err)
+	// }
 
-	if err := s.sendAlerts(ctx); err != nil {
-		return fmt.Errorf("while sending alerts: %w", err)
-	}
+	// TODO: Sweep old stories?
+
+	// if err := s.sendAlerts(ctx); err != nil {
+	// 	return fmt.Errorf("while sending alerts: %w", err)
+	// }
 
 	glog.Infof("Successfully completed scraper pass")
 
@@ -207,7 +207,7 @@ func (s *Scraper) ingestTopStory(ctx context.Context, rank int, id uint64) error
 	err := s.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txn *firestore.Transaction) error {
 		now := time.Now()
 
-		trackedArticleRef := s.firestoreClient.Document(fmt.Sprintf("TrackedArticles/%d", id))
+		trackedArticleRef := s.firestoreClient.Doc(fmt.Sprintf("TrackedArticles/%d", id))
 		trackedArticleSnap, err := txn.Get(trackedArticleRef)
 		if status.Code(err) == codes.NotFound {
 			// Not found in DB.  Create.
@@ -254,8 +254,11 @@ func (s *Scraper) ingestTopStory(ctx context.Context, rank int, id uint64) error
 	if err != nil {
 		return fmt.Errorf("while running Firestore transaction: %w", err)
 	}
+
+	return nil
 }
 
+//
 func (s *Scraper) sendAlerts(ctx context.Context) error {
 	tracer := otel.Tracer("row-major/rumor-mill/scraper")
 	var span trace.Span
