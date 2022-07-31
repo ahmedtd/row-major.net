@@ -116,7 +116,7 @@ spec:
     responseCodeName: FOUND
 ---
 kind: Ingress
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 metadata:
   name: ingress6
   namespace: row-major-web
@@ -128,6 +128,8 @@ metadata:
     kubernetes.io/ingress.global-static-ip-name: row-major-web
     networking.gke.io/v1beta1.FrontendConfig: row-major-web
 spec:
-  backend:
-    serviceName: row-major-web-content-service
-    servicePort: http
+  defaultBackend:
+    service:
+      name: row-major-web-content-service
+      port:
+        name: http

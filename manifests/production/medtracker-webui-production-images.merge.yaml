@@ -1,0 +1,14 @@
+# This file is overwritten by CI.
+#
+# Refer to //infra-tools/bump-manifest to see how it is generated.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: medtracker
+  name: webui
+spec:
+  template:
+    spec:
+      containers:
+      - name: main
+        image: gcr.io/bomsync-214520/medtracker/webui:latest

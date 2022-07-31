@@ -7,42 +7,14 @@ import (
 	"text/template"
 	"time"
 
+	"row-major/medtracker/dbtypes"
+
 	"cloud.google.com/go/firestore"
 	"github.com/golang/glog"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"google.golang.org/api/iterator"
 )
-
-type Patient struct {
-	NotificationEmails []string `firestore:"notificationEmails"`
-
-	Medications []*Medication `firestore:"medications"`
-}
-
-type Medication struct {
-	Name string `firestore:"name"`
-
-	// The current count of stock.
-	//
-	// For split pills, track the count of half-pills.
-	StockCount int64 `firestore:"stockCount"`
-
-	// A display name for the unit of medicine.  "Pill", "Half-pill", etc.
-	StockUnit string `firestore:"stockUnit"`
-
-	StockDecrementCount  int64  `firestore:"stockDecrementCount"`
-	StockDecrementPeriod string `firestore:"stockDecrementPeriod"`
-
-	RunwayAlertThreshold string `firestore:"runwayAlertThreshold"`
-
-	NextStockDecrementAt time.Time `firestore:"nextStockDecrementAt"`
-
-	PrescriptionLastFilledAt    time.Time `firestore:"prescriptionLastFilledAt"`
-	PrescriptionLengthDays      int64     `firestore:"prescriptionLengthDays"`
-	Prescription5DayWarningSent bool      `firestore:"prescription5DayWarningSent"`
-	Prescription2DayWarningSent bool      `firestore:"prescription2DayWarningSent"`
-}
 
 type MedicationAlert struct {
 	NotificationEmails       []string
@@ -132,7 +104,7 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 			return fmt.Errorf("while reading patient: %w", err)
 		}
 
-		patient := &Patient{}
+		patient := &dbtypes.Patient{}
 		if err := patientDocSnap.DataTo(patient); err != nil {
 			return fmt.Errorf("while deserializing patient: %w", err)
 		}

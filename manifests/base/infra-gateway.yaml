@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infra-gateway
+
+---
+
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  namespace: infra-gateway
+  name: external-http
+spec:
+  gatewayClassName: gke-l7-gxlb
+  addresses:
+  - type: NamedAddress
+    value: shared-gateway-ipv4 # Created out of band.
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+      namespaces:
+        from: All
+    tls:
+      mode: Terminate
+      options:
+        networking.gke.io/pre-shared-certs: medtracker-dev

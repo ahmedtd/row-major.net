@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_push",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "row-major/medtracker/cmd/webui",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//medtracker/webui:go_default_library",
+        "//webalator/healthz:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
+        "@com_google_cloud_go_firestore//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "webui",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+go_image(
+    name = "webui_image",
+    binary = ":webui",
+)
+
+container_push(
+    name = "webui_push",
+    format = "Docker",
+    image = ":webui_image",
+    registry = "gcr.io",
+    repository = "bomsync-214520/medtracker/webui",
+    tag = "{STABLE_IMAGE_TAG}",
+)

@@ -5,10 +5,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: medtracker
-  name: medtracker
+  name: poller
 spec:
   template:
     spec:
       containers:
       - name: main
-        image: gcr.io/bomsync-214520/medtracker:43f475ed6e078e4eacb1a3f8d45f2049f5205b37
+        image: gcr.io/bomsync-214520/medtracker/poller:latest

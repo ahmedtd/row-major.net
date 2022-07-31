@@ -107,8 +107,8 @@ def go_dependencies():
     )
     go_repository(
         name = "com_github_census_instrumentation_opencensus_proto",
-        importpath = "github.com/census-instrumentation/opencensus-proto",
         build_extra_args = ["-exclude=src"],  # keep, https://github.com/census-instrumentation/opencensus-proto/issues/200
+        importpath = "github.com/census-instrumentation/opencensus-proto",
         sum = "h1:glEXhBS5PSLLv4IXzLA5yPRVX4bilULVyxxbrfOtDAk=",
         version = "v0.2.1",
     )
@@ -545,12 +545,7 @@ def go_dependencies():
         sum = "h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=",
         version = "v1.0.0",
     )
-    go_repository(
-        name = "com_github_jlaffaye_ftp",
-        importpath = "github.com/jlaffaye/ftp",
-        sum = "h1:dzYWuozdWNaY7mTQh5ZdmoJt2BUMavwhiux0AfGwg90=",
-        version = "v0.0.0-20200422224957-b9f3ade29122",
-    )
+
     go_repository(
         name = "com_github_jmespath_go_jmespath",
         importpath = "github.com/jmespath/go-jmespath",
@@ -1159,6 +1154,13 @@ def go_dependencies():
         sum = "h1:FZR1q0exgwxzPzp/aF+VccGrSfxfPpkBqjIIEq3ru6c=",
         version = "v1.6.7",
     )
+    go_repository(
+        name = "org_golang_google_genproto",
+        importpath = "google.golang.org/genproto",
+        sum = "h1:wtujag7C+4D6KMoulW9YauvK2lgdvCMS260jsqqBXr0=",
+        version = "v0.0.0-20210602131652-f16073e35f0c",
+    )
+
     go_repository(
         name = "org_golang_google_grpc",
         importpath = "google.golang.org/grpc",

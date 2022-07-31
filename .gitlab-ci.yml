@@ -28,14 +28,23 @@ medtracker/upload-images-and-update-manifest:
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
     - "./bazel test -- //..."
-    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //medtracker/cmd/medtracker:medtracker_push"
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //medtracker/cmd/poller:poller_push"
+    - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //medtracker/cmd/webui:webui_push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
-        --merge-file=manifests/production/medtracker-production-images.merge.yaml \
+        --merge-file=manifests/production/medtracker-poller-production-images.merge.yaml \
         --namespace=medtracker \
-        --name=medtracker \
+        --name=poller \
         --container-name=main \
-        --container-image=gcr.io/bomsync-214520/medtracker \
+        --container-image=gcr.io/bomsync-214520/medtracker/poller \
+        --container-image-tag=${CI_COMMIT_SHA}
+    - |
+      ./bazel run //infra-tools/bump-manifest -- \
+        --merge-file=manifests/production/medtracker-webui-production-images.merge.yaml \
+        --namespace=medtracker \
+        --name=webui \
+        --container-name=main \
+        --container-image=gcr.io/bomsync-214520/medtracker/webui \
         --container-image-tag=${CI_COMMIT_SHA}
   
 sharded-controller/upload-images-and-update-manifest:

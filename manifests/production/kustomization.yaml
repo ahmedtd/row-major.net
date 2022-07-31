@@ -5,7 +5,8 @@ bases:
   - ../base
 
 patchesStrategicMerge:
-  - medtracker-production-images.merge.yaml
+  - medtracker-poller-production-images.merge.yaml
+  - medtracker-webui-production-images.merge.yaml
   - row-major-web-production-images.merge.yaml
   - rumor-mill-production-images.merge.yaml
   - sharded-controller-production-images.merge.yaml

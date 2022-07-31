@@ -6,23 +6,23 @@ load(
 )
 
 go_image(
-    name = "medtracker_image",
-    binary = ":medtracker",
+    name = "poller_image",
+    binary = ":poller",
 )
 
 container_push(
-    name = "medtracker_push",
+    name = "poller_push",
     format = "Docker",
-    image = ":medtracker_image",
+    image = ":poller_image",
     registry = "gcr.io",
-    repository = "bomsync-214520/medtracker",
+    repository = "bomsync-214520/medtracker/poller",
     tag = "{STABLE_IMAGE_TAG}",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    importpath = "row-major/medtracker/cmd/medtracker",
+    importpath = "row-major/medtracker/cmd/poller",
     visibility = ["//visibility:private"],
     deps = [
         "//medtracker/poller:go_default_library",
@@ -36,7 +36,7 @@ go_library(
 )
 
 go_binary(
-    name = "medtracker",
+    name = "poller",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )
