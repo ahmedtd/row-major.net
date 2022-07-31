@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"row-major/medtracker/dbtypes"
@@ -32,6 +33,7 @@ func New(firestoreClient *firestore.Client) *WebUI {
 func (u *WebUI) Register(m *http.ServeMux) {
 	m.HandleFunc("/", u.homeHandler)
 	m.HandleFunc("/log-in", u.logInHandler)
+	m.HandleFunc("/list-patients", u.listPatientsHandler)
 }
 
 // getLoggedInUser loads the user associated with the session cookie in the
@@ -110,8 +112,7 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if user != nil {
-		params.ActiveUser.LoggedIn = true
-		params.ActiveUser.Email = user.Email
+		params.LoggedIn = true
 	}
 
 	content := bytes.Buffer{}
@@ -194,7 +195,7 @@ func (u *WebUI) doLogIn(ctx context.Context, email, password string) (cookie *ht
 	return cookie, "", nil
 }
 
-// logIn renders the login page.
+// logInHandler renders the login page.
 func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/log-in" {
 		http.Error(w, "Not Found", http.StatusNotFound)
@@ -270,6 +271,81 @@ func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 
 	content := bytes.Buffer{}
 	if err := uitemplates.LogInTemplate.Execute(&content, params); err != nil {
+		glog.Errorf("Error while executing template: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := io.Copy(w, &content); err != nil {
+		// It's too late to write an error to the HTTP response.
+		glog.Errorf("Error while writing output: %v", err)
+		return
+	}
+}
+
+// patientsHandler renders the /patients list for the logged-in user.
+func (u *WebUI) listPatientsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/list-patients" {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	ctx := r.Context()
+
+	user, err := u.getLoggedInUser(ctx, r)
+	if err != nil {
+		glog.Errorf("Error while getting logged-in user: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if user == nil {
+		// User is not logged in.  Send them to log in.
+		//
+		// TODO: Have log-in redirect back to this page?
+		http.Redirect(w, r, "/log-in", http.StatusFound)
+		return
+	}
+
+	params := &uitemplates.ListPatientsParams{}
+
+	// TODO: Pull list of patients for this user.
+	patientsIter := u.firestoreClient.Collection("Patients").Where("managingUsers", "array-contains", user.ID).Documents(ctx)
+	for {
+		patientSnapshot, err := patientsIter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			glog.Errorf("Error while iterating patients managed by user %q: %v", user.Email, err)
+			http.Error(w, "Internal Error", http.StatusInternalServerError)
+			return
+		}
+
+		dbPatient := &dbtypes.Patient{}
+		if err := patientSnapshot.DataTo(dbPatient); err != nil {
+			glog.Errorf("Error while extracting patient %s: %v", patientSnapshot.Ref.ID, err)
+			http.Error(w, "Internal Error", http.StatusInternalServerError)
+			return
+		}
+
+		q := url.Values{}
+		q.Add("patient-id", dbPatient.ID)
+		showPatientLink := &url.URL{
+			Path:     "/show-patient",
+			RawQuery: q.Encode(),
+		}
+
+		showPatientLink.Query().Add("patient-id", dbPatient.ID)
+
+		params.Patients = append(params.Patients, uitemplates.ListPatientsPatient{
+			DisplayName:     dbPatient.DisplayName,
+			ShowPatientLink: showPatientLink.String(),
+		})
+	}
+
+	content := bytes.Buffer{}
+	if err := uitemplates.ListPatientsTemplate.Execute(&content, params); err != nil {
 		glog.Errorf("Error while executing template: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return

@@ -3,7 +3,7 @@ package uitemplates
 import "html/template"
 
 type HomeParams struct {
-	ActiveUser ActiveUserParams
+	LoggedIn bool
 }
 
 var homeText = `{{define "title"}}Home{{end}}
@@ -12,8 +12,8 @@ var homeText = `{{define "title"}}Home{{end}}
 {{- end}}
 
 {{define "content"}}
-{{if .ActiveUser.LoggedIn}}
-You are now logged in, {{.ActiveUser.Email}}.
+{{if .LoggedIn}}
+<a href="/list-patients">List Patients</a>
 {{else}}
 <a href="/log-in">Log In</a>
 {{end}}

@@ -11,6 +11,7 @@ import (
 // One user can manage multiple patients, and a patient can be managed by
 // multiple users.
 type User struct {
+	ID           string `firestore:"id"`
 	Email        string `firestore:"email"`
 	PasswordHash string `firestore:"passwordHash"`
 }
@@ -23,6 +24,13 @@ type Session struct {
 }
 
 type Patient struct {
+	ID string `firestore:"id"`
+
+	DisplayName string `firestore:"displayName"`
+
+	// The set of users who can manage this patient.
+	ManagingUsers []string `firestore:"managingUsers"`
+
 	NotificationEmails []string `firestore:"notificationEmails"`
 
 	Medications []*Medication `firestore:"medications"`
