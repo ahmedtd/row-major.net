@@ -2,6 +2,8 @@ kind: Namespace
 apiVersion: v1
 metadata:
   name: row-major-web
+  labels:
+    row-major.net/gateway-application: row-major-net
 
 ---
 
@@ -85,51 +87,23 @@ spec:
           resources:
             limits:
               memory: 200Mi
-          
+
 ---
-apiVersion: networking.gke.io/v1beta1
-kind: ManagedCertificate
-metadata:
-  name: www-row-major-net
-  namespace: row-major-web
-spec:
-  domains:
-    - www.row-major.net
----
-apiVersion: networking.gke.io/v1beta1
-kind: ManagedCertificate
+
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
   name: row-major-net
   namespace: row-major-web
 spec:
-  domains:
-    - row-major.net
----
-apiVersion: networking.gke.io/v1beta1
-kind: FrontendConfig
-metadata:
-  namespace: row-major-web
-  name: row-major-web
-spec:
-  redirectToHttps:
-    enabled: true
-    responseCodeName: FOUND
----
-kind: Ingress
-apiVersion: networking.k8s.io/v1
-metadata:
-  name: ingress6
-  namespace: row-major-web
-  labels:
-    app: row-major-web
-    component: ingress
-  annotations:
-    networking.gke.io/managed-certificates: www-row-major-net,row-major-net
-    kubernetes.io/ingress.global-static-ip-name: row-major-web
-    networking.gke.io/v1beta1.FrontendConfig: row-major-web
-spec:
-  defaultBackend:
-    service:
-      name: row-major-web-content-service
-      port:
-        name: http
+ parentRefs:
+ - kind: Gateway
+   namespace: infra-gateway
+   name: external-http
+ hostnames:
+ - "row-major.net"
+ - "www.row-major.net"
+ rules:
+ - backendRefs:
+   - name: row-major-web-content-service
+     port: 8001

@@ -16,15 +16,54 @@ spec:
   - type: NamedAddress
     value: shared-gateway-ipv4 # Created out of band.
   listeners:
-  - name: https
+  - name: medtracker-net-https
     protocol: HTTPS
     port: 443
+    hostname: medtracker.dev
     allowedRoutes:
       kinds:
       - kind: HTTPRoute
       namespaces:
-        from: All
+        from: Selector
+        selector:
+          matchLabels:
+            row-major.net/gateway-application: "medtracker-dev"
     tls:
       mode: Terminate
       options:
-        networking.gke.io/pre-shared-certs: medtracker-dev
+        networking.gke.io/pre-shared-certs: medtracker-dev # Created out of band.
+  - name: www-row-major-net-https
+    protocol: HTTPS
+    port: 443
+    hostname: www.row-major.net
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            row-major.net/gateway-application: "row-major-net"
+    tls:
+      mode: Terminate
+      options:
+        # Created out of band, covers both www.row-major.net and row-major.net
+        networking.gke.io/pre-shared-certs: row-major-net
+  - name: row-major-net-https
+    protocol: HTTPS
+    port: 443
+    hostname: row-major.net
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            row-major.net/gateway-application: "row-major-net"
+    tls:
+      mode: Terminate
+      options:
+        # Created out of band, covers both www.row-major.net and row-major.net
+        networking.gke.io/pre-shared-certs: row-major-net
+    

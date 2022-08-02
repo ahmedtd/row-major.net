@@ -2,6 +2,8 @@ kind: Namespace
 apiVersion: v1
 metadata:
   name: medtracker
+  labels:
+    row-major.net/gateway-application: medtracker-dev
 
 ---
 
