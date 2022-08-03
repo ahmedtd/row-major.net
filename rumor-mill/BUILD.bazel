@@ -27,7 +27,6 @@ go_library(
     deps = [
         "//rumor-mill/hackernews:go_default_library",
         "//rumor-mill/scraper:go_default_library",
-        "//rumor-mill/table:go_default_library",
         "//webalator/healthz:go_default_library",
         "@com_github_golang_glog//:go_default_library",
         "@com_github_googlecloudplatform_opentelemetry_operations_go_exporter_metric//:go_default_library",
@@ -35,10 +34,8 @@ go_library(
         "@com_github_sendgrid_sendgrid_go//:go_default_library",
         "@com_google_cloud_go//secretmanager/apiv1:go_default_library",
         "@com_google_cloud_go_firestore//:go_default_library",
-        "@com_google_cloud_go_storage//:go_default_library",
         "@go_googleapis//google/cloud/secretmanager/v1:secretmanager_go_proto",
         "@io_opentelemetry_go_otel_sdk//trace:go_default_library",
-        "@org_golang_google_api//option:go_default_library",
     ],
 )
 

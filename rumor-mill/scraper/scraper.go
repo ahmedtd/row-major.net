@@ -5,22 +5,17 @@ package scraper
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
-	"path"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	texttemplate "text/template"
 	"time"
 
 	"row-major/rumor-mill/hackernews"
-	"row-major/rumor-mill/table"
-	trackerpb "row-major/rumor-mill/table/trackerpb"
 
 	"cloud.google.com/go/firestore"
 	"github.com/golang/glog"
@@ -30,16 +25,14 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/prototext"
 )
 
 type TrackedArticle struct {
+	ID string `firestore:"id"`
+
 	// A Hacker News ID.
-	HackerNewsID uint64 `firestore:"hackerNewsID"`
+	HackerNewsID string `firestore:"hackerNewsID"`
 
 	FirstSeenTime  time.Time `firestore:"firstSeenTime"`
 	LatestSeenTime time.Time `firestore:"latestSeenTime"`
@@ -49,10 +42,15 @@ type TrackedArticle struct {
 	Title     string `firestore:"title"`
 	Submitter string `firestore:"submitter"`
 
-	FiredWatchConfigs []*firestore.DocumentRef `firestore:"firedWatchConfigs"`
+	CheckedWatchConfigs []string `firestore:"checkedWatchConfigs"`
+	MatchedWatchConfigs []string `firestore:"matchedWatchConfigs"`
+
+	Expiry time.Time `firestore:"expiry"`
 }
 
 type WatchConfig struct {
+	ID string `firestore:"id"`
+
 	// A friendly descriptor for the watch config.  Appears in alert emails.
 	Description string `firestore:"description"`
 
@@ -61,8 +59,8 @@ type WatchConfig struct {
 	NotifyAddresses []string `firestore:"notifyAddresses"`
 }
 
-func hnURL(t *trackerpb.TrackedArticle) string {
-	return fmt.Sprintf("https://news.ycombinator.com/item?id=%d", t.GetId())
+func hnURL(t *TrackedArticle) string {
+	return fmt.Sprintf("https://news.ycombinator.com/item?id=%s", t.HackerNewsID)
 }
 
 type hnClient interface {
@@ -73,13 +71,9 @@ type hnClient interface {
 
 // Scraper checks data sources for articles matching the specified topic regexp.
 type Scraper struct {
-	hn hnClient
-	sg *sendgrid.Client
-
+	hn              hnClient
+	sg              *sendgrid.Client
 	firestoreClient *firestore.Client
-
-	trackedArticles *table.TrackedArticleTable
-	watchConfigs    *table.WatchConfigTable
 
 	scrapePeriod time.Duration
 }
@@ -93,21 +87,17 @@ func WithScrapePeriod(period time.Duration) ScraperOpt {
 }
 
 // New creates a new Scraper
-func New(hn hnClient, sg *sendgrid.Client, firestoreClient *firestore.Client, trackedArticles *table.TrackedArticleTable, watchConfigs *table.WatchConfigTable, opts ...ScraperOpt) *Scraper {
+func New(hn hnClient, sg *sendgrid.Client, firestoreClient *firestore.Client, opts ...ScraperOpt) *Scraper {
 	scraper := &Scraper{
 		hn:              hn,
 		sg:              sg,
 		firestoreClient: firestoreClient,
-		trackedArticles: trackedArticles,
-		watchConfigs:    watchConfigs,
 		scrapePeriod:    30 * time.Minute,
 	}
 
 	for _, opt := range opts {
 		opt(scraper)
 	}
-
-	// TODO: Validate watchConfigs (unique IDs).
 
 	return scraper
 }
@@ -143,17 +133,13 @@ func (s *Scraper) scraperPass(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	// TODO: Complete migration to firestore.
+	if err := s.ingestTopStories(ctx); err != nil {
+		return fmt.Errorf("while scraping: %w", err)
+	}
 
-	// if err := s.ingestTopStories(ctx); err != nil {
-	// 	return fmt.Errorf("while scraping: %w", err)
-	// }
-
-	// TODO: Sweep old stories?
-
-	// if err := s.sendAlerts(ctx); err != nil {
-	// 	return fmt.Errorf("while sending alerts: %w", err)
-	// }
+	if err := s.sendAlerts(ctx); err != nil {
+		return fmt.Errorf("while sending alerts: %w", err)
+	}
 
 	glog.Infof("Successfully completed scraper pass")
 
@@ -207,45 +193,60 @@ func (s *Scraper) ingestTopStory(ctx context.Context, rank int, id uint64) error
 	err := s.firestoreClient.RunTransaction(ctx, func(ctx context.Context, txn *firestore.Transaction) error {
 		now := time.Now()
 
-		trackedArticleRef := s.firestoreClient.Doc(fmt.Sprintf("TrackedArticles/%d", id))
-		trackedArticleSnap, err := txn.Get(trackedArticleRef)
-		if status.Code(err) == codes.NotFound {
-			// Not found in DB.  Create.
+		var articleSnapshot *firestore.DocumentSnapshot
+		articleIter := s.firestoreClient.Collection("TrackedArticles").Where("hackerNewsID", "==", strconv.FormatUint(id, 10)).Documents(ctx)
+		for {
+			var err error
+			articleSnapshot, err = articleIter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("while querying for tracked articles with HN id %d: %w", id, err)
+			}
 
+			// This field is supposed to be unique.  Consider only one document.
+			break
+		}
+		if articleSnapshot == nil {
+			// Not found in DB.  Create.
 			item, err := s.hn.Item(ctx, id)
 			if err != nil {
 				return fmt.Errorf("while fetching item %d from HN: %w", id, err)
 			}
 
+			newArticleRef := s.firestoreClient.Collection("TrackedArticles").NewDoc()
+
 			trackedArticle := &TrackedArticle{
-				HackerNewsID:   id,
+				ID:             newArticleRef.ID,
+				HackerNewsID:   strconv.FormatUint(id, 10),
 				FirstSeenTime:  now,
 				LatestSeenTime: now,
 				LatestRank:     int64(rank) + 1,
 				Title:          item.Title,
 				Submitter:      item.By,
+				Expiry:         time.Now().Add(12 * time.Hour),
 			}
 
-			if err := txn.Create(trackedArticleRef, trackedArticle); err != nil {
+			if err := txn.Create(newArticleRef, trackedArticle); err != nil {
 				return fmt.Errorf("while writing new tracked article: %w", err)
 			}
 
 			return nil
-		} else if err != nil {
-			return fmt.Errorf("while reading tracked article: %w", err)
 		}
 
 		// Found in DB. Update.
 
 		trackedArticle := &TrackedArticle{}
-		if err := trackedArticleSnap.DataTo(trackedArticle); err != nil {
+		if err := articleSnapshot.DataTo(trackedArticle); err != nil {
 			return fmt.Errorf("while deserializing tracked article: %w", err)
 		}
 
 		trackedArticle.LatestSeenTime = now
 		trackedArticle.LatestRank = int64(rank) + 1
+		trackedArticle.Expiry = time.Now().Add(12 * time.Hour)
 
-		if err := txn.Set(trackedArticleRef, trackedArticle); err != nil {
+		if err := txn.Set(articleSnapshot.Ref, trackedArticle); err != nil {
 			return fmt.Errorf("while writing back tracked article: %w", err)
 		}
 
@@ -265,33 +266,42 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 	ctx, span = tracer.Start(ctx, "Scraper.sendAlerts")
 	defer span.End()
 
-	// Load all WatchConfigs.  We'll join them against articles in-memory.
-	wcs := []*trackerpb.WatchConfig{}
-	wcIt := s.watchConfigs.List(ctx)
+	watchConfigs := []*WatchConfig{}
+	watchConfigIter := s.firestoreClient.Collection("WatchConfigs").Documents(ctx)
 	for {
-		wc, err := wcIt.Next(ctx)
+		watchConfigSnapshot, err := watchConfigIter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("while advancing WatchConfig iterator: %w", err)
+			return fmt.Errorf("while iterating watchconfigs: %w", err)
 		}
 
-		wcs = append(wcs, wc)
+		watchConfig := &WatchConfig{}
+		if err := watchConfigSnapshot.DataTo(watchConfig); err != nil {
+			return fmt.Errorf("while unmarshaling watchconfig: %w", err)
+		}
+
+		watchConfigs = append(watchConfigs, watchConfig)
 	}
 
 	// Use errgroup and semaphore to limit concurrency.
 	eg, ctx := errgroup.WithContext(ctx)
 	sem := semaphore.NewWeighted(500)
 
-	it := s.trackedArticles.ListIDs(ctx)
+	trackedArticleIter := s.firestoreClient.Collection("TrackedArticles").Documents(ctx)
 	for {
-		id, err := it.Next(ctx)
+		trackedArticleSnapshot, err := trackedArticleIter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("while advancing article iterator: %w", err)
+			return fmt.Errorf("while iterating tracked articles: %w", err)
+		}
+
+		trackedArticle := &TrackedArticle{}
+		if err := trackedArticleSnapshot.DataTo(trackedArticle); err != nil {
+			return fmt.Errorf("while unmarshaling tracked article: %w", err)
 		}
 
 		if err := sem.Acquire(ctx, 1); err != nil {
@@ -299,10 +309,22 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 		}
 
 		eg.Go(func() error {
+			var span trace.Span
+			ctx, span = tracer.Start(ctx, "Scraper.sendAlertsForArticle")
+			defer span.End()
+
 			defer sem.Release(1)
 
-			if err := s.sendAlertsForArticle(ctx, id, wcs); err != nil {
-				return fmt.Errorf("while sending alerts for article id=%d: %w", id, err)
+			for _, wc := range watchConfigs {
+				if err := s.sendAlertForArticleAndWatchConfig(ctx, trackedArticle, wc); err != nil {
+					return fmt.Errorf("while checking article %s against watchconfig %s: %w", trackedArticleSnapshot.Ref.ID, wc.ID, err)
+				}
+			}
+
+			// sendAlertsForArticle might have updated the set of checked or matched watch configs.
+			_, err := trackedArticleSnapshot.Ref.Set(ctx, trackedArticle)
+			if err != nil {
+				return fmt.Errorf("while updating article %s: %w", trackedArticleSnapshot.Ref.ID, err)
 			}
 
 			return nil
@@ -316,44 +338,6 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 	return nil
 }
 
-func (s *Scraper) sendAlertsForArticle(ctx context.Context, id uint64, wcs []*trackerpb.WatchConfig) error {
-	tracer := otel.Tracer("row-major/rumor-mill/scraper")
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "Scraper.sendAlertsForArticle")
-	defer span.End()
-
-readModifyWrite:
-	for {
-		ta, ok, err := s.trackedArticles.Get(ctx, id)
-		if err != nil {
-			return fmt.Errorf("while fetching article id=%d: %w", id, err)
-		}
-		if !ok {
-			// Article deleted during scan.
-			return nil
-		}
-
-		for _, wc := range wcs {
-			if err := s.sendAlertForArticleAndWatchConfig(ctx, ta, wc); err != nil {
-				return fmt.Errorf("while checking article %d against watchconfig %d: %w", id, wc.Id, err)
-			}
-		}
-
-		if err := s.trackedArticles.Update(ctx, ta); err != nil {
-			var gErr *googleapi.Error
-			if errors.As(err, &gErr) {
-				if gErr.Code == 412 {
-					// Bad precondition, retry.
-					continue readModifyWrite
-				}
-			}
-			return fmt.Errorf("while updating tracked article: %w", err)
-		}
-
-		return nil
-	}
-}
-
 const emailPlain = `There's a new Hacker News article matching your watch config:
 * Article: {{.ArticleTitle}}
 * Link: {{.ArticleLink}}
@@ -362,10 +346,10 @@ const emailPlain = `There's a new Hacker News article matching your watch config
 
 var emailPlainTemplate = texttemplate.Must(texttemplate.New("email").Parse(emailPlain))
 
-func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *trackerpb.TrackedArticle, wc *trackerpb.WatchConfig) error {
+func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *TrackedArticle, wc *WatchConfig) error {
 	// Have we already fired an alert for this watch config?
-	for _, wcID := range ta.FiredWatchConfigs {
-		if wcID == wc.Id {
+	for _, wcID := range ta.CheckedWatchConfigs {
+		if wcID == wc.ID {
 			return nil
 		}
 	}
@@ -378,6 +362,8 @@ func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *tra
 	if err != nil {
 		return fmt.Errorf("while compiling WatchConfig regexp: %w", err)
 	}
+
+	ta.CheckedWatchConfigs = append(ta.CheckedWatchConfigs, wc.ID)
 	if !r.MatchString(strings.ToLower(ta.Title)) {
 		return nil
 	}
@@ -420,14 +406,13 @@ func (s *Scraper) sendAlertForArticleAndWatchConfig(ctx context.Context, ta *tra
 		return fmt.Errorf("non-2xx response while sending mail through SendGrid: %d %q", resp.StatusCode, resp.Body)
 	}
 
-	ta.FiredWatchConfigs = append(ta.FiredWatchConfigs, wc.Id)
+	ta.MatchedWatchConfigs = append(ta.MatchedWatchConfigs, wc.ID)
 
 	return nil
 }
 
 func (s *Scraper) RegisterDebugHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/rumor-mill/tracked-articles", s.debugHandlerTrackedArticles)
-	mux.HandleFunc("/rumor-mill/datastore/tracked-article/", s.debugHandlerTrackedArticle)
 }
 
 const articlesHTML = `
@@ -485,58 +470,34 @@ func (s *Scraper) debugHandlerTrackedArticles(w http.ResponseWriter, req *http.R
 
 func (s *Scraper) debugHandlerTrackedArticlesData(ctx context.Context) (*TrackedArticlesData, error) {
 	tmplData := &TrackedArticlesData{}
-	tmplDataLock := sync.Mutex{}
 
-	// Use errgroup and semaphore to limit concurrency.
-	eg, ctx := errgroup.WithContext(ctx)
-	sem := semaphore.NewWeighted(500)
-
-	it := s.trackedArticles.ListIDs(ctx)
+	trackedArticleIter := s.firestoreClient.Collection("TrackedArticles").Documents(ctx)
 	for {
-		id, err := it.Next(ctx)
+		trackedArticleSnapshot, err := trackedArticleIter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("while advancing article iterator: %w", err)
+			return nil, fmt.Errorf("while iterating tracked articles: %w", err)
 		}
 
-		if err := sem.Acquire(ctx, 1); err != nil {
-			return nil, fmt.Errorf("while acquiring concurrency limiter semaphore: %w", err)
+		ta := &TrackedArticle{}
+		if err := trackedArticleSnapshot.DataTo(ta); err != nil {
+			return nil, fmt.Errorf("while unmarshaling tracked article: %w", err)
 		}
 
-		eg.Go(func() error {
-			defer sem.Release(1)
+		tmplArticle := TrackedArticleData{
+			LatestRank: ta.LatestRank,
+			Title:      ta.Title,
+			Submitter:  ta.Submitter,
+			URL:        hnURL(ta),
+		}
 
-			ta, ok, err := s.trackedArticles.Get(ctx, id)
-			if err != nil {
-				return fmt.Errorf("while getting article id=%d: %w", id, err)
-			}
-			if !ok {
-				return nil
-			}
-
-			tmplArticle := TrackedArticleData{
-				LatestRank: ta.LatestRank,
-				Title:      ta.Title,
-				Submitter:  ta.Submitter,
-				URL:        hnURL(ta),
-			}
-
-			tmplDataLock.Lock()
-			defer tmplDataLock.Unlock()
-			if len(ta.FiredWatchConfigs) != 0 {
-				tmplData.InterestedArticles = append(tmplData.InterestedArticles, tmplArticle)
-			} else {
-				tmplData.NotInterestedArticles = append(tmplData.NotInterestedArticles, tmplArticle)
-			}
-
-			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return nil, fmt.Errorf("while waiting for completion of errgroup: %w", err)
+		if len(ta.MatchedWatchConfigs) != 0 {
+			tmplData.InterestedArticles = append(tmplData.InterestedArticles, tmplArticle)
+		} else {
+			tmplData.NotInterestedArticles = append(tmplData.NotInterestedArticles, tmplArticle)
+		}
 	}
 
 	sort.Slice(tmplData.InterestedArticles, func(i, j int) bool {
@@ -547,54 +508,4 @@ func (s *Scraper) debugHandlerTrackedArticlesData(ctx context.Context) (*Tracked
 	})
 
 	return tmplData, nil
-}
-
-const trackedArticleHTML = `
-<!DOCTYPE html>
-<head>
-	<title>Tracked Article</title>
-</head>
-
-<pre>
-{{.TextProto}}
-</pre>
-`
-
-var trackedArticleTemplate = template.Must(template.New("articles").Parse(trackedArticleHTML))
-
-func (s *Scraper) debugHandlerTrackedArticle(w http.ResponseWriter, req *http.Request) {
-	tracer := otel.Tracer("row-major/rumor-mill/scraper")
-	ctx, span := tracer.Start(req.Context(), "Scraper.debugHandlerTrackedArticle")
-	defer span.End()
-
-	type TmplData struct {
-		TextProto string
-	}
-	tmplData := TmplData{}
-
-	id, err := strconv.ParseUint(path.Base(req.URL.Path), 10, 64)
-	if err != nil {
-		glog.Errorf("Error while parsing ID: %v", err)
-		http.Error(w, "error while parsing ID", http.StatusBadRequest)
-		return
-	}
-
-	ta, ok, err := s.trackedArticles.Get(ctx, id)
-	if err != nil {
-		glog.Errorf("Error while getting article: %v", err)
-		http.Error(w, "error retrieving article", http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		glog.Errorf("Error: article %d doesn't exist", id)
-		http.Error(w, "article doesn't exist", http.StatusNotFound)
-		return
-	}
-
-	tmplData.TextProto = prototext.Format(ta)
-
-	if err := trackedArticleTemplate.Execute(w, tmplData); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
-		return
-	}
 }
