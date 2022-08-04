@@ -42,8 +42,9 @@ type TrackedArticle struct {
 	Title     string `firestore:"title"`
 	Submitter string `firestore:"submitter"`
 
-	CheckedWatchConfigs []string `firestore:"checkedWatchConfigs"`
-	MatchedWatchConfigs []string `firestore:"matchedWatchConfigs"`
+	HaveCheckedWatchConfigs bool     `firestore:"haveCheckedWatchConfigs"`
+	CheckedWatchConfigs     []string `firestore:"checkedWatchConfigs"`
+	MatchedWatchConfigs     []string `firestore:"matchedWatchConfigs"`
 
 	Expiry time.Time `firestore:"expiry"`
 }
@@ -289,7 +290,7 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	sem := semaphore.NewWeighted(500)
 
-	trackedArticleIter := s.firestoreClient.Collection("TrackedArticles").Documents(ctx)
+	trackedArticleIter := s.firestoreClient.Collection("TrackedArticles").Where("haveCheckedWatchConfigs", "==", false).Documents(ctx)
 	for {
 		trackedArticleSnapshot, err := trackedArticleIter.Next()
 		if err == iterator.Done {
@@ -320,6 +321,8 @@ func (s *Scraper) sendAlerts(ctx context.Context) error {
 					return fmt.Errorf("while checking article %s against watchconfig %s: %w", trackedArticleSnapshot.Ref.ID, wc.ID, err)
 				}
 			}
+
+			trackedArticle.HaveCheckedWatchConfigs = true
 
 			// sendAlertsForArticle might have updated the set of checked or matched watch configs.
 			_, err := trackedArticleSnapshot.Ref.Set(ctx, trackedArticle)
