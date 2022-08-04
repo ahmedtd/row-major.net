@@ -5,6 +5,16 @@ metadata:
 
 ---
 
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  namespace: rumor-mill
+  name: default
+  annotations:
+    iam.gke.io/gcp-service-account: rumor-mill-prod@bomsync-214520.iam.gserviceaccount.com
+
+---
+
 kind: Deployment
 apiVersion: apps/v1
 metadata:
