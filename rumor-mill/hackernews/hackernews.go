@@ -110,11 +110,11 @@ func (c *Client) Item(ctx context.Context, id uint64) (*Item, error) {
 		Path:   path.Join("v0", "item", fmt.Sprintf("%v.json", id)),
 	}
 
-	item := &Item{}
+	item := Item{}
 	if err := c.doGet(ctx, url.String(), &item); err != nil {
 		return nil, fmt.Errorf("while getting item %d: %w", id, err)
 	}
-	return item, nil
+	return &item, nil
 }
 
 // Items pulls the specified items from the /v0/item collection.
