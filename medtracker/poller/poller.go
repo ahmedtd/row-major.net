@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"row-major/medtracker/dbtypes"
+	"row-major/medtracker/webui"
 
 	"cloud.google.com/go/firestore"
 	"github.com/golang/glog"
@@ -19,6 +20,7 @@ import (
 type MedicationAlert struct {
 	NotificationEmails       []string
 	PrescriptionLengthAlerts []PrescriptionLengthAlert
+	ShowPatientLink          string
 }
 
 type PrescriptionLengthAlert struct {
@@ -114,6 +116,7 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 		// scratch each time.
 		medicationAlert = &MedicationAlert{
 			NotificationEmails: patient.NotificationEmails,
+			ShowPatientLink:    webui.ShowPatientLink(patient.ID),
 		}
 
 		for _, medication := range patient.Medications {
@@ -166,6 +169,8 @@ The following prescriptions are ending soon:
 {{range .PrescriptionLengthAlerts -}}
 * {{.Name}}: {{.Info}}.  Last filled on {{.PrescriptionLastFilledAt}} for {{.PrescriptionLengthDays}} days.
 {{end}}
+
+Manage in the Web UI: https://medtracker.dev{{.ShowPatientLink}}
 {{end}}
 `
 
