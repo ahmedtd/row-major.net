@@ -197,6 +197,21 @@ func (u *WebUI) doLogIn(ctx context.Context, email, password string) (cookie *ht
 	return cookie, "", nil
 }
 
+func logInLink(userError, redirectTarget string) string {
+	q := url.Values{}
+	if userError != "" {
+		q.Add("user-error", userError)
+	}
+	if redirectTarget != "" {
+		q.Add("redirect-target", redirectTarget)
+	}
+	link := &url.URL{
+		Path:     "/log-in",
+		RawQuery: q.Encode(),
+	}
+	return link.String()
+}
+
 // logInHandler renders the login page.
 func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/log-in" {
@@ -204,6 +219,21 @@ func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	switch r.Method {
+	case http.MethodGet:
+		u.logInGetHandler(w, r)
+		return
+	case http.MethodPost:
+		u.logInPostHandler(w, r)
+		return
+	default:
+		glog.Errorf("Returning Bad Request because recordMedicationRefillHandler doesn't support path %q", r.URL.Path)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+}
+
+func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	user, err := u.getLoggedInUser(ctx, r)
@@ -213,63 +243,25 @@ func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("Error while parsing form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
 	if user != nil {
-		// User is already logged in.  Send them back home.
+		// User is already logged in.
+		if target := r.Form.Get("redirect-target"); target != "" {
+			http.Redirect(w, r, target, http.StatusFound)
+			return
+		}
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
-	if r.Method == http.MethodPost {
-		// The user is submitting a login form.
-
-		if err := r.ParseForm(); err != nil {
-			glog.Errorf("Error while parsing form: %v", err)
-			http.Error(w, "Internal Error", http.StatusInternalServerError)
-			return
-		}
-
-		cookie, userErr, err := u.doLogIn(ctx, r.PostForm.Get("email"), r.PostForm.Get("password"))
-		if err != nil {
-			glog.Errorf("Error while processing log in form: %v", err)
-			http.Error(w, "Internal Error", http.StatusInternalServerError)
-			return
-		}
-
-		if userErr != "" {
-			// Render log in form with user error.
-
-			// TODO: Should we instead redirect back to the login form with the
-			// user error as a query parameter?
-
-			params := &uitemplates.LogInParams{
-				UserError: userErr,
-			}
-
-			content := bytes.Buffer{}
-			if err := uitemplates.LogInTemplate.Execute(&content, params); err != nil {
-				glog.Errorf("Error while executing template: %v", err)
-				http.Error(w, "Internal Error", http.StatusInternalServerError)
-				return
-			}
-
-			if _, err := io.Copy(w, &content); err != nil {
-				// It's too late to write an error to the HTTP response.
-				glog.Errorf("Error while writing output: %v", err)
-				return
-			}
-
-			return
-		}
-
-		// User successfully logged in
-		http.SetCookie(w, cookie)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
+	params := &uitemplates.LogInParams{
+		UserError: r.Form.Get("user-error"),
 	}
-
-	// Otherwise, render login form.
-
-	params := &uitemplates.LogInParams{}
 
 	content := bytes.Buffer{}
 	if err := uitemplates.LogInTemplate.Execute(&content, params); err != nil {
@@ -283,6 +275,54 @@ func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 		glog.Errorf("Error while writing output: %v", err)
 		return
 	}
+}
+
+func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	user, err := u.getLoggedInUser(ctx, r)
+	if err != nil {
+		glog.Errorf("Error while getting logged-in user: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("Error while parsing form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if user != nil {
+		// User is already logged in.
+		if target := r.Form.Get("redirect-target"); target != "" {
+			http.Redirect(w, r, target, http.StatusFound)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	cookie, userErr, err := u.doLogIn(ctx, r.PostForm.Get("email"), r.PostForm.Get("password"))
+	if err != nil {
+		glog.Errorf("Error while processing log in form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if userErr != "" {
+		http.Redirect(w, r, logInLink(userErr, r.Form.Get("redirect-target")), http.StatusFound)
+		return
+	}
+
+	// User successfully logged in
+	http.SetCookie(w, cookie)
+	if target := r.Form.Get("redirect-target"); target != "" {
+		http.Redirect(w, r, target, http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+	return
 }
 
 // patientsHandler renders the /patients list for the logged-in user.
@@ -303,9 +343,7 @@ func (u *WebUI) listPatientsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if user == nil {
 		// User is not logged in.  Send them to log in.
-		//
-		// TODO: Have log-in redirect back to this page?
-		http.Redirect(w, r, "/log-in", http.StatusFound)
+		http.Redirect(w, r, logInLink("", "/list-patients"), http.StatusFound)
 		return
 	}
 
@@ -376,14 +414,6 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user == nil {
-		// User is not logged in.  Send them to log in.
-		//
-		// TODO: Have log-in redirect back to this page?
-		http.Redirect(w, r, "/log-in", http.StatusFound)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		glog.Errorf("Error while parsing form: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -391,6 +421,12 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	patientID := r.Form.Get("id")
+
+	if user == nil {
+		// User is not logged in.  Send them to log in.
+		http.Redirect(w, r, logInLink("", ShowPatientLink(patientID)), http.StatusFound)
+		return
+	}
 
 	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
 	patientDocSnap, err := patientDocRef.Get(ctx)
@@ -475,6 +511,7 @@ func (u *WebUI) recordMedicationRefillHandler(w http.ResponseWriter, r *http.Req
 		return
 	case http.MethodPost:
 		u.recordMedicationRefillPostHandler(w, r)
+		return
 	default:
 		glog.Errorf("Returning Bad Request because recordMedicationRefillHandler doesn't support path %q", r.URL.Path)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -492,14 +529,6 @@ func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if user == nil {
-		// User is not logged in.  Send them to log in.
-		//
-		// TODO: Have log-in redirect back to this page?
-		http.Redirect(w, r, "/log-in", http.StatusFound)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		glog.Errorf("Error while parsing form: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -507,6 +536,13 @@ func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.
 	}
 
 	patientID := r.Form.Get("patient-id")
+	medicationName := r.Form.Get("medication-name")
+
+	if user == nil {
+		// User is not logged in.  Send them to log in.
+		http.Redirect(w, r, recordMedicationRefillLink(patientID, medicationName, ""), http.StatusFound)
+		return
+	}
 
 	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
 	patientDocSnap, err := patientDocRef.Get(ctx)
@@ -568,14 +604,6 @@ func (u *WebUI) recordMedicationRefillPostHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	if user == nil {
-		// User is not logged in.  Send them to log in.
-		//
-		// TODO: Have log-in redirect back to this page?
-		http.Redirect(w, r, "/log-in", http.StatusFound)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		glog.Errorf("Error while parsing form: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -583,11 +611,18 @@ func (u *WebUI) recordMedicationRefillPostHandler(w http.ResponseWriter, r *http
 	}
 
 	patientID := r.Form.Get("patient-id")
+	medicationName := r.Form.Get("medication-name")
+
+	if user == nil {
+		// User is not logged in.  Send them to log in.
+		http.Redirect(w, r, recordMedicationRefillLink(patientID, medicationName, ""), http.StatusFound)
+		return
+	}
 
 	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
 	patientDocSnap, err := patientDocRef.Get(ctx)
 	if err != nil {
-		glog.Errorf("Errow while retrieving patient: %v", err)
+		glog.Errorf("Error while retrieving patient: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
