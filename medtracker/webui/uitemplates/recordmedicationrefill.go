@@ -15,7 +15,7 @@ var recordMedicationRefillText = `
 {{define "title"}}Record Medication Refill{{end}}
 
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">Home</a><a href="{{.SelfLink}}">Record Medication Refill</a></li>
+<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">Home</a></li><a href="{{.SelfLink}}">Record Medication Refill</a></li>
 {{- end}}
 
 {{define "content"}}
