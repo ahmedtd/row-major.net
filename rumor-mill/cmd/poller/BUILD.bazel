@@ -1,0 +1,46 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_push",
+)
+
+go_image(
+    name = "poller_image",
+    binary = ":poller",
+)
+
+container_push(
+    name = "poller_push",
+    format = "Docker",
+    image = ":poller_image",
+    registry = "gcr.io",
+    repository = "bomsync-214520/rumor-mill/poller",
+    tag = "{STABLE_IMAGE_TAG}",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "row-major/rumor-mill/cmd/poller",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//rumor-mill/hackernews:go_default_library",
+        "//rumor-mill/scraper:go_default_library",
+        "//webalator/healthz:go_default_library",
+        "@com_github_golang_glog//:go_default_library",
+        "@com_github_googlecloudplatform_opentelemetry_operations_go_exporter_metric//:go_default_library",
+        "@com_github_googlecloudplatform_opentelemetry_operations_go_exporter_trace//:go_default_library",
+        "@com_github_sendgrid_sendgrid_go//:go_default_library",
+        "@com_google_cloud_go//secretmanager/apiv1:go_default_library",
+        "@com_google_cloud_go_firestore//:go_default_library",
+        "@go_googleapis//google/cloud/secretmanager/v1:secretmanager_go_proto",
+        "@io_opentelemetry_go_otel_sdk//trace:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "poller",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

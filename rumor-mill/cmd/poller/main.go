@@ -33,7 +33,6 @@ var (
 	scrapePeriod = flag.Duration("scrape-period", 30*time.Minute, "Time between scraper passes.")
 
 	dataProject       = flag.String("data-project", "", "GCP project for cloud resources.")
-	dataDir           = flag.String("data-dir", "", "GCS bucket for database")
 	sendgridKeySecret = flag.String("sendgrid-key-secret", "sendgrid-api-key", "GCP Secret Manager secret name containing SendGrid API key.")
 
 	monitoring           = flag.Bool("monitoring", false, "Enable monitoring?")
@@ -52,7 +51,6 @@ func main() {
 	glog.Infof("scrape-period: %v", *scrapePeriod)
 
 	glog.Infof("data-project: %v", *dataProject)
-	glog.Infof("data-dir: %v", *dataDir)
 	glog.Infof("sendgrid-key-secret: %v", *sendgridKeySecret)
 
 	glog.Infof("monitoring: %v", *monitoring)

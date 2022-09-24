@@ -35,7 +35,7 @@ spec:
       serviceAccountName: default
       containers:
       - name: main
-        image: gcr.io/bomsync-214520/rumor-mill:latest
+        image: gcr.io/bomsync-214520/rumor-mill/poller:latest
         ports:
         - containerPort: 8001
         resources:
@@ -54,7 +54,7 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 10
         command:
-        - /app/rumor-mill/rumor-mill
+        - /app/rumor-mill/cmd/poller/poller
         - --debug-listen=0.0.0.0:8001
         - --logtostderr=true
         - --v=9
@@ -62,5 +62,4 @@ spec:
         - --monitoring-project=bomsync-214520
         - --monitoring-trace-ratio=0.1
         - --data-project=rumor-mill-prod
-        - --data-dir=rumor-mill-state-prod-us-west1
         - --scrape-period=30m
