@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -13,7 +12,6 @@ import (
 
 	"row-major/webalator/healthz"
 
-	"cloud.google.com/go/firestore"
 	"github.com/golang/glog"
 )
 
@@ -40,10 +38,10 @@ func main() {
 }
 
 func do(ctx context.Context) error {
-	fstore, err := firestore.NewClient(ctx, *dataProject)
-	if err != nil {
-		return fmt.Errorf("while creating FireStore client: %w", err)
-	}
+	// fstore, err := firestore.NewClient(ctx, *dataProject)
+	// if err != nil {
+	// 	return fmt.Errorf("while creating FireStore client: %w", err)
+	// }
 
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
