@@ -11,4 +11,4 @@ spec:
     spec:
       containers:
       - name: main
-        image: gcr.io/bomsync-214520/rumor-mill:e4e10cde81398f42550cb4b9446bef56f0343f8c
+        image: gcr.io/bomsync-214520/rumor-mill/cmd/poller:d6d0678e197d3e018db5b69ef47481afd2b471d2
