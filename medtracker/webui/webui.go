@@ -3,36 +3,39 @@ package webui
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
 
+	"row-major/medtracker/dblayer"
 	"row-major/medtracker/dbtypes"
 	"row-major/medtracker/webui/uitemplates"
 
 	"cloud.google.com/go/firestore"
 	"github.com/golang/glog"
-	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/iterator"
 )
 
 type WebUI struct {
-	firestoreClient *firestore.Client
+	firestoreClient     *firestore.Client
+	db                  *dblayer.DB
+	googleOAuthClientID string
 }
 
-func New(firestoreClient *firestore.Client) *WebUI {
+func New(firestoreClient *firestore.Client, db *dblayer.DB, googleOAuthClientID string) *WebUI {
 	return &WebUI{
-		firestoreClient: firestoreClient,
+		firestoreClient:     firestoreClient,
+		db:                  db,
+		googleOAuthClientID: googleOAuthClientID,
 	}
 }
 
 func (u *WebUI) Register(m *http.ServeMux) {
 	m.HandleFunc("/", u.homeHandler)
 	m.HandleFunc("/log-in", u.logInHandler)
+	m.HandleFunc("/sign-in-with-google", u.signInWithGoogleHandler)
 	m.HandleFunc("/list-patients", u.listPatientsHandler)
 	m.HandleFunc("/show-patient", u.showPatientHandler)
 	m.HandleFunc("/record-medication-refill", u.recordMedicationRefillHandler)
@@ -53,46 +56,9 @@ func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (*dbtypes.
 		return nil, nil
 	}
 
-	var sessionSnapshot *firestore.DocumentSnapshot
-	sessionIter := u.firestoreClient.Collection("Sessions").Where("cookie", "==", sessionCookie.Value).Documents(ctx)
-	for {
-		var err error
-		sessionSnapshot, err = sessionIter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("while looking up session: %w", err)
-		}
-
-		// We only consider a single session.
-		break
-	}
-	if sessionSnapshot == nil {
-		// Session object must have been cleaned up due to expiration; user is not logged in.
-		glog.Infof("No logged-in user because there was no session object corresponding to the cookie in the database.")
-		return nil, nil
-	}
-
-	session := &dbtypes.Session{}
-	if err := sessionSnapshot.DataTo(session); err != nil {
-		return nil, fmt.Errorf("while unmarshaling session: %w", err)
-	}
-
-	if session.Expires.Before(time.Now()) {
-		// Session object is expired; user is not logged in.
-		glog.Infof("No logged-in user because the session object in the database was expired.")
-		return nil, nil
-	}
-
-	userSnapshot, err := session.User.Get(ctx)
+	user, err := u.db.UserFromSessionCookie(ctx, sessionCookie.Value)
 	if err != nil {
-		return nil, fmt.Errorf("while getting user linked from session: %w", err)
-	}
-
-	user := &dbtypes.User{}
-	if err := userSnapshot.DataTo(user); err != nil {
-		return nil, fmt.Errorf("while unmarshaling user: %w", err)
+		return nil, fmt.Errorf("while getting user from session cookie: %w", err)
 	}
 
 	return user, nil
@@ -131,72 +97,6 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (u *WebUI) doLogIn(ctx context.Context, email, password string) (cookie *http.Cookie, toast string, err error) {
-	if email == "" {
-		return nil, "Email must not be empty", nil
-	}
-
-	if password == "" {
-		return nil, "Password must not be empty", nil
-	}
-
-	var userSnapshot *firestore.DocumentSnapshot
-	userIter := u.firestoreClient.Collection("Users").Where("email", "==", email).Documents(ctx)
-	for {
-		userSnapshot, err = userIter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, "", fmt.Errorf("while looking up user with email %q: %w", email, err)
-		}
-
-		// We only consider a single user.
-		break
-	}
-
-	if userSnapshot == nil {
-		return nil, "Unknown user or wrong password", nil
-	}
-
-	user := &dbtypes.User{}
-	if err := userSnapshot.DataTo(user); err != nil {
-		return nil, "", fmt.Errorf("while unmarshaling user %q: %w", email, err)
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return nil, "Unknown user or wrong password", nil
-	}
-
-	sessionCookieBytes := make([]byte, 32)
-	if _, err := rand.Read(sessionCookieBytes); err != nil {
-		return nil, "", fmt.Errorf("while generating session cookie: %w", err)
-	}
-
-	sessionCookie := base64.StdEncoding.EncodeToString(sessionCookieBytes)
-
-	expires := time.Now().Add(18 * time.Hour)
-
-	sessions := u.firestoreClient.Collection("Sessions")
-	_, _, err = sessions.Add(ctx, &dbtypes.Session{
-		Cookie:  sessionCookie,
-		User:    userSnapshot.Ref,
-		Expires: expires,
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("while storing session cookie: %w", err)
-	}
-
-	cookie = &http.Cookie{
-		Name:     "MedTracker-Session",
-		Value:    sessionCookie,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  expires,
-	}
-
-	return cookie, "", nil
-}
-
 func logInLink(userError, redirectTarget string) string {
 	q := url.Values{}
 	if userError != "" {
@@ -227,10 +127,22 @@ func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 		u.logInPostHandler(w, r)
 		return
 	default:
-		glog.Errorf("Returning Bad Request because recordMedicationRefillHandler doesn't support path %q", r.URL.Path)
+		glog.Errorf("Returning Bad Request because logInHandler doesn't support path %q", r.URL.Path)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
+}
+
+func signInWithGoogleTarget(redirectTarget string) string {
+	q := url.Values{}
+	if redirectTarget != "" {
+		q.Add("redirect-target", redirectTarget)
+	}
+	link := &url.URL{
+		Path:     "/sign-in-with-google",
+		RawQuery: q.Encode(),
+	}
+	return link.String()
 }
 
 func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +172,9 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := &uitemplates.LogInParams{
-		UserError: r.Form.Get("user-error"),
+		UserError:            r.Form.Get("user-error"),
+		GoogleOAuthClientID:  u.googleOAuthClientID,
+		SignInWithGoogleLink: signInWithGoogleTarget(r.Form.Get("redirect-target")),
 	}
 
 	content := bytes.Buffer{}
@@ -303,25 +217,98 @@ func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie, userErr, err := u.doLogIn(ctx, r.PostForm.Get("email"), r.PostForm.Get("password"))
+	session, err := u.db.SessionFromPassword(ctx, r.PostForm.Get("email"), r.PostForm.Get("password"))
+	if err == dblayer.ErrEmailMustNotBeEmpty {
+		http.Redirect(w, r, logInLink("Email must not be empty", r.Form.Get("redirect-target")), http.StatusFound)
+		return
+	}
+	if err == dblayer.ErrPasswordMustNotBeEmpty {
+		http.Redirect(w, r, logInLink("Password must not be empty", r.Form.Get("redirect-target")), http.StatusFound)
+		return
+	}
+	if err == dblayer.ErrUnknownUserOrWrongPassword {
+		http.Redirect(w, r, logInLink("Unknown user or wrong password", r.Form.Get("redirect-target")), http.StatusFound)
+		return
+	}
 	if err != nil {
 		glog.Errorf("Error while processing log in form: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
-	if userErr != "" {
-		http.Redirect(w, r, logInLink(userErr, r.Form.Get("redirect-target")), http.StatusFound)
-		return
+	cookie := &http.Cookie{
+		Name:     "MedTracker-Session",
+		Value:    session.Cookie,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  session.Expires,
 	}
 
 	// User successfully logged in
 	http.SetCookie(w, cookie)
-	if target := r.Form.Get("redirect-target"); target != "" {
-		http.Redirect(w, r, target, http.StatusFound)
+
+	target := r.Form.Get("redirect-target")
+	if target == "" {
+		target = "/"
+	}
+
+	http.Redirect(w, r, target, http.StatusFound)
+	return
+}
+
+// signInWithGoogleHandler accepts the "Sign In With Google" ID token POST.
+func (u *WebUI) signInWithGoogleHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/sign-in-with-google" {
+		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusFound)
+
+	switch r.Method {
+	case http.MethodPost:
+		u.signInWithGooglePostHandler(w, r)
+		return
+	default:
+		glog.Errorf("Returning Bad Request because signInWithGoogleHandler doesn't support path %q", r.URL.Path)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+}
+
+func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("Error while parsing form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	session, err := u.db.SessionFromGoogleFederation(ctx, r.PostForm.Get("credential"))
+	if err == dblayer.ErrUnknownUserOrWrongPassword {
+		http.Redirect(w, r, logInLink("Unknown user or wrong password", r.Form.Get("redirect-target")), http.StatusFound)
+		return
+	}
+	if err != nil {
+		glog.Errorf("Error while processing log in form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	cookie := &http.Cookie{
+		Name:     "MedTracker-Session",
+		Value:    session.Cookie,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  session.Expires,
+	}
+
+	// User successfully logged in
+	http.SetCookie(w, cookie)
+
+	target := r.Form.Get("redirect-target")
+	if target == "" {
+		target = "/"
+	}
+
+	http.Redirect(w, r, target, http.StatusFound)
 	return
 }
 

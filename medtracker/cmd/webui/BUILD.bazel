@@ -11,6 +11,7 @@ go_library(
     importpath = "row-major/medtracker/cmd/webui",
     visibility = ["//visibility:private"],
     deps = [
+        "//medtracker/dblayer:go_default_library",
         "//medtracker/webui:go_default_library",
         "//webalator/healthz:go_default_library",
         "@com_github_golang_glog//:go_default_library",

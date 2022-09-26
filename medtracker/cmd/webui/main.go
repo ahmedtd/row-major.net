@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"row-major/medtracker/dblayer"
 	"row-major/medtracker/webui"
 	"row-major/webalator/healthz"
 
@@ -19,9 +20,10 @@ import (
 )
 
 var (
-	debugListen = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
-	uiListen    = flag.String("ui-listen", "127.0.0.1:8000", "Server address:port for ui endpoint.")
-	dataProject = flag.String("data-project", "", "GCP project that contains the application state.")
+	debugListen         = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
+	uiListen            = flag.String("ui-listen", "127.0.0.1:8000", "Server address:port for ui endpoint.")
+	dataProject         = flag.String("data-project", "", "GCP project that contains the application state.")
+	googleOAuthClientID = flag.String("google-oauth-client-id", "", "Google OAuth Client ID for the application.  Used for Sign In With Google.")
 )
 
 func main() {
@@ -31,6 +33,7 @@ func main() {
 	glog.Infof("debug-listen: %v", *debugListen)
 	glog.Infof("ui-listen: %v", *uiListen)
 	glog.Infof("data-project: %v", *dataProject)
+	glog.Infof("google-oauth-client-id: %v", *googleOAuthClientID)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -45,6 +48,8 @@ func do(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("while creating FireStore client: %w", err)
 	}
+
+	db := dblayer.New(fstore, *googleOAuthClientID)
 
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
@@ -63,7 +68,7 @@ func do(ctx context.Context) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	ui := webui.New(fstore)
+	ui := webui.New(fstore, db, *googleOAuthClientID)
 	uiServeMux := http.NewServeMux()
 	uiServer := &http.Server{
 		Addr:    *uiListen,
