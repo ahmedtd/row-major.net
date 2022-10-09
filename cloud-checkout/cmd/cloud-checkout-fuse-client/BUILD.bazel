@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "row-major/cloud-checkout/cmd/cloud-checkout-fuse-client",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//cloud-checkout/pkg/storage:go_default_library",
+        "//cloud-checkout/proto:go_default_library",
+        "@com_github_dgraph_io_badger//:go_default_library",
+        "@com_github_hanwen_go_fuse_v2//fs:go_default_library",
+        "@com_github_hanwen_go_fuse_v2//fuse:go_default_library",
+        "@org_golang_x_xerrors//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "cloud-checkout-fuse-client",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

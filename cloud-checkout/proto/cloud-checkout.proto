@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+// Protobuf messages used in the storage layer.
+
+message Revision {
+  uint64 revision_id = 1;
+
+  // Pointers to FSNodes that were changed in this Revision.
+  repeated uint64 changed_fs_node_id = 3;
+}
+
+message FSNode {
+  uint64 fs_node_id = 1;
+  uint64 revision_id = 2;
+
+  message File {
+    bool present = 1;
+  }
+  File file = 3;
+
+  message Directory {
+    bool present = 1;
+
+    message Entry {
+      string name = 1;
+      uint64 fs_node_id = 2;
+    }
+    repeated Entry children = 2;
+  }
+  Directory directory = 4;
+}
+
+message InodeIndexEntry {
+  uint64 inode = 1;
+
+  enum Mode {
+    // When the file or directory this inode points to gets updated, this inode
+    // should be modified so that it points to the new revision.  Used for the
+    // main view of the filesystem.
+    Live = 0;
+
+    // This inode is frozen to point at a particular revision of an FSNode.
+    Snapshot = 1;
+  }
+  Mode mode = 4;
+
+  uint64 fs_node_id = 3;
+
+  // Only relevant if mode == snapshot.
+  uint64 revision_id = 2;
+
+}
