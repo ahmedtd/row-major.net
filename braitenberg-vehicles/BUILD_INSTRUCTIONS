@@ -1,0 +1,26 @@
+This project uses CMake as its build system, and has dependencies on
+Boost (a common set of C++ libraries), GLUT (a cross-platform wrapper
+for OpenGL), and Armadillo (an expression template C++ linear algebra
+library).
+
+Install the dependencies in a location that is accessible to CMake
+(This will be automatic on a *NIX) system).  Then clone the project
+with git:
+
+$ git clone git://gitorious.org/libkinematics/braitenberg_vehicles.git
+
+Make a build directory:
+
+$ cd braitenberg_vehicles
+$ mkdir build
+$ cd build
+
+Configure and build:
+
+$ cmake ..
+$ make
+
+Note the example configuration and --help option.
+
+$ nano example_config.cfg
+$ ./braitenberg --help
