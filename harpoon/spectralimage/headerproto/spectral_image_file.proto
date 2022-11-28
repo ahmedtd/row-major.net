@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+message SpectralImageHeader {
+  uint32 row_size = 1;
+  uint32 col_size = 2;
+  uint32 wavelength_size = 3;
+  float wavelength_min = 4;
+  float wavelength_max = 5;
+
+  uint32 data_layout_version = 6;
+}
