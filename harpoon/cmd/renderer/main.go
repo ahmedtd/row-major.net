@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"runtime/pprof"
 	"sync"
 
 	"row-major/harpoon/spectralimage/headerproto"
@@ -18,72 +19,68 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Vec2 struct {
-	X, Y float64
-}
+type Vec2 [2]float64
 
 func (v Vec2) Norm() float64 {
-	return math.Sqrt(v.X*v.X + v.Y*v.Y)
+	return math.Sqrt(v[0]*v[0] + v[1]*v[1])
 }
 
-type Vec3 struct {
-	X, Y, Z float64
-}
+type Vec3 [3]float64
 
 func (v Vec3) Norm() float64 {
-	return math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z)
+	return math.Sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
 }
 
 func Normalize(v Vec3) Vec3 {
 	l := v.Norm()
 	return Vec3{
-		X: v.X / l,
-		Y: v.Y / l,
-		Z: v.Z / l,
+		v[0] / l,
+		v[1] / l,
+		v[2] / l,
 	}
 }
 
 func AddVV(a, b Vec3) Vec3 {
 	return Vec3{
-		X: a.X + b.X,
-		Y: a.Y + b.Y,
-		Z: a.Z + b.Z,
+		a[0] + b[0],
+		a[1] + b[1],
+		a[2] + b[2],
 	}
 }
 
 func SubVV(a, b Vec3) Vec3 {
 	return Vec3{
-		X: a.X - b.X,
-		Y: a.Y - b.Y,
-		Z: a.Z - b.Z,
+		a[0] - b[0],
+		a[1] - b[1],
+		a[2] - b[2],
 	}
 }
 
 func MulVS(a Vec3, b float64) Vec3 {
 	return Vec3{
-		X: a.X * b,
-		Y: a.Y * b,
-		Z: a.Z * b,
+		a[0] * b,
+		a[1] * b,
+		a[2] * b,
 	}
 }
 
 func DivVS(a Vec3, b float64) Vec3 {
 	return Vec3{
-		X: a.X / b,
-		Y: a.Y / b,
-		Z: a.Z / b,
+		a[0] / b,
+		a[1] / b,
+		a[2] / b,
 	}
 }
 
 func IProd(a, b Vec3) float64 {
-	return a.X*b.X + a.Y*b.Y + a.Z*b.Z
+	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 }
 
 func CProd(a, b Vec3) Vec3 {
 	return Vec3{
-		X: a.Y*b.Z - a.Z*b.Y,
-		Y: a.Z*b.X - a.X*b.Z,
-		Z: a.X*b.Y - a.Y*b.X,
+		a[1]*b[2] - a[2]*b[1],
+		a[2]*b[0] - a[0]*b[2],
+		a[0]*b[1] - a[1]*b[0],
 	}
 }
 
@@ -114,9 +111,9 @@ func MulMM(a, b Mat33) Mat33 {
 
 func MulMV(a Mat33, b Vec3) Vec3 {
 	return Vec3{
-		X: a.Elts[0]*b.X + a.Elts[1]*b.Y + a.Elts[2]*b.Z,
-		Y: a.Elts[3]*b.X + a.Elts[4]*b.Y + a.Elts[5]*b.Z,
-		Z: a.Elts[6]*b.X + a.Elts[7]*b.Y + a.Elts[8]*b.Z,
+		a.Elts[0]*b[0] + a.Elts[1]*b[1] + a.Elts[2]*b[2],
+		a.Elts[3]*b[0] + a.Elts[4]*b[1] + a.Elts[5]*b[2],
+		a.Elts[6]*b[0] + a.Elts[7]*b[1] + a.Elts[8]*b[2],
 	}
 }
 
@@ -286,9 +283,9 @@ func Mat44Inverse(m Mat44) Mat44 {
 func UniformUnitVec3Distribution(rng *rand.Rand) Vec3 {
 	result := Vec3{}
 	for result.Norm() > 1.0 || result.Norm() == 0.0 {
-		result.X = rng.Float64() - 0.5
-		result.Y = rng.Float64() - 0.5
-		result.Z = rng.Float64() - 0.5
+		result[0] = rng.Float64() - 0.5
+		result[1] = rng.Float64() - 0.5
+		result[2] = rng.Float64() - 0.5
 	}
 	return Normalize(result)
 }
@@ -296,9 +293,9 @@ func UniformUnitVec3Distribution(rng *rand.Rand) Vec3 {
 func HemisphereUnitVec3Distribution(normal Vec3, rng *rand.Rand) Vec3 {
 	candidate := UniformUnitVec3Distribution(rng)
 	if IProd(candidate, normal) < 0.0 {
-		candidate.X = -candidate.X
-		candidate.Y = -candidate.Y
-		candidate.Z = -candidate.Z
+		candidate[0] = -candidate[0]
+		candidate[1] = -candidate[1]
+		candidate[2] = -candidate[2]
 	}
 	return candidate
 }
@@ -310,9 +307,9 @@ func CosineUnitVec3Distribution(normal Vec3, rng *rand.Rand) Vec3 {
 
 		if cosine < 0.0 {
 			cosine = -cosine
-			candidate.X = -candidate.X
-			candidate.Y = -candidate.Y
-			candidate.Z = -candidate.Z
+			candidate[0] = -candidate[0]
+			candidate[1] = -candidate[1]
+			candidate[2] = -candidate[2]
 		}
 
 		// TODO: Shouldn't it be fine to use a rejection sample from [0.0, 1.0)?
@@ -343,9 +340,9 @@ func GaussianUnitVec3Distribution(normal Vec3, mid float64, rng *rand.Rand) Vec3
 		cosine := IProd(normal, candidate)
 		if cosine < 0.0 {
 			cosine = -cosine
-			candidate.X = -candidate.X
-			candidate.Y = -candidate.Y
-			candidate.Z = -candidate.Z
+			candidate[0] = -candidate[0]
+			candidate[1] = -candidate[1]
+			candidate[2] = -candidate[2]
 		}
 
 		// PDF is a triangle with peak at `cosine == mid`
@@ -404,9 +401,9 @@ func Compose(a, b AffineTransform) AffineTransform {
 
 func (t AffineTransform) Invert() AffineTransform {
 	mat := Mat44{[16]float64{
-		t.Linear.Elts[0], t.Linear.Elts[1], t.Linear.Elts[2], t.Offset.X,
-		t.Linear.Elts[3], t.Linear.Elts[4], t.Linear.Elts[5], t.Offset.Y,
-		t.Linear.Elts[6], t.Linear.Elts[7], t.Linear.Elts[8], t.Offset.Z,
+		t.Linear.Elts[0], t.Linear.Elts[1], t.Linear.Elts[2], t.Offset[0],
+		t.Linear.Elts[3], t.Linear.Elts[4], t.Linear.Elts[5], t.Offset[1],
+		t.Linear.Elts[6], t.Linear.Elts[7], t.Linear.Elts[8], t.Offset[2],
 		0, 0, 0, 1,
 	}}
 
@@ -786,9 +783,9 @@ type Ray struct {
 
 func (r *Ray) Eval(t float64) Vec3 {
 	return Vec3{
-		X: r.Point.X + t*r.Slope.X,
-		Y: r.Point.Y + t*r.Slope.Y,
-		Z: r.Point.Z + t*r.Slope.Z,
+		r.Point[0] + t*r.Slope[0],
+		r.Point[1] + t*r.Slope[1],
+		r.Point[2] + t*r.Slope[2],
 	}
 }
 
@@ -829,15 +826,15 @@ type PinholeCamera struct {
 
 func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *rand.Rand) Ray {
 	imageCoords := Vec3{
-		X: 1.0,
-		Y: 1.0 - 2.0*(float64(curCol)-rng.Float64())/float64(imgCols),
-		Z: 1.0 - 2.0*(float64(curRow)-rng.Float64())/float64(imgRows),
+		1.0,
+		1.0 - 2.0*(float64(curCol)-rng.Float64())/float64(imgCols),
+		1.0 - 2.0*(float64(curRow)-rng.Float64())/float64(imgRows),
 	}
 
 	apertureCoords := Vec3{
-		X: imageCoords.X * c.Aperture.X,
-		Y: imageCoords.Y * c.Aperture.Y,
-		Z: imageCoords.Z * c.Aperture.Z,
+		imageCoords[0] * c.Aperture[0],
+		imageCoords[1] * c.Aperture[1],
+		imageCoords[2] * c.Aperture[2],
 	}
 
 	return Ray{
@@ -848,25 +845,25 @@ func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *ra
 
 func (c *PinholeCamera) Eye() Vec3 {
 	return Vec3{
-		X: c.ApertureToWorld.Elts[0],
-		Y: c.ApertureToWorld.Elts[3],
-		Z: c.ApertureToWorld.Elts[6],
+		c.ApertureToWorld.Elts[0],
+		c.ApertureToWorld.Elts[3],
+		c.ApertureToWorld.Elts[6],
 	}
 }
 
 func (c *PinholeCamera) Left() Vec3 {
 	return Vec3{
-		X: c.ApertureToWorld.Elts[1],
-		Y: c.ApertureToWorld.Elts[4],
-		Z: c.ApertureToWorld.Elts[7],
+		c.ApertureToWorld.Elts[1],
+		c.ApertureToWorld.Elts[4],
+		c.ApertureToWorld.Elts[7],
 	}
 }
 
 func (c *PinholeCamera) Up() Vec3 {
 	return Vec3{
-		X: c.ApertureToWorld.Elts[2],
-		Y: c.ApertureToWorld.Elts[5],
-		Z: c.ApertureToWorld.Elts[8],
+		c.ApertureToWorld.Elts[2],
+		c.ApertureToWorld.Elts[5],
+		c.ApertureToWorld.Elts[8],
 	}
 }
 
@@ -882,21 +879,21 @@ func (c *PinholeCamera) SetUp(newUp Vec3) {
 }
 
 func (c *PinholeCamera) setEyeDirect(newEye Vec3) {
-	c.ApertureToWorld.Elts[0] = newEye.X
-	c.ApertureToWorld.Elts[3] = newEye.Y
-	c.ApertureToWorld.Elts[6] = newEye.Z
+	c.ApertureToWorld.Elts[0] = newEye[0]
+	c.ApertureToWorld.Elts[3] = newEye[1]
+	c.ApertureToWorld.Elts[6] = newEye[2]
 }
 
 func (c *PinholeCamera) setLeftDirect(newLeft Vec3) {
-	c.ApertureToWorld.Elts[1] = newLeft.X
-	c.ApertureToWorld.Elts[4] = newLeft.Y
-	c.ApertureToWorld.Elts[7] = newLeft.Z
+	c.ApertureToWorld.Elts[1] = newLeft[0]
+	c.ApertureToWorld.Elts[4] = newLeft[1]
+	c.ApertureToWorld.Elts[7] = newLeft[2]
 }
 
 func (c *PinholeCamera) setUpDirect(newUp Vec3) {
-	c.ApertureToWorld.Elts[2] = newUp.X
-	c.ApertureToWorld.Elts[5] = newUp.Y
-	c.ApertureToWorld.Elts[8] = newUp.Z
+	c.ApertureToWorld.Elts[2] = newUp[0]
+	c.ApertureToWorld.Elts[5] = newUp[1]
+	c.ApertureToWorld.Elts[8] = newUp[2]
 }
 
 type AABox struct {
@@ -948,23 +945,23 @@ func (a AABox) Transform(t AffineTransform) AABox {
 
 	result := AccumZeroAABox()
 	for _, p := range points {
-		if p.X < result.X.Lo {
-			result.X.Lo = p.X
+		if p[0] < result.X.Lo {
+			result.X.Lo = p[0]
 		}
-		if p.X > result.X.Hi {
-			result.X.Hi = p.X
+		if p[0] > result.X.Hi {
+			result.X.Hi = p[0]
 		}
-		if p.Y < result.Y.Lo {
-			result.Y.Lo = p.Y
+		if p[1] < result.Y.Lo {
+			result.Y.Lo = p[1]
 		}
-		if p.Y > result.Y.Hi {
-			result.Y.Hi = p.Y
+		if p[1] > result.Y.Hi {
+			result.Y.Hi = p[1]
 		}
-		if p.Z < result.Z.Lo {
-			result.Z.Lo = p.Z
+		if p[2] < result.Z.Lo {
+			result.Z.Lo = p[2]
 		}
-		if p.Z > result.Z.Hi {
-			result.Z.Hi = p.Z
+		if p[2] > result.Z.Hi {
+			result.Z.Hi = p[2]
 		}
 	}
 
@@ -975,8 +972,8 @@ func RayTestAABox(r RaySegment, b AABox) Span {
 	cover := Span{math.Inf(-1), math.Inf(1)}
 
 	coverX := Span{
-		(b.X.Lo - r.TheRay.Point.X) / r.TheRay.Slope.X,
-		(b.X.Hi - r.TheRay.Point.X) / r.TheRay.Slope.X,
+		(b.X.Lo - r.TheRay.Point[0]) / r.TheRay.Slope[0],
+		(b.X.Hi - r.TheRay.Point[0]) / r.TheRay.Slope[0],
 	}
 	if coverX.Hi < coverX.Lo {
 		coverX.Lo, coverX.Hi = coverX.Hi, coverX.Lo
@@ -992,8 +989,8 @@ func RayTestAABox(r RaySegment, b AABox) Span {
 	}
 
 	coverY := Span{
-		(b.Y.Lo - r.TheRay.Point.Y) / r.TheRay.Slope.Y,
-		(b.Y.Hi - r.TheRay.Point.Y) / r.TheRay.Slope.Y,
+		(b.Y.Lo - r.TheRay.Point[1]) / r.TheRay.Slope[1],
+		(b.Y.Hi - r.TheRay.Point[1]) / r.TheRay.Slope[1],
 	}
 	if coverY.Hi < coverY.Lo {
 		coverY.Lo, coverY.Hi = coverY.Hi, coverY.Lo
@@ -1009,8 +1006,8 @@ func RayTestAABox(r RaySegment, b AABox) Span {
 	}
 
 	coverZ := Span{
-		(b.Z.Lo - r.TheRay.Point.Z) / r.TheRay.Slope.Z,
-		(b.Z.Hi - r.TheRay.Point.Z) / r.TheRay.Slope.Z,
+		(b.Z.Lo - r.TheRay.Point[2]) / r.TheRay.Slope[2],
+		(b.Z.Hi - r.TheRay.Point[2]) / r.TheRay.Slope[2],
 	}
 	if coverZ.Hi < coverZ.Lo {
 		coverZ.Lo, coverZ.Hi = coverZ.Hi, coverZ.Lo
@@ -1103,7 +1100,7 @@ func (s *Sphere) RayInto(query RaySegment) Contact {
 		T:    tMin,
 		P:    p,
 		N:    Normalize(p),
-		Mtl2: Vec2{X: math.Atan2(p.X, p.Y), Y: math.Acos(p.Z)},
+		Mtl2: Vec2{math.Atan2(p[0], p[1]), math.Acos(p[2])},
 		Mtl3: p,
 		R:    query.TheRay,
 	}
@@ -1124,7 +1121,7 @@ func (s *Sphere) RayExit(query RaySegment) Contact {
 		T:    tMax,
 		P:    p,
 		N:    Normalize(p),
-		Mtl2: Vec2{X: math.Atan2(p.X, p.Y), Y: math.Acos(p.Z)},
+		Mtl2: Vec2{math.Atan2(p[0], p[1]), math.Acos(p[2])},
 		Mtl3: p,
 		R:    query.TheRay,
 	}
@@ -1156,7 +1153,7 @@ func (i *Infinity) RayInto(query RaySegment) Contact {
 		R:    query.TheRay,
 		P:    p,
 		N:    MulVS(query.TheRay.Slope, -1.0),
-		Mtl2: Vec2{X: math.Atan2(query.TheRay.Slope.X, query.TheRay.Slope.Y), Y: math.Acos(query.TheRay.Slope.Z)},
+		Mtl2: Vec2{math.Atan2(query.TheRay.Slope[0], query.TheRay.Slope[1]), math.Acos(query.TheRay.Slope[2])},
 		Mtl3: p,
 	}
 }
@@ -1172,7 +1169,7 @@ func (i *Infinity) RayExit(query RaySegment) Contact {
 		R:    query.TheRay,
 		P:    p,
 		N:    query.TheRay.Slope,
-		Mtl2: Vec2{X: math.Atan2(-query.TheRay.Slope.X, -query.TheRay.Slope.Y), Y: math.Acos(-query.TheRay.Slope.Z)},
+		Mtl2: Vec2{math.Atan2(-query.TheRay.Slope[0], -query.TheRay.Slope[1]), math.Acos(-query.TheRay.Slope[2])},
 		Mtl3: p,
 	}
 }
@@ -1196,8 +1193,8 @@ func (b *Box) RayInto(query RaySegment) Contact {
 
 	// I'm beginning to regret choosing the X,Y,Z convention for vectors.  Lots
 	// of things are easier if the axes can be indexed.
-	point := [3]float64{query.TheRay.Point.X, query.TheRay.Point.Y, query.TheRay.Point.Z}
-	slope := [3]float64{query.TheRay.Slope.X, query.TheRay.Slope.Y, query.TheRay.Slope.Z}
+	point := [3]float64{query.TheRay.Point[0], query.TheRay.Point[1], query.TheRay.Point[2]}
+	slope := [3]float64{query.TheRay.Slope[0], query.TheRay.Slope[1], query.TheRay.Slope[2]}
 
 	hitAxis := [3]float64{}
 
@@ -1248,8 +1245,8 @@ func (b *Box) RayExit(query RaySegment) Contact {
 
 	// I'm beginning to regret choosing the X,Y,Z convention for vectors.  Lots
 	// of things are easier if the axes can be indexed.
-	point := [3]float64{query.TheRay.Point.X, query.TheRay.Point.Y, query.TheRay.Point.Z}
-	slope := [3]float64{query.TheRay.Slope.X, query.TheRay.Slope.Y, query.TheRay.Slope.Z}
+	point := [3]float64{query.TheRay.Point[0], query.TheRay.Point[1], query.TheRay.Point[2]}
+	slope := [3]float64{query.TheRay.Slope[0], query.TheRay.Slope[1], query.TheRay.Slope[2]}
 
 	hitAxis := [3]float64{}
 
@@ -1350,14 +1347,14 @@ func CheckerboardSurface(period float64) MaterialMap {
 	return func(coords MaterialCoords) float64 {
 		parity := 0
 
-		qx := coords.Mtl2.X / period
+		qx := coords.Mtl2[0] / period
 		fx := math.Floor(qx)
 		rx := qx - fx
 		if rx > 0.5 {
 			parity ^= 1
 		}
 
-		qy := coords.Mtl2.Y / period
+		qy := coords.Mtl2[1] / period
 		fy := math.Floor(qy)
 		ry := qy - fy
 		if ry > 0.5 {
@@ -1376,21 +1373,21 @@ func CheckerboardVolume(period float64) MaterialMap {
 	return func(coords MaterialCoords) float64 {
 		parity := 0
 
-		qx := coords.Mtl3.X / period
+		qx := coords.Mtl3[0] / period
 		fx := math.Floor(qx)
 		rx := qx - fx
 		if rx > 0.5 {
 			parity ^= 1
 		}
 
-		qy := coords.Mtl3.Y / period
+		qy := coords.Mtl3[1] / period
 		fy := math.Floor(qy)
 		ry := qy - fy
 		if ry > 0.5 {
 			parity ^= 1
 		}
 
-		qz := coords.Mtl3.Z / period
+		qz := coords.Mtl3[2] / period
 		fz := math.Floor(qz)
 		rz := qz - fz
 		if rz > 0.5 {
@@ -1498,8 +1495,8 @@ func lerp(t, a, b float64) float64 {
 
 func PerlinSurface(period float64) MaterialMap {
 	return func(coords MaterialCoords) float64 {
-		x := coords.Mtl2.X * 256.0 / period
-		y := coords.Mtl2.Y * 256.0 / period
+		x := coords.Mtl2[0] * 256.0 / period
+		y := coords.Mtl2[1] * 256.0 / period
 		z := 0.0
 
 		cellX := uint32(int32(math.Floor(x)) & 0xff)
@@ -1525,9 +1522,9 @@ func PerlinSurface(period float64) MaterialMap {
 
 func PerlinVolume(period float64) MaterialMap {
 	return func(coords MaterialCoords) float64 {
-		x := coords.Mtl3.X * 256.0 / period
-		y := coords.Mtl3.Y * 256.0 / period
-		z := coords.Mtl3.Y * 256.0 / period
+		x := coords.Mtl3[1] * 256.0 / period
+		y := coords.Mtl3[1] * 256.0 / period
+		z := coords.Mtl3[1] * 256.0 / period
 
 		cellX := uint32(int32(math.Floor(x)) & 0xff)
 		cellY := uint32(int32(math.Floor(y)) & 0xff)
@@ -1587,8 +1584,8 @@ func (d *DirectionalEmitter) Shade(contact Contact, freq float32, rng *rand.Rand
 	materialCoords := MaterialCoords{
 		Mtl3: contact.R.Slope,
 		Mtl2: Vec2{
-			X: math.Atan2(contact.R.Slope.X, contact.R.Slope.Y),
-			Y: math.Acos(contact.R.Slope.Z),
+			math.Atan2(contact.R.Slope[0], contact.R.Slope[1]),
+			math.Acos(contact.R.Slope[2]),
 		},
 		Freq: freq,
 	}
@@ -2492,13 +2489,40 @@ var (
 	renderMaxDepth         = flag.Int("render-max-depth", 8, "Maximum number of bounces to consider")
 
 	resume = flag.Bool("resume", false, "Should we re-open the output file to add more samples?")
+
+	cpuprofile = flag.String("cpu-profile", "", "write cpu profile to `file`")
+	memprofile = flag.String("mem-profile", "", "write memory profile to `file`")
 )
 
 func main() {
 	flag.Parse()
 
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close() // error handling omitted for example
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	if err := do(); err != nil {
 		log.Fatalf("Error: %v", err)
+	}
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		defer f.Close() // error handling omitted for example
+		//runtime.GC()    // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
 	}
 }
 
