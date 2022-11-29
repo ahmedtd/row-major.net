@@ -282,10 +282,14 @@ func Mat44Inverse(m Mat44) Mat44 {
 
 func UniformUnitVec3Distribution(rng *rand.Rand) Vec3 {
 	result := Vec3{}
-	for result.Norm() > 1.0 || result.Norm() == 0.0 {
-		result[0] = rng.Float64() - 0.5
-		result[1] = rng.Float64() - 0.5
-		result[2] = rng.Float64() - 0.5
+	for {
+		result[0] = 2 * (rng.Float64() - 0.5)
+		result[1] = 2 * (rng.Float64() - 0.5)
+		result[2] = 2 * (rng.Float64() - 0.5)
+		normSquared := result[0]*result[0] + result[1]*result[1] + result[2]*result[2]
+		if normSquared <= 1.0 && normSquared != 0.0 {
+			break
+		}
 	}
 	return Normalize(result)
 }
@@ -1069,8 +1073,16 @@ type Geometry interface {
 	RayExit(query RaySegment) Contact
 }
 
+type MaterialCoordsMode int
+
+const (
+	MaterialCoords3D = iota
+	MaterialCoords2D
+)
+
 // Sphere is a Geometry that represents a unit sphere.
 type Sphere struct {
+	TheMaterialCoordsMode MaterialCoordsMode
 }
 
 func (s *Sphere) GetAABox() AABox {
@@ -1096,14 +1108,20 @@ func (s *Sphere) RayInto(query RaySegment) Contact {
 	}
 
 	p := query.TheRay.Eval(tMin)
-	return Contact{
+
+	result := Contact{
 		T:    tMin,
 		P:    p,
 		N:    Normalize(p),
-		Mtl2: Vec2{math.Atan2(p[0], p[1]), math.Acos(p[2])},
-		Mtl3: p,
 		R:    query.TheRay,
+		Mtl3: p,
 	}
+
+	if s.TheMaterialCoordsMode == MaterialCoords2D {
+		result.Mtl2 = Vec2{math.Atan2(p[0], p[1]), math.Acos(p[2])}
+	}
+
+	return result
 }
 
 func (s *Sphere) RayExit(query RaySegment) Contact {
@@ -1127,53 +1145,6 @@ func (s *Sphere) RayExit(query RaySegment) Contact {
 	}
 }
 
-// Infinity is a Geometry that represents a surface infinitely far away.
-type Infinity struct {
-}
-
-func (i *Infinity) GetAABox() AABox {
-	return AABox{
-		X: Span{Lo: math.Inf(-1), Hi: math.Inf(1)},
-		Y: Span{Lo: math.Inf(-1), Hi: math.Inf(1)},
-		Z: Span{Lo: math.Inf(-1), Hi: math.Inf(1)},
-	}
-}
-
-func (i *Infinity) Crush(time float64) {
-}
-
-func (i *Infinity) RayInto(query RaySegment) Contact {
-	if query.TheSegment.Hi != math.Inf(1) {
-		return ContactNaN()
-	}
-
-	p := query.TheRay.Eval(math.Inf(1))
-	return Contact{
-		T:    math.Inf(1),
-		R:    query.TheRay,
-		P:    p,
-		N:    MulVS(query.TheRay.Slope, -1.0),
-		Mtl2: Vec2{math.Atan2(query.TheRay.Slope[0], query.TheRay.Slope[1]), math.Acos(query.TheRay.Slope[2])},
-		Mtl3: p,
-	}
-}
-
-func (i *Infinity) RayExit(query RaySegment) Contact {
-	if query.TheSegment.Lo != math.Inf(-1) {
-		return ContactNaN()
-	}
-
-	p := query.TheRay.Eval(math.Inf(-1))
-	return Contact{
-		T:    math.Inf(-1),
-		R:    query.TheRay,
-		P:    p,
-		N:    query.TheRay.Slope,
-		Mtl2: Vec2{math.Atan2(-query.TheRay.Slope[0], -query.TheRay.Slope[1]), math.Acos(-query.TheRay.Slope[2])},
-		Mtl3: p,
-	}
-}
-
 type Box struct {
 	Spans [3]Span
 }
@@ -1191,17 +1162,12 @@ func (b *Box) Crush(time float64) {}
 func (b *Box) RayInto(query RaySegment) Contact {
 	cover := Span{math.Inf(-1), math.Inf(1)}
 
-	// I'm beginning to regret choosing the X,Y,Z convention for vectors.  Lots
-	// of things are easier if the axes can be indexed.
-	point := [3]float64{query.TheRay.Point[0], query.TheRay.Point[1], query.TheRay.Point[2]}
-	slope := [3]float64{query.TheRay.Slope[0], query.TheRay.Slope[1], query.TheRay.Slope[2]}
-
 	hitAxis := [3]float64{}
 
 	for i := 0; i < 3; i++ {
 		cur := Span{
-			(b.Spans[i].Lo - point[i]) / slope[i],
-			(b.Spans[i].Hi - point[i]) / slope[i],
+			(b.Spans[i].Lo - query.TheRay.Point[i]) / query.TheRay.Slope[i],
+			(b.Spans[i].Hi - query.TheRay.Point[i]) / query.TheRay.Slope[i],
 		}
 
 		normalComponent := -1.0
@@ -1941,30 +1907,20 @@ func (cur *KDNode) refineViaSurfaceAreaHeuristic(splitCost, terminationThreshold
 }
 
 type KDTree struct {
-	InfiniteElements []KDElement
-	Root             *KDNode
+	Root *KDNode
 }
 
 func NewKDTree(elements []KDElement) *KDTree {
 	tree := &KDTree{}
 
-	finiteElements := []KDElement{}
-	for _, element := range elements {
-		if element.Bounds.IsFinite() {
-			finiteElements = append(finiteElements, element)
-		} else {
-			tree.InfiniteElements = append(tree.InfiniteElements, element)
-		}
-	}
-
 	maxBox := AccumZeroAABox()
-	for _, element := range finiteElements {
+	for _, element := range elements {
 		maxBox = MinContainingAABox(maxBox, element.Bounds)
 	}
 
 	tree.Root = &KDNode{
 		Bounds:   maxBox,
-		Elements: finiteElements,
+		Elements: elements,
 	}
 
 	return tree
@@ -2001,11 +1957,6 @@ type KDSelector func(b AABox) bool
 type KDVisitor func(i int)
 
 func (t *KDTree) Query(selector KDSelector, visitor KDVisitor) {
-	// Always check all infinite elements.
-	for i := range t.InfiniteElements {
-		visitor(t.InfiniteElements[i].Ref)
-	}
-
 	workStack := []*KDNode{t.Root}
 	for len(workStack) != 0 {
 		cur := workStack[len(workStack)-1]
@@ -2058,6 +2009,7 @@ type CrushedSceneElement struct {
 type Scene struct {
 	Elements         []*SceneElement
 	CrushedElements  []*CrushedSceneElement
+	InfinityMaterial Material
 	QueryAccelerator *KDTree
 }
 
@@ -2066,6 +2018,8 @@ func (s *Scene) Crush(time float64) {
 	// fashion, whith each crushing its own dependencies.  To prevent redundant
 	// crushes, objects should cache whether they have been crushed at the given
 	// key value (time).
+
+	s.InfinityMaterial.Crush(time)
 
 	kdElements := []KDElement{}
 	for i, element := range s.Elements {
@@ -2092,7 +2046,7 @@ func (s *Scene) Crush(time float64) {
 	s.QueryAccelerator.RefineViaSurfaceAreaHeuristic(1.0, 0.9)
 }
 
-func (s *Scene) SceneRayIntersect(worldQuery RaySegment) (Contact, *CrushedSceneElement) {
+func (s *Scene) SceneRayIntersect(worldQuery RaySegment) (Contact, int) {
 	minContact := Contact{}
 	minElementIndex := -1
 
@@ -2121,7 +2075,49 @@ func (s *Scene) SceneRayIntersect(worldQuery RaySegment) (Contact, *CrushedScene
 
 	s.QueryAccelerator.Query(selector, visitor)
 
-	return minContact, s.CrushedElements[minElementIndex]
+	return minContact, minElementIndex
+}
+
+func (s *Scene) ShadeRay(reflectedRay Ray, curWavelength float32, rng *rand.Rand) ShadeInfo {
+	reflectedQuery := RaySegment{
+		TheRay:     reflectedRay,
+		TheSegment: Span{0.0001, math.Inf(1)},
+	}
+
+	glbContact, hitIndex := s.SceneRayIntersect(reflectedQuery)
+	if hitIndex == -1 {
+		p := reflectedRay.Eval(math.Inf(1))
+		c := Contact{
+			T:    math.Inf(1),
+			R:    reflectedRay,
+			P:    p,
+			N:    MulVS(reflectedRay.Slope, -1.0),
+			Mtl2: Vec2{math.Atan2(reflectedRay.Slope[0], reflectedRay.Slope[1]), math.Acos(reflectedRay.Slope[2])},
+			Mtl3: p,
+		}
+		return s.InfinityMaterial.Shade(c, curWavelength, rng)
+	}
+
+	return s.CrushedElements[hitIndex].TheMaterial.Shade(glbContact, curWavelength, rng)
+}
+
+func (s *Scene) SampleRay(initialQuery Ray, curWavelength float32, rng *rand.Rand, depthLim int) float32 {
+	var accumPower float32
+	var curK float32 = 1.0
+	curRay := initialQuery
+
+	for i := 0; i < depthLim; i++ {
+		shading := s.ShadeRay(curRay, curWavelength, rng)
+		accumPower += curK * shading.EmittedPower
+
+		curK = shading.PropagationK
+		if shading.PropagationK == 0.0 {
+			continue
+		}
+		curRay = shading.IncidentRay
+	}
+
+	return accumPower
 }
 
 type SpectralImage struct {
@@ -2312,39 +2308,6 @@ func WriteSpectralImage(im *SpectralImage, w io.Writer) error {
 	return nil
 }
 
-func shadeRay(scene *Scene, reflectedRay Ray, curWavelength float32, rng *rand.Rand) ShadeInfo {
-	reflectedQuery := RaySegment{
-		TheRay:     reflectedRay,
-		TheSegment: Span{0.0001, math.Inf(1)},
-	}
-
-	glbContact, hitElement := scene.SceneRayIntersect(reflectedQuery)
-	if hitElement == nil {
-		return ShadeInfo{}
-	}
-
-	return hitElement.TheMaterial.Shade(glbContact, curWavelength, rng)
-}
-
-func sampleRay(initialQuery Ray, scene *Scene, curWavelength float32, rng *rand.Rand, depthLim int) float32 {
-	var accumPower float32
-	var curK float32 = 1.0
-	curRay := initialQuery
-
-	for i := 0; i < depthLim; i++ {
-		shading := shadeRay(scene, curRay, curWavelength, rng)
-		accumPower += curK * shading.EmittedPower
-
-		curK = shading.PropagationK
-		if shading.PropagationK == 0.0 {
-			continue
-		}
-		curRay = shading.IncidentRay
-	}
-
-	return accumPower
-}
-
 type ChunkWorker struct {
 	sampleDB         *SpectralImage
 	rng              *rand.Rand
@@ -2386,7 +2349,7 @@ func (w *ChunkWorker) Render() {
 					curQuery := w.camera.ImageToRay(cr, w.imgRows, cc, w.imgCols, w.rng)
 
 					// We get a power density sample in W / m^2
-					sampledPower := sampleRay(curQuery, w.scene, curWavelength, w.rng, w.maxDepth)
+					sampledPower := w.scene.SampleRay(curQuery, curWavelength, w.rng, w.maxDepth)
 					w.sampleDB.RecordSample(r, c, cw, sampledPower)
 					samplesCollected++
 				}
@@ -2593,7 +2556,6 @@ func do() error {
 		ExteriorIndexOfRefraction: ConstantScalar(1.0),
 	}
 
-	infinity := &Infinity{}
 	sphere := &Sphere{}
 	centerBox := &Box{[3]Span{Span{0, 0.5}, Span{0, 0.5}, Span{0, 0.5}}}
 	ground := &Box{[3]Span{Span{0, 10.1}, Span{0, 10.1}, Span{-0.5, 0}}}
@@ -2602,12 +2564,8 @@ func do() error {
 	wallW := &Box{[3]Span{Span{-0.1, 0}, Span{0, 10}, Span{0, 10}}}
 	wallS := &Box{[3]Span{Span{0, 10}, Span{-0.1, 0}, Span{0, 10}}}
 
+	scene.InfinityMaterial = cieD65Emitter
 	scene.Elements = []*SceneElement{
-		&SceneElement{
-			TheGeometry:  infinity,
-			TheMaterial:  cieD65Emitter,
-			ModelToWorld: Identity(),
-		},
 		&SceneElement{
 			TheGeometry:  sphere,
 			TheMaterial:  cieAEmitter,
