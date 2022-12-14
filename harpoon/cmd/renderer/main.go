@@ -14,78 +14,14 @@ import (
 	"runtime/pprof"
 	"sync"
 
+	"row-major/harpoon/affinetransform"
 	"row-major/harpoon/spectralimage/headerproto"
 	"row-major/harpoon/vmath/mat33"
-	"row-major/harpoon/vmath/mat44"
 	"row-major/harpoon/vmath/vec2"
 	"row-major/harpoon/vmath/vec3"
 
 	"google.golang.org/protobuf/proto"
 )
-
-type AffineTransform struct {
-	Linear mat33.T
-	Offset vec3.T
-}
-
-func Identity() AffineTransform {
-	return AffineTransform{
-		Linear: mat33.T{
-			[9]float64{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0},
-		},
-		Offset: vec3.T{0.0, 0.0, 0.0},
-	}
-}
-
-func Scale(s float64) AffineTransform {
-	return AffineTransform{
-		Linear: mat33.T{
-			[9]float64{s, 0.0, 0.0, 0.0, s, 0.0, 0.0, 0.0, s},
-		},
-		Offset: vec3.T{0.0, 0.0, 0.0},
-	}
-}
-
-func Translate(x vec3.T) AffineTransform {
-	result := Identity()
-	result.Offset = x
-	return result
-}
-
-func Compose(a, b AffineTransform) AffineTransform {
-	return AffineTransform{
-		Linear: mat33.MulMM(a.Linear, b.Linear),
-		Offset: vec3.AddVV(a.Offset, mat33.MulMV(a.Linear, b.Offset)),
-	}
-}
-
-func (t AffineTransform) Invert() AffineTransform {
-	mat := mat44.T{[16]float64{
-		t.Linear.Elts[0], t.Linear.Elts[1], t.Linear.Elts[2], t.Offset[0],
-		t.Linear.Elts[3], t.Linear.Elts[4], t.Linear.Elts[5], t.Offset[1],
-		t.Linear.Elts[6], t.Linear.Elts[7], t.Linear.Elts[8], t.Offset[2],
-		0, 0, 0, 1,
-	}}
-
-	inv := mat44.Mat44Inverse(mat)
-
-	return AffineTransform{
-		Linear: mat33.T{[9]float64{
-			inv.Elts[0], inv.Elts[1], inv.Elts[2],
-			inv.Elts[4], inv.Elts[5], inv.Elts[6],
-			inv.Elts[8], inv.Elts[9], inv.Elts[10],
-		}},
-		Offset: vec3.T{inv.Elts[3], inv.Elts[7], inv.Elts[11]},
-	}
-}
-
-func (t AffineTransform) NormalTransformMat() mat33.T {
-	return mat33.Transpose(mat33.Inverse(t.Linear))
-}
-
-func TransformPoint(a AffineTransform, b vec3.T) vec3.T {
-	return vec3.AddVV(mat33.MulMV(a.Linear, b), a.Offset)
-}
 
 type DenseSignal struct {
 	SrcX    float32
@@ -449,7 +385,7 @@ func (r *Ray) Eval(t float64) vec3.T {
 	}
 }
 
-func (b *Ray) Transform(a AffineTransform) Ray {
+func (b *Ray) Transform(a affinetransform.AffineTransform) Ray {
 	return Ray{
 		Point:     vec3.AddVV(mat33.MulMV(a.Linear, b.Point), a.Offset),
 		Slope:     vec3.Normalize(mat33.MulMV(a.Linear, b.Slope)),
@@ -462,7 +398,7 @@ type RaySegment struct {
 	TheSegment Span
 }
 
-func (b *RaySegment) Transform(a AffineTransform) RaySegment {
+func (b *RaySegment) Transform(a affinetransform.AffineTransform) RaySegment {
 	result := RaySegment{}
 	result.TheRay.PatchArea = b.TheRay.PatchArea
 	result.TheRay.Point = vec3.AddVV(mat33.MulMV(a.Linear, b.TheRay.Point), a.Offset)
@@ -591,16 +527,16 @@ func (a AABox) SurfaceArea() float64 {
 	return 2 * (xLen*yLen + xLen*zLen + yLen*zLen)
 }
 
-func (a AABox) Transform(t AffineTransform) AABox {
+func (a AABox) Transform(t affinetransform.AffineTransform) AABox {
 	points := []vec3.T{
-		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Lo, a.Z.Lo}),
-		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Lo, a.Z.Hi}),
-		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Hi, a.Z.Lo}),
-		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Hi, a.Z.Hi}),
-		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Lo, a.Z.Lo}),
-		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Lo, a.Z.Hi}),
-		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Hi, a.Z.Lo}),
-		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Hi, a.Z.Hi}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Lo, a.Y.Lo, a.Z.Lo}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Lo, a.Y.Lo, a.Z.Hi}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Lo, a.Y.Hi, a.Z.Lo}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Lo, a.Y.Hi, a.Z.Hi}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Hi, a.Y.Lo, a.Z.Lo}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Hi, a.Y.Lo, a.Z.Hi}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Hi, a.Y.Hi, a.Z.Lo}),
+		affinetransform.TransformPoint(t, vec3.T{a.X.Hi, a.Y.Hi, a.Z.Hi}),
 	}
 
 	result := AccumZeroAABox()
@@ -704,7 +640,7 @@ func ContactNaN() Contact {
 //
 // nm is the transpose inverse of the linear part of the transform.  Taken as an
 // argument rather than calculating it every time.
-func (c Contact) Transform(t AffineTransform, nm mat33.T) Contact {
+func (c Contact) Transform(t affinetransform.AffineTransform, nm mat33.T) Contact {
 	result := c
 
 	// We don't use the standard ray-transforming support, since we need to know
@@ -1641,7 +1577,7 @@ type SceneElement struct {
 	TheMaterial Material
 
 	// The transform that takes model space to world space.
-	ModelToWorld AffineTransform
+	ModelToWorld affinetransform.AffineTransform
 }
 
 type CrushedSceneElement struct {
@@ -1649,11 +1585,11 @@ type CrushedSceneElement struct {
 	TheMaterial Material
 
 	// The transform that takes a ray from world space to model space.
-	WorldToModel AffineTransform
+	WorldToModel affinetransform.AffineTransform
 
 	// The transform that takes rays and contacts from model space to world
 	// space.
-	ModelToWorld AffineTransform
+	ModelToWorld affinetransform.AffineTransform
 
 	// The linear map that takes normal vectors from model space to world space.
 	ModelToWorldNormals mat33.T
@@ -2225,42 +2161,42 @@ func do() error {
 		&SceneElement{
 			TheGeometry:  sphere,
 			TheMaterial:  cieAEmitter,
-			ModelToWorld: Compose(Translate(vec3.T{5, 4, 0}), Scale(1)),
+			ModelToWorld: affinetransform.Compose(affinetransform.Translate(vec3.T{5, 4, 0}), affinetransform.Scale(1)),
 		},
 		&SceneElement{
 			TheGeometry:  sphere,
 			TheMaterial:  matte,
-			ModelToWorld: Compose(Translate(vec3.T{5, 6, 0}), Scale(1)),
+			ModelToWorld: affinetransform.Compose(affinetransform.Translate(vec3.T{5, 6, 0}), affinetransform.Scale(1)),
 		},
 		&SceneElement{
 			TheGeometry:  ground,
 			TheMaterial:  matte2,
-			ModelToWorld: Identity(),
+			ModelToWorld: affinetransform.Identity(),
 		},
 		&SceneElement{
 			TheGeometry:  roof,
 			TheMaterial:  matte2,
-			ModelToWorld: Identity(),
+			ModelToWorld: affinetransform.Identity(),
 		},
 		&SceneElement{
 			TheGeometry:  wallN,
 			TheMaterial:  matte2,
-			ModelToWorld: Identity(),
+			ModelToWorld: affinetransform.Identity(),
 		},
 		&SceneElement{
 			TheGeometry:  wallW,
 			TheMaterial:  matte2,
-			ModelToWorld: Identity(),
+			ModelToWorld: affinetransform.Identity(),
 		},
 		&SceneElement{
 			TheGeometry:  wallS,
 			TheMaterial:  matte2,
-			ModelToWorld: Identity(),
+			ModelToWorld: affinetransform.Identity(),
 		},
 		&SceneElement{
 			TheGeometry:  centerBox,
 			TheMaterial:  glass,
-			ModelToWorld: Translate(vec3.T{3, 3, 0}),
+			ModelToWorld: affinetransform.Translate(vec3.T{3, 3, 0}),
 		},
 	}
 

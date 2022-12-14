@@ -6,9 +6,9 @@ go_library(
     importpath = "row-major/harpoon/cmd/renderer",
     visibility = ["//visibility:private"],
     deps = [
+        "//harpoon/affinetransform:go_default_library",
         "//harpoon/spectralimage/headerproto:go_default_library",
         "//harpoon/vmath/mat33:go_default_library",
-        "//harpoon/vmath/mat44:go_default_library",
         "//harpoon/vmath/vec2:go_default_library",
         "//harpoon/vmath/vec3:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
