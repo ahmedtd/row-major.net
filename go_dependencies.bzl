@@ -65,6 +65,13 @@ def go_dependencies():
         version = "v0.5.0",
     )
     go_repository(
+        name = "com_github_barnex_fmath",
+        importpath = "github.com/barnex/fmath",
+        sum = "h1:FOAZHSIFEhocAOfB7LQcZmCEAra7hneHMBPL8Nq/eDk=",
+        version = "v0.0.0-20150108074215-ec9671f295c2",
+    )
+
+    go_repository(
         name = "com_github_benbjohnson_clock",
         importpath = "github.com/benbjohnson/clock",
         sum = "h1:vkLuvpK4fmtSCuo60+yC63p7y0BmQ8gm5ZXGuBCJyXg=",

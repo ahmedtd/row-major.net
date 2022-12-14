@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["mat33.go"],
+    importpath = "row-major/harpoon/vmath/mat33",
+    visibility = ["//visibility:public"],
+    deps = ["//harpoon/vmath/vec3:go_default_library"],
+)

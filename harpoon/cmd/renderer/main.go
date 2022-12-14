@@ -15,382 +15,38 @@ import (
 	"sync"
 
 	"row-major/harpoon/spectralimage/headerproto"
+	"row-major/harpoon/vmath/mat33"
+	"row-major/harpoon/vmath/mat44"
+	"row-major/harpoon/vmath/vec2"
+	"row-major/harpoon/vmath/vec3"
 
 	"google.golang.org/protobuf/proto"
 )
 
-type Vec2 [2]float64
-
-func (v Vec2) Norm() float64 {
-	return math.Sqrt(v[0]*v[0] + v[1]*v[1])
-}
-
-type Vec3 [3]float64
-
-func (v Vec3) Norm() float64 {
-	return math.Sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
-}
-
-func Normalize(v Vec3) Vec3 {
-	l := v.Norm()
-	return Vec3{
-		v[0] / l,
-		v[1] / l,
-		v[2] / l,
-	}
-}
-
-func AddVV(a, b Vec3) Vec3 {
-	return Vec3{
-		a[0] + b[0],
-		a[1] + b[1],
-		a[2] + b[2],
-	}
-}
-
-func SubVV(a, b Vec3) Vec3 {
-	return Vec3{
-		a[0] - b[0],
-		a[1] - b[1],
-		a[2] - b[2],
-	}
-}
-
-func MulVS(a Vec3, b float64) Vec3 {
-	return Vec3{
-		a[0] * b,
-		a[1] * b,
-		a[2] * b,
-	}
-}
-
-func DivVS(a Vec3, b float64) Vec3 {
-	return Vec3{
-		a[0] / b,
-		a[1] / b,
-		a[2] / b,
-	}
-}
-
-func IProd(a, b Vec3) float64 {
-	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
-}
-
-func CProd(a, b Vec3) Vec3 {
-	return Vec3{
-		a[1]*b[2] - a[2]*b[1],
-		a[2]*b[0] - a[0]*b[2],
-		a[0]*b[1] - a[1]*b[0],
-	}
-}
-
-// Reject returns the component of b that is orthogonal to A.
-func Reject(a, b Vec3) Vec3 {
-	return SubVV(b, MulVS(Normalize(a), IProd(a, b)/a.Norm()))
-}
-
-func Reflect(a, n Vec3) Vec3 {
-	return SubVV(a, MulVS(n, 2*IProd(a, n)))
-}
-
-type Mat33 struct {
-	Elts [9]float64
-}
-
-func MulMM(a, b Mat33) Mat33 {
-	result := Mat33{}
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
-			for k := 0; k < 3; k++ {
-				result.Elts[i*3+j] += a.Elts[i*3+k] * b.Elts[k*3+j]
-			}
-		}
-	}
-	return result
-}
-
-func MulMV(a Mat33, b Vec3) Vec3 {
-	return Vec3{
-		a.Elts[0]*b[0] + a.Elts[1]*b[1] + a.Elts[2]*b[2],
-		a.Elts[3]*b[0] + a.Elts[4]*b[1] + a.Elts[5]*b[2],
-		a.Elts[6]*b[0] + a.Elts[7]*b[1] + a.Elts[8]*b[2],
-	}
-}
-
-func Mat33Transpose(m Mat33) Mat33 {
-	transpose := Mat33{}
-	for r := 0; r < 3; r++ {
-		for c := 0; c < 3; c++ {
-			transpose.Elts[c*3+r] = m.Elts[r*3+c]
-		}
-	}
-	return transpose
-}
-
-func mat33RowEchelonInplace(m, a *Mat33) {
-	for k := 0; k < 3; k++ {
-		// Select the row below row k with the best pivot.
-		maxRow := k
-		for i := k; i < 3; i++ {
-			if math.Abs(m.Elts[i*3+k]) > math.Abs(m.Elts[maxRow*3+k]) {
-				maxRow = i
-			}
-		}
-
-		// Swap selected row to current row.
-		for i := 0; i < 3; i++ {
-			m.Elts[k*3+i], m.Elts[maxRow*3+i] = m.Elts[maxRow*3+i], m.Elts[k*3+i]
-			a.Elts[k*3+i], a.Elts[maxRow*3+i] = a.Elts[maxRow*3+i], a.Elts[k*3+i]
-		}
-
-		// Now the pivot element is at m[k, k].
-		pivot := m.Elts[k*3+k]
-		for r := k + 1; r < 3; r++ {
-			scale := m.Elts[r*3+k] / pivot
-			for c := k + 1; c < 3; c++ {
-				m.Elts[r*3+c] -= m.Elts[k*3+c] * scale
-			}
-			for c := 0; c < 3; c++ {
-				a.Elts[r*3+c] -= a.Elts[k*3+c] * scale
-			}
-			m.Elts[r*3+k] = 0.0
-		}
-	}
-
-}
-
-func mat33BacksubInplace(m, a *Mat33) {
-	for k := 3 - 1; k > 0; k-- {
-		// m[k,k] is the pivot
-
-		// Nullify all entries above the pivot element.
-		for r := 0; r < k; r++ {
-			scale := m.Elts[r*3+k] / m.Elts[k*3+k]
-
-			m.Elts[r*3+k] = 0
-			for c := k + 1; c < 3; c++ {
-				m.Elts[r*3+c] -= m.Elts[k*3+c] * scale
-			}
-
-			// Mirror the action in the augmented matrix.
-			for c := 0; c < 3; c++ {
-				a.Elts[r*3+c] -= a.Elts[k*3+c] * scale
-			}
-		}
-	}
-
-	// Now we simply need to divide each row by its pivot.
-	for k := 0; k < 3; k++ {
-		for c := k + 1; c < 3; c++ {
-			m.Elts[k*3+c] /= m.Elts[k*3+k]
-		}
-		for c := 0; c < 3; c++ {
-			a.Elts[k*3+c] /= m.Elts[k*3+k]
-		}
-		m.Elts[k*3+k] = 1
-	}
-}
-
-func Mat33SolveInplace(m, a *Mat33) {
-	mat33RowEchelonInplace(m, a)
-	mat33BacksubInplace(m, a)
-}
-
-func Mat33Inverse(m Mat33) Mat33 {
-	a := Mat33{[9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}}
-	Mat33SolveInplace(&m, &a)
-	return a
-}
-
-type Mat44 struct {
-	Elts [16]float64
-}
-
-func mat44RowEchelonInplace(m, a *Mat44) {
-	for k := 0; k < 4; k++ {
-		// Select the row below row k with the best pivot.
-		maxRow := k
-		for i := k; i < 4; i++ {
-			if math.Abs(m.Elts[i*4+k]) > math.Abs(m.Elts[maxRow*4+k]) {
-				maxRow = i
-			}
-		}
-
-		// Swap selected row to current row.
-		for i := 0; i < 4; i++ {
-			m.Elts[k*4+i], m.Elts[maxRow*4+i] = m.Elts[maxRow*4+i], m.Elts[k*4+i]
-			a.Elts[k*4+i], a.Elts[maxRow*4+i] = a.Elts[maxRow*4+i], a.Elts[k*4+i]
-		}
-
-		// Now the pivot element is at m[k, k].
-		pivot := m.Elts[k*4+k]
-		for r := k + 1; r < 4; r++ {
-			scale := m.Elts[r*4+k] / pivot
-			for c := k + 1; c < 4; c++ {
-				m.Elts[r*4+c] -= m.Elts[k*4+c] * scale
-			}
-			for c := 0; c < 4; c++ {
-				a.Elts[r*4+c] -= a.Elts[k*4+c] * scale
-			}
-			m.Elts[r*4+k] = 0.0
-		}
-	}
-}
-
-func mat44BacksubInplace(m, a *Mat44) {
-	for k := 4 - 1; k > 0; k-- {
-		// m[k,k] is the pivot
-
-		// Nullify all entries above the pivot element.
-		for r := 0; r < k; r++ {
-			scale := m.Elts[r*4+k] / m.Elts[k*4+k]
-
-			m.Elts[r*4+k] = 0
-			for c := k + 1; c < 4; c++ {
-				m.Elts[r*4+c] -= m.Elts[k*4+c] * scale
-			}
-
-			// Mirror the action in the augmented matrix.
-			for c := 0; c < 4; c++ {
-				a.Elts[r*4+c] -= a.Elts[k*4+c] * scale
-			}
-		}
-	}
-
-	// Now we simply need to divide each row by its pivot.
-	for k := 0; k < 4; k++ {
-		for c := k + 1; c < 4; c++ {
-			m.Elts[k*4+c] /= m.Elts[k*4+k]
-		}
-		for c := 0; c < 4; c++ {
-			a.Elts[k*4+c] /= m.Elts[k*4+k]
-		}
-		m.Elts[k*4+k] = 1
-	}
-}
-
-func Mat44SolveInplace(m, a *Mat44) {
-	mat44RowEchelonInplace(m, a)
-	mat44BacksubInplace(m, a)
-}
-
-func Mat44Inverse(m Mat44) Mat44 {
-	a := Mat44{Elts: [16]float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}}
-	Mat44SolveInplace(&m, &a)
-	return a
-}
-
-func UniformUnitVec3Distribution(rng *rand.Rand) Vec3 {
-	result := Vec3{}
-	for {
-		result[0] = 2 * (rng.Float64() - 0.5)
-		result[1] = 2 * (rng.Float64() - 0.5)
-		result[2] = 2 * (rng.Float64() - 0.5)
-		normSquared := result[0]*result[0] + result[1]*result[1] + result[2]*result[2]
-		if normSquared <= 1.0 && normSquared != 0.0 {
-			break
-		}
-	}
-	return Normalize(result)
-}
-
-func HemisphereUnitVec3Distribution(normal Vec3, rng *rand.Rand) Vec3 {
-	candidate := UniformUnitVec3Distribution(rng)
-	if IProd(candidate, normal) < 0.0 {
-		candidate[0] = -candidate[0]
-		candidate[1] = -candidate[1]
-		candidate[2] = -candidate[2]
-	}
-	return candidate
-}
-
-func CosineUnitVec3Distribution(normal Vec3, rng *rand.Rand) Vec3 {
-	for {
-		candidate := UniformUnitVec3Distribution(rng)
-		cosine := IProd(normal, candidate)
-
-		if cosine < 0.0 {
-			cosine = -cosine
-			candidate[0] = -candidate[0]
-			candidate[1] = -candidate[1]
-			candidate[2] = -candidate[2]
-		}
-
-		// TODO: Shouldn't it be fine to use a rejection sample from [0.0, 1.0)?
-		// We know cosine is always nonnegative.
-		rejectionSample := rng.Float64()*2.0 - 1.0
-		if rejectionSample >= cosine {
-			return candidate
-		}
-	}
-	// Dead code.
-	return Vec3{0, 0, 0}
-}
-
-func GaussianUnitVec3Distribution(normal Vec3, mid float64, rng *rand.Rand) Vec3 {
-	// By cutting the case variance == 0 from the rejection testing, we
-	// ensure that the loop below will terminate, since the result of exp
-	// will never be NaN.
-
-	// The loop could, however, take a very long time indeed for small
-	// variance values, since the pdf evaluates to zero for larger and
-	// larger fractions of the rejection test interval as v gets larger.
-
-	// In general, for double precision arithmetic, truly problematic values
-	// will start as v gets smaller than ~(1/1400).
-
-	for {
-		candidate := UniformUnitVec3Distribution(rng)
-		cosine := IProd(normal, candidate)
-		if cosine < 0.0 {
-			cosine = -cosine
-			candidate[0] = -candidate[0]
-			candidate[1] = -candidate[1]
-			candidate[2] = -candidate[2]
-		}
-
-		// PDF is a triangle with peak at `cosine == mid`
-		pdfVal := 0.0
-		if cosine < mid {
-			pdfVal = cosine / mid
-		} else {
-			pdfVal = -(cosine-mid)/(1-mid) + 1
-		}
-
-		rejectionSample := rng.Float64()
-		if rejectionSample >= pdfVal {
-			return candidate
-		}
-	}
-
-	// Dead code.
-	return Vec3{0, 0, 0}
-}
-
 type AffineTransform struct {
-	Linear Mat33
-	Offset Vec3
+	Linear mat33.T
+	Offset vec3.T
 }
 
 func Identity() AffineTransform {
 	return AffineTransform{
-		Linear: Mat33{
+		Linear: mat33.T{
 			[9]float64{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0},
 		},
-		Offset: Vec3{0.0, 0.0, 0.0},
+		Offset: vec3.T{0.0, 0.0, 0.0},
 	}
 }
 
 func Scale(s float64) AffineTransform {
 	return AffineTransform{
-		Linear: Mat33{
+		Linear: mat33.T{
 			[9]float64{s, 0.0, 0.0, 0.0, s, 0.0, 0.0, 0.0, s},
 		},
-		Offset: Vec3{0.0, 0.0, 0.0},
+		Offset: vec3.T{0.0, 0.0, 0.0},
 	}
 }
 
-func Translate(x Vec3) AffineTransform {
+func Translate(x vec3.T) AffineTransform {
 	result := Identity()
 	result.Offset = x
 	return result
@@ -398,37 +54,37 @@ func Translate(x Vec3) AffineTransform {
 
 func Compose(a, b AffineTransform) AffineTransform {
 	return AffineTransform{
-		Linear: MulMM(a.Linear, b.Linear),
-		Offset: AddVV(a.Offset, MulMV(a.Linear, b.Offset)),
+		Linear: mat33.MulMM(a.Linear, b.Linear),
+		Offset: vec3.AddVV(a.Offset, mat33.MulMV(a.Linear, b.Offset)),
 	}
 }
 
 func (t AffineTransform) Invert() AffineTransform {
-	mat := Mat44{[16]float64{
+	mat := mat44.T{[16]float64{
 		t.Linear.Elts[0], t.Linear.Elts[1], t.Linear.Elts[2], t.Offset[0],
 		t.Linear.Elts[3], t.Linear.Elts[4], t.Linear.Elts[5], t.Offset[1],
 		t.Linear.Elts[6], t.Linear.Elts[7], t.Linear.Elts[8], t.Offset[2],
 		0, 0, 0, 1,
 	}}
 
-	inv := Mat44Inverse(mat)
+	inv := mat44.Mat44Inverse(mat)
 
 	return AffineTransform{
-		Linear: Mat33{[9]float64{
+		Linear: mat33.T{[9]float64{
 			inv.Elts[0], inv.Elts[1], inv.Elts[2],
 			inv.Elts[4], inv.Elts[5], inv.Elts[6],
 			inv.Elts[8], inv.Elts[9], inv.Elts[10],
 		}},
-		Offset: Vec3{inv.Elts[3], inv.Elts[7], inv.Elts[11]},
+		Offset: vec3.T{inv.Elts[3], inv.Elts[7], inv.Elts[11]},
 	}
 }
 
-func (t AffineTransform) NormalTransformMat() Mat33 {
-	return Mat33Transpose(Mat33Inverse(t.Linear))
+func (t AffineTransform) NormalTransformMat() mat33.T {
+	return mat33.Transpose(mat33.Inverse(t.Linear))
 }
 
-func TransformPoint(a AffineTransform, b Vec3) Vec3 {
-	return AddVV(MulMV(a.Linear, b), a.Offset)
+func TransformPoint(a AffineTransform, b vec3.T) vec3.T {
+	return vec3.AddVV(mat33.MulMV(a.Linear, b), a.Offset)
 }
 
 type DenseSignal struct {
@@ -780,13 +436,13 @@ func (s Span) IsNaN() bool {
 }
 
 type Ray struct {
-	Point     Vec3
-	Slope     Vec3
+	Point     vec3.T
+	Slope     vec3.T
 	PatchArea float64
 }
 
-func (r *Ray) Eval(t float64) Vec3 {
-	return Vec3{
+func (r *Ray) Eval(t float64) vec3.T {
+	return vec3.T{
 		r.Point[0] + t*r.Slope[0],
 		r.Point[1] + t*r.Slope[1],
 		r.Point[2] + t*r.Slope[2],
@@ -795,8 +451,8 @@ func (r *Ray) Eval(t float64) Vec3 {
 
 func (b *Ray) Transform(a AffineTransform) Ray {
 	return Ray{
-		Point:     AddVV(MulMV(a.Linear, b.Point), a.Offset),
-		Slope:     Normalize(MulMV(a.Linear, b.Slope)),
+		Point:     vec3.AddVV(mat33.MulMV(a.Linear, b.Point), a.Offset),
+		Slope:     vec3.Normalize(mat33.MulMV(a.Linear, b.Slope)),
 		PatchArea: b.PatchArea,
 	}
 }
@@ -809,10 +465,10 @@ type RaySegment struct {
 func (b *RaySegment) Transform(a AffineTransform) RaySegment {
 	result := RaySegment{}
 	result.TheRay.PatchArea = b.TheRay.PatchArea
-	result.TheRay.Point = AddVV(MulMV(a.Linear, b.TheRay.Point), a.Offset)
-	result.TheRay.Slope = MulMV(a.Linear, b.TheRay.Slope)
+	result.TheRay.Point = vec3.AddVV(mat33.MulMV(a.Linear, b.TheRay.Point), a.Offset)
+	result.TheRay.Slope = mat33.MulMV(a.Linear, b.TheRay.Slope)
 	scaleFactor := result.TheRay.Slope.Norm()
-	result.TheRay.Slope = DivVS(result.TheRay.Slope, scaleFactor)
+	result.TheRay.Slope = vec3.DivVS(result.TheRay.Slope, scaleFactor)
 	result.TheSegment.Lo = scaleFactor * b.TheSegment.Lo
 	result.TheSegment.Hi = scaleFactor * b.TheSegment.Hi
 	return result
@@ -823,19 +479,19 @@ type Camera interface {
 }
 
 type PinholeCamera struct {
-	Center          Vec3
-	ApertureToWorld Mat33
-	Aperture        Vec3
+	Center          vec3.T
+	ApertureToWorld mat33.T
+	Aperture        vec3.T
 }
 
 func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *rand.Rand) Ray {
-	imageCoords := Vec3{
+	imageCoords := vec3.T{
 		1.0,
 		1.0 - 2.0*(float64(curCol)-rng.Float64())/float64(imgCols),
 		1.0 - 2.0*(float64(curRow)-rng.Float64())/float64(imgRows),
 	}
 
-	apertureCoords := Vec3{
+	apertureCoords := vec3.T{
 		imageCoords[0] * c.Aperture[0],
 		imageCoords[1] * c.Aperture[1],
 		imageCoords[2] * c.Aperture[2],
@@ -843,58 +499,58 @@ func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *ra
 
 	return Ray{
 		Point: c.Center,
-		Slope: Normalize(MulMV(c.ApertureToWorld, apertureCoords)),
+		Slope: vec3.Normalize(mat33.MulMV(c.ApertureToWorld, apertureCoords)),
 	}
 }
 
-func (c *PinholeCamera) Eye() Vec3 {
-	return Vec3{
+func (c *PinholeCamera) Eye() vec3.T {
+	return vec3.T{
 		c.ApertureToWorld.Elts[0],
 		c.ApertureToWorld.Elts[3],
 		c.ApertureToWorld.Elts[6],
 	}
 }
 
-func (c *PinholeCamera) Left() Vec3 {
-	return Vec3{
+func (c *PinholeCamera) Left() vec3.T {
+	return vec3.T{
 		c.ApertureToWorld.Elts[1],
 		c.ApertureToWorld.Elts[4],
 		c.ApertureToWorld.Elts[7],
 	}
 }
 
-func (c *PinholeCamera) Up() Vec3 {
-	return Vec3{
+func (c *PinholeCamera) Up() vec3.T {
+	return vec3.T{
 		c.ApertureToWorld.Elts[2],
 		c.ApertureToWorld.Elts[5],
 		c.ApertureToWorld.Elts[8],
 	}
 }
 
-func (c *PinholeCamera) SetEye(newEye Vec3) {
-	c.setEyeDirect(Normalize(newEye))
-	c.setUpDirect(Normalize(Reject(c.Eye(), c.Up())))
-	c.setLeftDirect(CProd(c.Up(), c.Eye()))
+func (c *PinholeCamera) SetEye(newEye vec3.T) {
+	c.setEyeDirect(vec3.Normalize(newEye))
+	c.setUpDirect(vec3.Normalize(vec3.Reject(c.Eye(), c.Up())))
+	c.setLeftDirect(vec3.CProd(c.Up(), c.Eye()))
 }
 
-func (c *PinholeCamera) SetUp(newUp Vec3) {
-	c.setUpDirect(Normalize(Reject(c.Eye(), newUp)))
-	c.setLeftDirect(CProd(c.Up(), c.Eye()))
+func (c *PinholeCamera) SetUp(newUp vec3.T) {
+	c.setUpDirect(vec3.Normalize(vec3.Reject(c.Eye(), newUp)))
+	c.setLeftDirect(vec3.CProd(c.Up(), c.Eye()))
 }
 
-func (c *PinholeCamera) setEyeDirect(newEye Vec3) {
+func (c *PinholeCamera) setEyeDirect(newEye vec3.T) {
 	c.ApertureToWorld.Elts[0] = newEye[0]
 	c.ApertureToWorld.Elts[3] = newEye[1]
 	c.ApertureToWorld.Elts[6] = newEye[2]
 }
 
-func (c *PinholeCamera) setLeftDirect(newLeft Vec3) {
+func (c *PinholeCamera) setLeftDirect(newLeft vec3.T) {
 	c.ApertureToWorld.Elts[1] = newLeft[0]
 	c.ApertureToWorld.Elts[4] = newLeft[1]
 	c.ApertureToWorld.Elts[7] = newLeft[2]
 }
 
-func (c *PinholeCamera) setUpDirect(newUp Vec3) {
+func (c *PinholeCamera) setUpDirect(newUp vec3.T) {
 	c.ApertureToWorld.Elts[2] = newUp[0]
 	c.ApertureToWorld.Elts[5] = newUp[1]
 	c.ApertureToWorld.Elts[8] = newUp[2]
@@ -920,7 +576,7 @@ func MinContainingAABox(a, b AABox) AABox {
 	}
 }
 
-func GrowAABoxToPoint(a AABox, b Vec3) AABox {
+func GrowAABoxToPoint(a AABox, b vec3.T) AABox {
 	return AABox{}
 }
 
@@ -936,15 +592,15 @@ func (a AABox) SurfaceArea() float64 {
 }
 
 func (a AABox) Transform(t AffineTransform) AABox {
-	points := []Vec3{
-		TransformPoint(t, Vec3{a.X.Lo, a.Y.Lo, a.Z.Lo}),
-		TransformPoint(t, Vec3{a.X.Lo, a.Y.Lo, a.Z.Hi}),
-		TransformPoint(t, Vec3{a.X.Lo, a.Y.Hi, a.Z.Lo}),
-		TransformPoint(t, Vec3{a.X.Lo, a.Y.Hi, a.Z.Hi}),
-		TransformPoint(t, Vec3{a.X.Hi, a.Y.Lo, a.Z.Lo}),
-		TransformPoint(t, Vec3{a.X.Hi, a.Y.Lo, a.Z.Hi}),
-		TransformPoint(t, Vec3{a.X.Hi, a.Y.Hi, a.Z.Lo}),
-		TransformPoint(t, Vec3{a.X.Hi, a.Y.Hi, a.Z.Hi}),
+	points := []vec3.T{
+		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Lo, a.Z.Lo}),
+		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Lo, a.Z.Hi}),
+		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Hi, a.Z.Lo}),
+		TransformPoint(t, vec3.T{a.X.Lo, a.Y.Hi, a.Z.Hi}),
+		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Lo, a.Z.Lo}),
+		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Lo, a.Z.Hi}),
+		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Hi, a.Z.Lo}),
+		TransformPoint(t, vec3.T{a.X.Hi, a.Y.Hi, a.Z.Hi}),
 	}
 
 	result := AccumZeroAABox()
@@ -1032,10 +688,10 @@ func RayTestAABox(r RaySegment, b AABox) Span {
 type Contact struct {
 	T    float64
 	R    Ray
-	P    Vec3
-	N    Vec3
-	Mtl2 Vec2
-	Mtl3 Vec3
+	P    vec3.T
+	N    vec3.T
+	Mtl2 vec2.T
+	Mtl3 vec3.T
 }
 
 func ContactNaN() Contact {
@@ -1048,20 +704,20 @@ func ContactNaN() Contact {
 //
 // nm is the transpose inverse of the linear part of the transform.  Taken as an
 // argument rather than calculating it every time.
-func (c Contact) Transform(t AffineTransform, nm Mat33) Contact {
+func (c Contact) Transform(t AffineTransform, nm mat33.T) Contact {
 	result := c
 
 	// We don't use the standard ray-transforming support, since we need to know
 	// how the transform changes the scale of the underlying space.
-	result.R.Point = AddVV(MulMV(t.Linear, result.R.Point), t.Offset)
-	result.R.Slope = MulMV(t.Linear, result.R.Slope)
+	result.R.Point = vec3.AddVV(mat33.MulMV(t.Linear, result.R.Point), t.Offset)
+	result.R.Slope = mat33.MulMV(t.Linear, result.R.Slope)
 
 	scaleFactor := result.R.Slope.Norm()
-	result.R.Slope = DivVS(result.R.Slope, scaleFactor)
+	result.R.Slope = vec3.DivVS(result.R.Slope, scaleFactor)
 	result.T = result.T * scaleFactor
 
-	result.P = AddVV(MulMV(t.Linear, result.P), t.Offset)
-	result.N = Normalize(MulMV(nm, result.N))
+	result.P = vec3.AddVV(mat33.MulMV(t.Linear, result.P), t.Offset)
+	result.N = vec3.Normalize(mat33.MulMV(nm, result.N))
 
 	return result
 }
@@ -1098,8 +754,8 @@ func (s *Sphere) Crush(time float64) {
 }
 
 func (s *Sphere) RayInto(query RaySegment) Contact {
-	b := IProd(query.TheRay.Slope, query.TheRay.Point)
-	c := IProd(query.TheRay.Point, query.TheRay.Point) - 1.0
+	b := vec3.IProd(query.TheRay.Slope, query.TheRay.Point)
+	c := vec3.IProd(query.TheRay.Point, query.TheRay.Point) - 1.0
 
 	tMin := -b - math.Sqrt(b*b-c)
 
@@ -1112,21 +768,21 @@ func (s *Sphere) RayInto(query RaySegment) Contact {
 	result := Contact{
 		T:    tMin,
 		P:    p,
-		N:    Normalize(p),
+		N:    vec3.Normalize(p),
 		R:    query.TheRay,
 		Mtl3: p,
 	}
 
 	if s.TheMaterialCoordsMode == MaterialCoords2D {
-		result.Mtl2 = Vec2{math.Atan2(p[0], p[1]), math.Acos(p[2])}
+		result.Mtl2 = vec2.T{math.Atan2(p[0], p[1]), math.Acos(p[2])}
 	}
 
 	return result
 }
 
 func (s *Sphere) RayExit(query RaySegment) Contact {
-	b := IProd(query.TheRay.Slope, query.TheRay.Point)
-	c := IProd(query.TheRay.Point, query.TheRay.Point) - 1.0
+	b := vec3.IProd(query.TheRay.Slope, query.TheRay.Point)
+	c := vec3.IProd(query.TheRay.Point, query.TheRay.Point) - 1.0
 
 	tMax := -b - math.Sqrt(b*b-c)
 
@@ -1138,8 +794,8 @@ func (s *Sphere) RayExit(query RaySegment) Contact {
 	return Contact{
 		T:    tMax,
 		P:    p,
-		N:    Normalize(p),
-		Mtl2: Vec2{math.Atan2(p[0], p[1]), math.Acos(p[2])},
+		N:    vec3.Normalize(p),
+		Mtl2: vec2.T{math.Atan2(p[0], p[1]), math.Acos(p[2])},
 		Mtl3: p,
 		R:    query.TheRay,
 	}
@@ -1199,8 +855,8 @@ func (b *Box) RayInto(query RaySegment) Contact {
 		T:    cover.Lo,
 		R:    query.TheRay,
 		P:    query.TheRay.Eval(cover.Lo),
-		N:    Vec3{hitAxis[0], hitAxis[1], hitAxis[2]},
-		Mtl2: Vec2{0, 0},
+		N:    vec3.T{hitAxis[0], hitAxis[1], hitAxis[2]},
+		Mtl2: vec2.T{0, 0},
 		Mtl3: query.TheRay.Eval(cover.Lo),
 	}
 	return val
@@ -1251,15 +907,15 @@ func (b *Box) RayExit(query RaySegment) Contact {
 		T:    cover.Hi,
 		R:    query.TheRay,
 		P:    query.TheRay.Eval(cover.Hi),
-		N:    Vec3{hitAxis[0], hitAxis[1], hitAxis[2]},
-		Mtl2: Vec2{0, 0},
+		N:    vec3.T{hitAxis[0], hitAxis[1], hitAxis[2]},
+		Mtl2: vec2.T{0, 0},
 		Mtl3: query.TheRay.Eval(cover.Hi),
 	}
 }
 
 type MaterialCoords struct {
-	Mtl2 Vec2
-	Mtl3 Vec3
+	Mtl2 vec2.T
+	Mtl3 vec3.T
 	Freq float32
 }
 
@@ -1549,7 +1205,7 @@ func (d *DirectionalEmitter) Crush(time float64) {}
 func (d *DirectionalEmitter) Shade(contact Contact, freq float32, rng *rand.Rand) ShadeInfo {
 	materialCoords := MaterialCoords{
 		Mtl3: contact.R.Slope,
-		Mtl2: Vec2{
+		Mtl2: vec2.T{
 			math.Atan2(contact.R.Slope[0], contact.R.Slope[1]),
 			math.Acos(contact.R.Slope[2]),
 		},
@@ -1586,9 +1242,9 @@ type MonteCarloLambert struct {
 func (l *MonteCarloLambert) Crush(time float64) {}
 
 func (l *MonteCarloLambert) Shade(contact Contact, freq float32, rng *rand.Rand) ShadeInfo {
-	dir := HemisphereUnitVec3Distribution(contact.N, rng)
+	dir := vec3.HemisphereUnitVec3Distribution(contact.N, rng)
 	reflectance := l.Reflectance(MaterialCoords{contact.Mtl2, contact.Mtl3, freq})
-	propagation := float32(IProd(contact.N, dir) * reflectance)
+	propagation := float32(vec3.IProd(contact.N, dir) * reflectance)
 
 	return ShadeInfo{
 		IncidentRay: Ray{
@@ -1616,7 +1272,7 @@ func (n *NonConductiveSmooth) Shade(contact Contact, freq float32, rng *rand.Ran
 	nA := n.ExteriorIndexOfRefraction(coord)
 	nB := n.InteriorIndexOfRefraction(coord)
 
-	aCos := IProd(contact.R.Slope, contact.N)
+	aCos := vec3.IProd(contact.R.Slope, contact.N)
 	if aCos > 0.0 {
 		nA, nB = nB, nA
 	}
@@ -1643,7 +1299,7 @@ func (n *NonConductiveSmooth) Shade(contact Contact, freq float32, rng *rand.Ran
 			PropagationK: 1.0,
 			IncidentRay: Ray{
 				Point: contact.P,
-				Slope: Reflect(contact.R.Slope, contact.N),
+				Slope: vec3.Reflect(contact.R.Slope, contact.N),
 			},
 		}
 	}
@@ -1670,7 +1326,7 @@ func (n *NonConductiveSmooth) Shade(contact Contact, freq float32, rng *rand.Ran
 			PropagationK: 1.0,
 			IncidentRay: Ray{
 				Point: contact.P,
-				Slope: Reflect(contact.R.Slope, contact.N),
+				Slope: vec3.Reflect(contact.R.Slope, contact.N),
 			},
 		}
 	} else {
@@ -1680,7 +1336,7 @@ func (n *NonConductiveSmooth) Shade(contact Contact, freq float32, rng *rand.Ran
 			PropagationK: 1.0,
 			IncidentRay: Ray{
 				Point: contact.P,
-				Slope: AddVV(MulVS(contact.N, bCos-nR*aCos), MulVS(contact.R.Slope, nR)),
+				Slope: vec3.AddVV(vec3.MulVS(contact.N, bCos-nR*aCos), vec3.MulVS(contact.R.Slope, nR)),
 			},
 		}
 	}
@@ -1704,7 +1360,7 @@ func (p *PerfectlyConductiveSmooth) Shade(contact Contact, freq float32, rng *ra
 		PropagationK: float32(propagation),
 		IncidentRay: Ray{
 			Point: contact.P,
-			Slope: Reflect(contact.R.Slope, contact.N),
+			Slope: vec3.Reflect(contact.R.Slope, contact.N),
 		},
 	}
 }
@@ -1717,11 +1373,11 @@ func (g *GaussianRoughNonConductive) Crush(time float64) {}
 
 func (g *GaussianRoughNonConductive) Shade(contact Contact, freq float32, rng *rand.Rand) ShadeInfo {
 	variance := g.Variance(MaterialCoords{contact.Mtl2, contact.Mtl3, freq})
-	facetNormal := GaussianUnitVec3Distribution(contact.N, variance, rng)
+	facetNormal := vec3.GaussianUnitVec3Distribution(contact.N, variance, rng)
 
 	// Performance hack
-	if IProd(facetNormal, contact.R.Slope) < 0.0 {
-		facetNormal = Reflect(facetNormal, contact.N)
+	if vec3.IProd(facetNormal, contact.R.Slope) < 0.0 {
+		facetNormal = vec3.Reflect(facetNormal, contact.N)
 	}
 
 	return ShadeInfo{
@@ -1729,7 +1385,7 @@ func (g *GaussianRoughNonConductive) Shade(contact Contact, freq float32, rng *r
 		PropagationK: 0.8,
 		IncidentRay: Ray{
 			Point: contact.P,
-			Slope: Reflect(contact.R.Slope, facetNormal),
+			Slope: vec3.Reflect(contact.R.Slope, facetNormal),
 		},
 	}
 }
@@ -2000,7 +1656,7 @@ type CrushedSceneElement struct {
 	ModelToWorld AffineTransform
 
 	// The linear map that takes normal vectors from model space to world space.
-	ModelToWorldNormals Mat33
+	ModelToWorldNormals mat33.T
 
 	// The element's bounding box in world coordinates.
 	WorldBounds AABox
@@ -2091,8 +1747,8 @@ func (s *Scene) ShadeRay(reflectedRay Ray, curWavelength float32, rng *rand.Rand
 			T:    math.Inf(1),
 			R:    reflectedRay,
 			P:    p,
-			N:    MulVS(reflectedRay.Slope, -1.0),
-			Mtl2: Vec2{math.Atan2(reflectedRay.Slope[0], reflectedRay.Slope[1]), math.Acos(reflectedRay.Slope[2])},
+			N:    vec3.MulVS(reflectedRay.Slope, -1.0),
+			Mtl2: vec2.T{math.Atan2(reflectedRay.Slope[0], reflectedRay.Slope[1]), math.Acos(reflectedRay.Slope[2])},
 			Mtl3: p,
 		}
 		return s.InfinityMaterial.Shade(c, curWavelength, rng)
@@ -2569,12 +2225,12 @@ func do() error {
 		&SceneElement{
 			TheGeometry:  sphere,
 			TheMaterial:  cieAEmitter,
-			ModelToWorld: Compose(Translate(Vec3{5, 4, 0}), Scale(1)),
+			ModelToWorld: Compose(Translate(vec3.T{5, 4, 0}), Scale(1)),
 		},
 		&SceneElement{
 			TheGeometry:  sphere,
 			TheMaterial:  matte,
-			ModelToWorld: Compose(Translate(Vec3{5, 6, 0}), Scale(1)),
+			ModelToWorld: Compose(Translate(vec3.T{5, 6, 0}), Scale(1)),
 		},
 		&SceneElement{
 			TheGeometry:  ground,
@@ -2604,18 +2260,18 @@ func do() error {
 		&SceneElement{
 			TheGeometry:  centerBox,
 			TheMaterial:  glass,
-			ModelToWorld: Translate(Vec3{3, 3, 0}),
+			ModelToWorld: Translate(vec3.T{3, 3, 0}),
 		},
 	}
 
 	scene.Crush(0.0)
 
 	camera := &PinholeCamera{
-		Center:          Vec3{1, 1, 2},
-		ApertureToWorld: Mat33{Elts: [9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}},
-		Aperture:        Vec3{0.02, 0.018, 0.012},
+		Center:          vec3.T{1, 1, 2},
+		ApertureToWorld: mat33.T{Elts: [9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}},
+		Aperture:        vec3.T{0.02, 0.018, 0.012},
 	}
-	camera.SetEye(SubVV(Vec3{5, 5, 1}, camera.Center))
+	camera.SetEye(vec3.SubVV(vec3.T{5, 5, 1}, camera.Center))
 
 	progress := func(cur, tot int) {
 		fmt.Fprintf(os.Stderr, "\r%d/%d %d%%", cur, tot, 100*cur/tot)
