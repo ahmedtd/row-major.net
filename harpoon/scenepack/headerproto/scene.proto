@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+message Mat33 {
+    float32 e00 = 1;
+    float32 e01 = 2;
+    float32 e02 = 3;
+    float32 e10 = 4;
+    float32 e11 = 5;
+    float32 e12 = 6;
+    float32 e20 = 7;
+    float32 e21 = 8;
+    float32 e22 = 9;
+}
+
+message Vec3 {
+    float32 e0 = 1;
+    float32 e1 = 2;
+    float32 e2 = 3;
+}
+
+message Scene {
+  repeated Geometry geometry = 1;
+  repeated Material material = 2;
+  Material infinity_material = 3;
+  repeated Element element = 4;
+  repeated Camera camera = 5;
+}
+
+enum MaterialCoordsMode {
+    MATERIAL_COORDS_MODE_3D = 0;
+    MATERIAL_COORDS_MODE_2D = 1;
+}
+
+message Geometry {
+    oneof {
+        Sphere sphere = 1;
+        Box box = 2;
+    }
+}
+
+message Sphere {
+
+}
+
+message Box {
+    float32 x_lo = 1;
+    float32 x_hi = 2;
+    float32 y_lo = 3;
+    float32 y_hi = 4;
+    float32 z_lo = 5;
+    float32 z_hi = 6;
+}
+
+message Material {
+    oneof {
+        Emitter emitter = 1;
+        GaussianRoughNonConductive gaussian_rough_non_conductive = 2;
+        NonConductiveSmooth non_conductive_smooth = 3;
+    }
+}
+
+message Emitter {
+}
+
+message GaussianRoughNonConductive {
+}
+
+message NonConductiveSmooth {
+}
+
+message Transform {
+    Mat33 linear = 1;
+    Vec3 offset = 2;
+}
+
+message Element {
+  int32 geometry = 1;
+  int32 material = 2;
+  Transform model_to_world = 3;
+}
+
+message Camera {
+    oneof {
+        PinholeCamera pinhole_camera = 1;
+    }
+}
+
+message PinholeCamera {
+    Vec3 eye = 1;
+    Vec3 left = 2;
+    Vec3 up = 3;
+}
+
