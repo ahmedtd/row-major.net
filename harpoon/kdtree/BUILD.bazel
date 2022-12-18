@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["kdtree.go"],
+    importpath = "row-major/harpoon/kdtree",
+    visibility = ["//visibility:public"],
+    deps = ["//harpoon/aabox:go_default_library"],
+)

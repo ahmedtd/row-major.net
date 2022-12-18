@@ -1,26 +1,22 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["main.go"],
-    importpath = "row-major/harpoon/cmd/renderer",
-    visibility = ["//visibility:private"],
+    srcs = ["scene.go"],
+    importpath = "row-major/harpoon/scene",
+    visibility = ["//visibility:public"],
     deps = [
+        "//harpoon/aabox:go_default_library",
         "//harpoon/affinetransform:go_default_library",
         "//harpoon/camera:go_default_library",
-        "//harpoon/densesignal:go_default_library",
+        "//harpoon/contact:go_default_library",
         "//harpoon/geometry:go_default_library",
+        "//harpoon/kdtree:go_default_library",
         "//harpoon/material:go_default_library",
         "//harpoon/ray:go_default_library",
-        "//harpoon/scene:go_default_library",
         "//harpoon/spectralimage:go_default_library",
         "//harpoon/vmath/mat33:go_default_library",
+        "//harpoon/vmath/vec2:go_default_library",
         "//harpoon/vmath/vec3:go_default_library",
     ],
-)
-
-go_binary(
-    name = "renderer",
-    embed = [":go_default_library"],
-    visibility = ["//visibility:public"],
 )

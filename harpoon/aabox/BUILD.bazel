@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["aabox.go"],
+    importpath = "row-major/harpoon/aabox",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//harpoon/affinetransform:go_default_library",
+        "//harpoon/ray:go_default_library",
+        "//harpoon/vmath/vec3:go_default_library",
+    ],
+)

@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["spectralimage.go"],
+    importpath = "row-major/harpoon/spectralimage",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//harpoon/spectralimage/headerproto:go_default_library",
+        "@org_golang_google_protobuf//proto:go_default_library",
+    ],
+)
