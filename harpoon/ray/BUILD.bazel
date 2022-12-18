@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["ray.go"],
+    importpath = "row-major/harpoon/ray",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//harpoon/affinetransform:go_default_library",
+        "//harpoon/vmath/mat33:go_default_library",
+        "//harpoon/vmath/vec3:go_default_library",
+    ],
+)

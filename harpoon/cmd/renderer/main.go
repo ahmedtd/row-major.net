@@ -16,6 +16,7 @@ import (
 
 	"row-major/harpoon/affinetransform"
 	"row-major/harpoon/densesignal"
+	"row-major/harpoon/ray"
 	"row-major/harpoon/spectralimage/headerproto"
 	"row-major/harpoon/vmath/mat33"
 	"row-major/harpoon/vmath/vec2"
@@ -24,81 +25,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Span struct {
-	Lo, Hi float64
-}
-
-func NaNSpan() Span {
-	return Span{math.NaN(), math.NaN()}
-}
-
-func SpanOverlaps(a, b Span) bool {
-	return !(a.Lo > b.Hi || a.Hi <= b.Lo)
-}
-
-func MinContainingSpan(a, b Span) Span {
-	min := a.Lo
-	if b.Lo < a.Lo {
-		min = b.Lo
-	}
-
-	max := a.Hi
-	if b.Hi > a.Hi {
-		max = b.Hi
-	}
-
-	return Span{min, max}
-}
-
-func (s Span) IsFinite() bool {
-	return !math.IsInf(s.Lo, 0) && !math.IsInf(s.Hi, 0)
-}
-
-func (s Span) IsNaN() bool {
-	return math.IsNaN(s.Lo) || math.IsNaN(s.Hi)
-}
-
-type Ray struct {
-	Point     vec3.T
-	Slope     vec3.T
-	PatchArea float64
-}
-
-func (r *Ray) Eval(t float64) vec3.T {
-	return vec3.T{
-		r.Point[0] + t*r.Slope[0],
-		r.Point[1] + t*r.Slope[1],
-		r.Point[2] + t*r.Slope[2],
-	}
-}
-
-func (b *Ray) Transform(a affinetransform.AffineTransform) Ray {
-	return Ray{
-		Point:     vec3.AddVV(mat33.MulMV(a.Linear, b.Point), a.Offset),
-		Slope:     vec3.Normalize(mat33.MulMV(a.Linear, b.Slope)),
-		PatchArea: b.PatchArea,
-	}
-}
-
-type RaySegment struct {
-	TheRay     Ray
-	TheSegment Span
-}
-
-func (b *RaySegment) Transform(a affinetransform.AffineTransform) RaySegment {
-	result := RaySegment{}
-	result.TheRay.PatchArea = b.TheRay.PatchArea
-	result.TheRay.Point = vec3.AddVV(mat33.MulMV(a.Linear, b.TheRay.Point), a.Offset)
-	result.TheRay.Slope = mat33.MulMV(a.Linear, b.TheRay.Slope)
-	scaleFactor := result.TheRay.Slope.Norm()
-	result.TheRay.Slope = vec3.DivVS(result.TheRay.Slope, scaleFactor)
-	result.TheSegment.Lo = scaleFactor * b.TheSegment.Lo
-	result.TheSegment.Hi = scaleFactor * b.TheSegment.Hi
-	return result
-}
-
 type Camera interface {
-	ImageToRay(curRow, imgRows, curCol, imgCols int, rng *rand.Rand) Ray
+	ImageToRay(curRow, imgRows, curCol, imgCols int, rng *rand.Rand) ray.Ray
 }
 
 type PinholeCamera struct {
@@ -107,7 +35,7 @@ type PinholeCamera struct {
 	Aperture        vec3.T
 }
 
-func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *rand.Rand) Ray {
+func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *rand.Rand) ray.Ray {
 	imageCoords := vec3.T{
 		1.0,
 		1.0 - 2.0*(float64(curCol)-rng.Float64())/float64(imgCols),
@@ -120,7 +48,7 @@ func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *ra
 		imageCoords[2] * c.Aperture[2],
 	}
 
-	return Ray{
+	return ray.Ray{
 		Point: c.Center,
 		Slope: vec3.Normalize(mat33.MulMV(c.ApertureToWorld, apertureCoords)),
 	}
@@ -180,22 +108,22 @@ func (c *PinholeCamera) setUpDirect(newUp vec3.T) {
 }
 
 type AABox struct {
-	X, Y, Z Span
+	X, Y, Z ray.Span
 }
 
 func AccumZeroAABox() AABox {
 	return AABox{
-		X: Span{math.Inf(1), math.Inf(-1)},
-		Y: Span{math.Inf(1), math.Inf(-1)},
-		Z: Span{math.Inf(1), math.Inf(-1)},
+		X: ray.Span{math.Inf(1), math.Inf(-1)},
+		Y: ray.Span{math.Inf(1), math.Inf(-1)},
+		Z: ray.Span{math.Inf(1), math.Inf(-1)},
 	}
 }
 
 func MinContainingAABox(a, b AABox) AABox {
 	return AABox{
-		X: MinContainingSpan(a.X, b.X),
-		Y: MinContainingSpan(a.Y, b.Y),
-		Z: MinContainingSpan(a.Z, b.Z),
+		X: ray.MinContainingSpan(a.X, b.X),
+		Y: ray.MinContainingSpan(a.Y, b.Y),
+		Z: ray.MinContainingSpan(a.Z, b.Z),
 	}
 }
 
@@ -251,18 +179,18 @@ func (a AABox) Transform(t affinetransform.AffineTransform) AABox {
 	return result
 }
 
-func RayTestAABox(r RaySegment, b AABox) Span {
-	cover := Span{math.Inf(-1), math.Inf(1)}
+func RayTestAABox(r ray.RaySegment, b AABox) ray.Span {
+	cover := ray.Span{math.Inf(-1), math.Inf(1)}
 
-	coverX := Span{
+	coverX := ray.Span{
 		(b.X.Lo - r.TheRay.Point[0]) / r.TheRay.Slope[0],
 		(b.X.Hi - r.TheRay.Point[0]) / r.TheRay.Slope[0],
 	}
 	if coverX.Hi < coverX.Lo {
 		coverX.Lo, coverX.Hi = coverX.Hi, coverX.Lo
 	}
-	if !SpanOverlaps(cover, coverX) {
-		return NaNSpan()
+	if !ray.SpanOverlaps(cover, coverX) {
+		return ray.NaNSpan()
 	}
 	if coverX.Lo > cover.Lo {
 		cover.Lo = coverX.Lo
@@ -271,15 +199,15 @@ func RayTestAABox(r RaySegment, b AABox) Span {
 		cover.Hi = coverX.Hi
 	}
 
-	coverY := Span{
+	coverY := ray.Span{
 		(b.Y.Lo - r.TheRay.Point[1]) / r.TheRay.Slope[1],
 		(b.Y.Hi - r.TheRay.Point[1]) / r.TheRay.Slope[1],
 	}
 	if coverY.Hi < coverY.Lo {
 		coverY.Lo, coverY.Hi = coverY.Hi, coverY.Lo
 	}
-	if !SpanOverlaps(cover, coverY) {
-		return NaNSpan()
+	if !ray.SpanOverlaps(cover, coverY) {
+		return ray.NaNSpan()
 	}
 	if coverY.Lo > cover.Lo {
 		cover.Lo = coverY.Lo
@@ -288,15 +216,15 @@ func RayTestAABox(r RaySegment, b AABox) Span {
 		cover.Hi = coverY.Hi
 	}
 
-	coverZ := Span{
+	coverZ := ray.Span{
 		(b.Z.Lo - r.TheRay.Point[2]) / r.TheRay.Slope[2],
 		(b.Z.Hi - r.TheRay.Point[2]) / r.TheRay.Slope[2],
 	}
 	if coverZ.Hi < coverZ.Lo {
 		coverZ.Lo, coverZ.Hi = coverZ.Hi, coverZ.Lo
 	}
-	if !SpanOverlaps(cover, coverZ) {
-		return NaNSpan()
+	if !ray.SpanOverlaps(cover, coverZ) {
+		return ray.NaNSpan()
 	}
 	if coverZ.Lo > cover.Lo {
 		cover.Lo = coverZ.Lo
@@ -310,7 +238,7 @@ func RayTestAABox(r RaySegment, b AABox) Span {
 
 type Contact struct {
 	T    float64
-	R    Ray
+	R    ray.Ray
 	P    vec3.T
 	N    vec3.T
 	Mtl2 vec2.T
@@ -348,8 +276,8 @@ func (c Contact) Transform(t affinetransform.AffineTransform, nm mat33.T) Contac
 type Geometry interface {
 	GetAABox() AABox
 	Crush(time float64)
-	RayInto(query RaySegment) Contact
-	RayExit(query RaySegment) Contact
+	RayInto(query ray.RaySegment) Contact
+	RayExit(query ray.RaySegment) Contact
 }
 
 type MaterialCoordsMode int
@@ -366,9 +294,9 @@ type Sphere struct {
 
 func (s *Sphere) GetAABox() AABox {
 	return AABox{
-		X: Span{Lo: -1.0, Hi: 1.0},
-		Y: Span{Lo: -1.0, Hi: 1.0},
-		Z: Span{Lo: -1.0, Hi: 1.0},
+		X: ray.Span{Lo: -1.0, Hi: 1.0},
+		Y: ray.Span{Lo: -1.0, Hi: 1.0},
+		Z: ray.Span{Lo: -1.0, Hi: 1.0},
 	}
 }
 
@@ -376,7 +304,7 @@ func (s *Sphere) Crush(time float64) {
 	// Nothing to do.
 }
 
-func (s *Sphere) RayInto(query RaySegment) Contact {
+func (s *Sphere) RayInto(query ray.RaySegment) Contact {
 	b := vec3.IProd(query.TheRay.Slope, query.TheRay.Point)
 	c := vec3.IProd(query.TheRay.Point, query.TheRay.Point) - 1.0
 
@@ -403,7 +331,7 @@ func (s *Sphere) RayInto(query RaySegment) Contact {
 	return result
 }
 
-func (s *Sphere) RayExit(query RaySegment) Contact {
+func (s *Sphere) RayExit(query ray.RaySegment) Contact {
 	b := vec3.IProd(query.TheRay.Slope, query.TheRay.Point)
 	c := vec3.IProd(query.TheRay.Point, query.TheRay.Point) - 1.0
 
@@ -425,26 +353,26 @@ func (s *Sphere) RayExit(query RaySegment) Contact {
 }
 
 type Box struct {
-	Spans [3]Span
+	Spans [3]ray.Span
 }
 
 func (b *Box) GetAABox() AABox {
 	return AABox{
-		X: Span{b.Spans[0].Lo, b.Spans[0].Hi},
-		Y: Span{b.Spans[1].Lo, b.Spans[1].Hi},
-		Z: Span{b.Spans[2].Lo, b.Spans[2].Hi},
+		X: ray.Span{b.Spans[0].Lo, b.Spans[0].Hi},
+		Y: ray.Span{b.Spans[1].Lo, b.Spans[1].Hi},
+		Z: ray.Span{b.Spans[2].Lo, b.Spans[2].Hi},
 	}
 }
 
 func (b *Box) Crush(time float64) {}
 
-func (b *Box) RayInto(query RaySegment) Contact {
-	cover := Span{math.Inf(-1), math.Inf(1)}
+func (b *Box) RayInto(query ray.RaySegment) Contact {
+	cover := ray.Span{math.Inf(-1), math.Inf(1)}
 
 	hitAxis := [3]float64{}
 
 	for i := 0; i < 3; i++ {
-		cur := Span{
+		cur := ray.Span{
 			(b.Spans[i].Lo - query.TheRay.Point[i]) / query.TheRay.Slope[i],
 			(b.Spans[i].Hi - query.TheRay.Point[i]) / query.TheRay.Slope[i],
 		}
@@ -455,7 +383,7 @@ func (b *Box) RayInto(query RaySegment) Contact {
 			normalComponent = 1.0
 		}
 
-		if !SpanOverlaps(cover, cur) {
+		if !ray.SpanOverlaps(cover, cur) {
 			return ContactNaN()
 		}
 
@@ -470,7 +398,7 @@ func (b *Box) RayInto(query RaySegment) Contact {
 		}
 	}
 
-	if !SpanOverlaps(cover, query.TheSegment) {
+	if !ray.SpanOverlaps(cover, query.TheSegment) {
 		return ContactNaN()
 	}
 
@@ -485,8 +413,8 @@ func (b *Box) RayInto(query RaySegment) Contact {
 	return val
 }
 
-func (b *Box) RayExit(query RaySegment) Contact {
-	cover := Span{math.Inf(-1), math.Inf(1)}
+func (b *Box) RayExit(query ray.RaySegment) Contact {
+	cover := ray.Span{math.Inf(-1), math.Inf(1)}
 
 	// I'm beginning to regret choosing the X,Y,Z convention for vectors.  Lots
 	// of things are easier if the axes can be indexed.
@@ -496,7 +424,7 @@ func (b *Box) RayExit(query RaySegment) Contact {
 	hitAxis := [3]float64{}
 
 	for i := 0; i < 3; i++ {
-		cur := Span{
+		cur := ray.Span{
 			(b.Spans[i].Lo - point[i]) / slope[i],
 			(b.Spans[i].Hi - point[i]) / slope[i],
 		}
@@ -507,7 +435,7 @@ func (b *Box) RayExit(query RaySegment) Contact {
 			normalComponent = -1.0
 		}
 
-		if !SpanOverlaps(cover, cur) {
+		if !ray.SpanOverlaps(cover, cur) {
 			return ContactNaN()
 		}
 
@@ -522,7 +450,7 @@ func (b *Box) RayExit(query RaySegment) Contact {
 		}
 	}
 
-	if !SpanOverlaps(cover, query.TheSegment) {
+	if !ray.SpanOverlaps(cover, query.TheSegment) {
 		return ContactNaN()
 	}
 
@@ -807,7 +735,7 @@ func PerlinVolume(period float64) MaterialMap {
 type ShadeInfo struct {
 	PropagationK float32
 	EmittedPower float32
-	IncidentRay  Ray
+	IncidentRay  ray.Ray
 }
 
 type Material interface {
@@ -870,7 +798,7 @@ func (l *MonteCarloLambert) Shade(contact Contact, freq float32, rng *rand.Rand)
 	propagation := float32(vec3.IProd(contact.N, dir) * reflectance)
 
 	return ShadeInfo{
-		IncidentRay: Ray{
+		IncidentRay: ray.Ray{
 			Point: contact.P,
 			Slope: dir,
 		},
@@ -920,7 +848,7 @@ func (n *NonConductiveSmooth) Shade(contact Contact, freq float32, rng *rand.Ran
 		return ShadeInfo{
 			EmittedPower: 0.0,
 			PropagationK: 1.0,
-			IncidentRay: Ray{
+			IncidentRay: ray.Ray{
 				Point: contact.P,
 				Slope: vec3.Reflect(contact.R.Slope, contact.N),
 			},
@@ -947,7 +875,7 @@ func (n *NonConductiveSmooth) Shade(contact Contact, freq float32, rng *rand.Ran
 		return ShadeInfo{
 			EmittedPower: 0.0,
 			PropagationK: 1.0,
-			IncidentRay: Ray{
+			IncidentRay: ray.Ray{
 				Point: contact.P,
 				Slope: vec3.Reflect(contact.R.Slope, contact.N),
 			},
@@ -957,7 +885,7 @@ func (n *NonConductiveSmooth) Shade(contact Contact, freq float32, rng *rand.Ran
 		return ShadeInfo{
 			EmittedPower: 0.0,
 			PropagationK: 1.0,
-			IncidentRay: Ray{
+			IncidentRay: ray.Ray{
 				Point: contact.P,
 				Slope: vec3.AddVV(vec3.MulVS(contact.N, bCos-nR*aCos), vec3.MulVS(contact.R.Slope, nR)),
 			},
@@ -981,7 +909,7 @@ func (p *PerfectlyConductiveSmooth) Shade(contact Contact, freq float32, rng *ra
 	return ShadeInfo{
 		EmittedPower: 0.0,
 		PropagationK: float32(propagation),
-		IncidentRay: Ray{
+		IncidentRay: ray.Ray{
 			Point: contact.P,
 			Slope: vec3.Reflect(contact.R.Slope, contact.N),
 		},
@@ -1006,7 +934,7 @@ func (g *GaussianRoughNonConductive) Shade(contact Contact, freq float32, rng *r
 	return ShadeInfo{
 		EmittedPower: 0.0,
 		PropagationK: 0.8,
-		IncidentRay: Ray{
+		IncidentRay: ray.Ray{
 			Point: contact.P,
 			Slope: vec3.Reflect(contact.R.Slope, facetNormal),
 		},
@@ -1325,7 +1253,7 @@ func (s *Scene) Crush(time float64) {
 	s.QueryAccelerator.RefineViaSurfaceAreaHeuristic(1.0, 0.9)
 }
 
-func (s *Scene) SceneRayIntersect(worldQuery RaySegment) (Contact, int) {
+func (s *Scene) SceneRayIntersect(worldQuery ray.RaySegment) (Contact, int) {
 	minContact := Contact{}
 	minElementIndex := -1
 
@@ -1357,10 +1285,10 @@ func (s *Scene) SceneRayIntersect(worldQuery RaySegment) (Contact, int) {
 	return minContact, minElementIndex
 }
 
-func (s *Scene) ShadeRay(reflectedRay Ray, curWavelength float32, rng *rand.Rand) ShadeInfo {
-	reflectedQuery := RaySegment{
+func (s *Scene) ShadeRay(reflectedRay ray.Ray, curWavelength float32, rng *rand.Rand) ShadeInfo {
+	reflectedQuery := ray.RaySegment{
 		TheRay:     reflectedRay,
-		TheSegment: Span{0.0001, math.Inf(1)},
+		TheSegment: ray.Span{0.0001, math.Inf(1)},
 	}
 
 	glbContact, hitIndex := s.SceneRayIntersect(reflectedQuery)
@@ -1380,7 +1308,7 @@ func (s *Scene) ShadeRay(reflectedRay Ray, curWavelength float32, rng *rand.Rand
 	return s.CrushedElements[hitIndex].TheMaterial.Shade(glbContact, curWavelength, rng)
 }
 
-func (s *Scene) SampleRay(initialQuery Ray, curWavelength float32, rng *rand.Rand, depthLim int) float32 {
+func (s *Scene) SampleRay(initialQuery ray.Ray, curWavelength float32, rng *rand.Rand, depthLim int) float32 {
 	var accumPower float32
 	var curK float32 = 1.0
 	curRay := initialQuery
@@ -1836,12 +1764,12 @@ func do() error {
 	}
 
 	sphere := &Sphere{}
-	centerBox := &Box{[3]Span{Span{0, 0.5}, Span{0, 0.5}, Span{0, 0.5}}}
-	ground := &Box{[3]Span{Span{0, 10.1}, Span{0, 10.1}, Span{-0.5, 0}}}
-	roof := &Box{[3]Span{Span{0, 10.1}, Span{0, 10.1}, Span{10, 10.1}}}
-	wallN := &Box{[3]Span{Span{0, 10}, Span{10, 10.1}, Span{0, 10}}}
-	wallW := &Box{[3]Span{Span{-0.1, 0}, Span{0, 10}, Span{0, 10}}}
-	wallS := &Box{[3]Span{Span{0, 10}, Span{-0.1, 0}, Span{0, 10}}}
+	centerBox := &Box{[3]ray.Span{ray.Span{0, 0.5}, ray.Span{0, 0.5}, ray.Span{0, 0.5}}}
+	ground := &Box{[3]ray.Span{ray.Span{0, 10.1}, ray.Span{0, 10.1}, ray.Span{-0.5, 0}}}
+	roof := &Box{[3]ray.Span{ray.Span{0, 10.1}, ray.Span{0, 10.1}, ray.Span{10, 10.1}}}
+	wallN := &Box{[3]ray.Span{ray.Span{0, 10}, ray.Span{10, 10.1}, ray.Span{0, 10}}}
+	wallW := &Box{[3]ray.Span{ray.Span{-0.1, 0}, ray.Span{0, 10}, ray.Span{0, 10}}}
+	wallS := &Box{[3]ray.Span{ray.Span{0, 10}, ray.Span{-0.1, 0}, ray.Span{0, 10}}}
 
 	scene.InfinityMaterial = cieD65Emitter
 	scene.Elements = []*SceneElement{

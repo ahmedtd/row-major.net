@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//harpoon/affinetransform:go_default_library",
         "//harpoon/densesignal:go_default_library",
+        "//harpoon/ray:go_default_library",
         "//harpoon/spectralimage/headerproto:go_default_library",
         "//harpoon/vmath/mat33:go_default_library",
         "//harpoon/vmath/vec2:go_default_library",
