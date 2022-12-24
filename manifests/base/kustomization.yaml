@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
 - infra-gateway.yaml
+- mastodon-tenant.yaml
 - medtracker.yaml
 - row-major-web.yaml
 - rumor-mill.yaml

@@ -1,0 +1,197 @@
+# Tenant ID is tuskten-{word}-{word}-{word}.  The words are taken from the SGB
+# list of 5-letter words.
+
+# To use this, create some secrets:
+#
+# kubectl create secret generic -n tuskten-barge-ester-reeds postgres-password --from-literal=postgres-password=$(pwgen 32 1)
+#
+# kubectl create secret generic -n tuskten-barge-ester-reeds persistent-redis-aclfile
+
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: tuskten-barge-ester-reeds
+  labels:
+    row-major.net/gateway-application: tuskten-barge-ester-reeds
+
+---
+
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  namespace: tuskten-barge-ester-reeds
+  name: default
+
+---
+
+# A headless service to provide a network identifier for the pods in the
+# postgres statefulset.
+kind: Service
+apiVersion: v1
+metadata:
+  namespace: tuskten-barge-ester-reeds
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  ports:
+  - name: postgres-port
+    port: 5432
+  clusterIP: None
+  selector:
+    app: postgres
+
+---
+
+# The primary postgres database.  To get started, I'm going to try managing the
+# DB in K8s, rather than using Cloud SQL.  I'd prefer to have IAM
+# authentication, but Cloud SQL is a bit pricey.
+#
+# In the meantime, use password authentication stored in a K8s secret.  In the
+# future, some possible upgrade paths are:
+#
+# 1) Store the password in GCP Secret Manager, and use an init container or init
+#    script to pull it down into the image.
+#
+# 2) Modify the postgres image so that we can use certificate authentication.
+
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  namespace: tuskten-barge-ester-reeds
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  serviceName: postgres
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14-alpine
+        ports:
+        - name: postgres-port
+          containerPort: 5432
+        env:
+        - name: POSTGRES_PASSWORD_FILE
+          value: /var/run/postgres-configuration/postgres-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-configuration
+          mountPath: /var/run/postgres-configuration
+      volumes:
+      - name: postgres-configuration
+        projected:
+          sources:
+          - secret:
+              name: postgres-password
+              items:
+                - key: postgres-password
+                  path: postgres-password
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard # TODO: Use a custom storage class that allows expansion and backups.
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+
+# The persistent redis statefulset headless service.
+kind: Service
+apiVersion: v1
+metadata:
+  namespace: tuskten-barge-ester-reeds
+  name: persistent-redis
+  labels:
+    app: persistent-redis
+spec:
+  ports:
+  - name: redis-port
+    port: 6379
+  clusterIP: None
+  selector:
+    app: persistent-redis
+
+---
+
+# The persistent redis statefulset.
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  namespace: tuskten-barge-ester-reeds
+  name: persistent-redis
+  labels:
+    app: persistent-redis
+spec:
+  selector:
+    matchLabels:
+      app: persistent-redis
+  serviceName: redis
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: persistent-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - name: redis-port
+          containerPort: 6379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: redis-configuration
+          mountPath: /redis-configuration
+      volumes:
+      - name: redis-configuration
+        projected:
+          sources:
+          - secret:
+              name: persistent-redis-aclfile
+              items:
+                - key: users.acl
+                  path: users.acl
+          - configMap:
+              name: persistent-redis-configuration
+              items:
+                - key: redis.conf
+                  path: redis.conf
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard # TODO: Use a custom storage class that allows expansion and backups.
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  namespace: tuskten-barge-ester-reeds
+  name: persistent-redis-configuration
+  labels:
+    app: persistent-redis
+data:
+  redis.conf: |
+    dir /data
+    aclfile /redis-configuration/users.acl
