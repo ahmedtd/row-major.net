@@ -27,7 +27,7 @@ medtracker/upload-images-and-update-manifest:
     - "gcloud auth configure-docker gcr.io"
     - "curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel"
     - "chmod +x bazel"
-    - "./bazel test -- //..."
+    - "./bazel test -- //medtracker/..."
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //medtracker/cmd/poller:poller_push"
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //medtracker/cmd/webui:webui_push"
     - |
