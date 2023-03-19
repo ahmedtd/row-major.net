@@ -38,25 +38,25 @@ func (c *PinholeCamera) ImageToRay(curRow, imgRows, curCol, imgCols int, rng *ra
 
 func (c *PinholeCamera) Eye() vec3.T {
 	return vec3.T{
-		c.ApertureToWorld.Elts[0],
-		c.ApertureToWorld.Elts[3],
-		c.ApertureToWorld.Elts[6],
+		c.ApertureToWorld[0],
+		c.ApertureToWorld[3],
+		c.ApertureToWorld[6],
 	}
 }
 
 func (c *PinholeCamera) Left() vec3.T {
 	return vec3.T{
-		c.ApertureToWorld.Elts[1],
-		c.ApertureToWorld.Elts[4],
-		c.ApertureToWorld.Elts[7],
+		c.ApertureToWorld[1],
+		c.ApertureToWorld[4],
+		c.ApertureToWorld[7],
 	}
 }
 
 func (c *PinholeCamera) Up() vec3.T {
 	return vec3.T{
-		c.ApertureToWorld.Elts[2],
-		c.ApertureToWorld.Elts[5],
-		c.ApertureToWorld.Elts[8],
+		c.ApertureToWorld[2],
+		c.ApertureToWorld[5],
+		c.ApertureToWorld[8],
 	}
 }
 
@@ -72,19 +72,19 @@ func (c *PinholeCamera) SetUp(newUp vec3.T) {
 }
 
 func (c *PinholeCamera) setEyeDirect(newEye vec3.T) {
-	c.ApertureToWorld.Elts[0] = newEye[0]
-	c.ApertureToWorld.Elts[3] = newEye[1]
-	c.ApertureToWorld.Elts[6] = newEye[2]
+	c.ApertureToWorld[0] = newEye[0]
+	c.ApertureToWorld[3] = newEye[1]
+	c.ApertureToWorld[6] = newEye[2]
 }
 
 func (c *PinholeCamera) setLeftDirect(newLeft vec3.T) {
-	c.ApertureToWorld.Elts[1] = newLeft[0]
-	c.ApertureToWorld.Elts[4] = newLeft[1]
-	c.ApertureToWorld.Elts[7] = newLeft[2]
+	c.ApertureToWorld[1] = newLeft[0]
+	c.ApertureToWorld[4] = newLeft[1]
+	c.ApertureToWorld[7] = newLeft[2]
 }
 
 func (c *PinholeCamera) setUpDirect(newUp vec3.T) {
-	c.ApertureToWorld.Elts[2] = newUp[0]
-	c.ApertureToWorld.Elts[5] = newUp[1]
-	c.ApertureToWorld.Elts[8] = newUp[2]
+	c.ApertureToWorld[2] = newUp[0]
+	c.ApertureToWorld[5] = newUp[1]
+	c.ApertureToWorld[8] = newUp[2]
 }

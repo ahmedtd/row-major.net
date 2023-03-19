@@ -5,6 +5,7 @@ go_library(
     srcs = ["main.go"],
     importpath = "row-major/harpoon/cmd/build-cornell-box",
     visibility = ["//visibility:public"],
+    deps = ["//harpoon/scenepack/headerproto:go_default_library"],
 )
 
 go_binary(

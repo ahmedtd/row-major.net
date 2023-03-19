@@ -13,18 +13,14 @@ type AffineTransform struct {
 
 func Identity() AffineTransform {
 	return AffineTransform{
-		Linear: mat33.T{
-			[9]float64{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0},
-		},
+		Linear: mat33.T{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0},
 		Offset: vec3.T{0.0, 0.0, 0.0},
 	}
 }
 
 func Scale(s float64) AffineTransform {
 	return AffineTransform{
-		Linear: mat33.T{
-			[9]float64{s, 0.0, 0.0, 0.0, s, 0.0, 0.0, 0.0, s},
-		},
+		Linear: mat33.T{s, 0.0, 0.0, 0.0, s, 0.0, 0.0, 0.0, s},
 		Offset: vec3.T{0.0, 0.0, 0.0},
 	}
 }
@@ -43,22 +39,22 @@ func Compose(a, b AffineTransform) AffineTransform {
 }
 
 func (t AffineTransform) Invert() AffineTransform {
-	mat := mat44.T{[16]float64{
-		t.Linear.Elts[0], t.Linear.Elts[1], t.Linear.Elts[2], t.Offset[0],
-		t.Linear.Elts[3], t.Linear.Elts[4], t.Linear.Elts[5], t.Offset[1],
-		t.Linear.Elts[6], t.Linear.Elts[7], t.Linear.Elts[8], t.Offset[2],
+	mat := mat44.T{
+		t.Linear[0], t.Linear[1], t.Linear[2], t.Offset[0],
+		t.Linear[3], t.Linear[4], t.Linear[5], t.Offset[1],
+		t.Linear[6], t.Linear[7], t.Linear[8], t.Offset[2],
 		0, 0, 0, 1,
-	}}
+	}
 
 	inv := mat44.Mat44Inverse(mat)
 
 	return AffineTransform{
-		Linear: mat33.T{[9]float64{
-			inv.Elts[0], inv.Elts[1], inv.Elts[2],
-			inv.Elts[4], inv.Elts[5], inv.Elts[6],
-			inv.Elts[8], inv.Elts[9], inv.Elts[10],
-		}},
-		Offset: vec3.T{inv.Elts[3], inv.Elts[7], inv.Elts[11]},
+		Linear: mat33.T{
+			inv[0], inv[1], inv[2],
+			inv[4], inv[5], inv[6],
+			inv[8], inv[9], inv[10],
+		},
+		Offset: vec3.T{inv[3], inv[7], inv[11]},
 	}
 }
 

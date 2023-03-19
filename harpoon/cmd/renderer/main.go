@@ -118,72 +118,72 @@ func do() error {
 
 	theScene := &scene.Scene{}
 
-	cieD65Emitter := &material.Emitter{
-		material.ConstantSpectrum(densesignal.CIED65Emission(300)),
-	}
-	cieAEmitter := &material.Emitter{
-		material.ConstantSpectrum(densesignal.CIEAEmission(100)),
-	}
-	matte := &material.GaussianRoughNonConductive{
+	cieD65Emitter := theScene.AddMaterial(&material.Emitter{
+		Emissivity: material.ConstantSpectrum(densesignal.CIED65Emission(300)),
+	})
+	cieAEmitter := theScene.AddMaterial(&material.Emitter{
+		Emissivity: material.ConstantSpectrum(densesignal.CIEAEmission(100)),
+	})
+	matte := theScene.AddMaterial(&material.GaussianRoughNonConductive{
 		Variance: material.ConstantScalar(0.5),
-	}
-	matte2 := &material.GaussianRoughNonConductive{
+	})
+	matte2 := theScene.AddMaterial(&material.GaussianRoughNonConductive{
 		Variance: material.ConstantScalar(0.05),
-	}
-	glass := &material.NonConductiveSmooth{
+	})
+	glass := theScene.AddMaterial(&material.NonConductiveSmooth{
 		InteriorIndexOfRefraction: material.ConstantSpectrum(densesignal.VisibleSpectrumRamp(1.7, 1.5)),
 		ExteriorIndexOfRefraction: material.ConstantScalar(1.0),
-	}
+	})
 
-	sphere := &geometry.Sphere{}
-	centerBox := &geometry.Box{[3]ray.Span{ray.Span{0, 0.5}, ray.Span{0, 0.5}, ray.Span{0, 0.5}}}
-	ground := &geometry.Box{[3]ray.Span{ray.Span{0, 10.1}, ray.Span{0, 10.1}, ray.Span{-0.5, 0}}}
-	roof := &geometry.Box{[3]ray.Span{ray.Span{0, 10.1}, ray.Span{0, 10.1}, ray.Span{10, 10.1}}}
-	wallN := &geometry.Box{[3]ray.Span{ray.Span{0, 10}, ray.Span{10, 10.1}, ray.Span{0, 10}}}
-	wallW := &geometry.Box{[3]ray.Span{ray.Span{-0.1, 0}, ray.Span{0, 10}, ray.Span{0, 10}}}
-	wallS := &geometry.Box{[3]ray.Span{ray.Span{0, 10}, ray.Span{-0.1, 0}, ray.Span{0, 10}}}
+	sphere := theScene.AddGeometry(&geometry.Sphere{})
+	centerBox := theScene.AddGeometry(&geometry.Box{[3]ray.Span{ray.Span{0, 0.5}, ray.Span{0, 0.5}, ray.Span{0, 0.5}}})
+	ground := theScene.AddGeometry(&geometry.Box{[3]ray.Span{ray.Span{0, 10.1}, ray.Span{0, 10.1}, ray.Span{-0.5, 0}}})
+	roof := theScene.AddGeometry(&geometry.Box{[3]ray.Span{ray.Span{0, 10.1}, ray.Span{0, 10.1}, ray.Span{10, 10.1}}})
+	wallN := theScene.AddGeometry(&geometry.Box{[3]ray.Span{ray.Span{0, 10}, ray.Span{10, 10.1}, ray.Span{0, 10}}})
+	wallW := theScene.AddGeometry(&geometry.Box{[3]ray.Span{ray.Span{-0.1, 0}, ray.Span{0, 10}, ray.Span{0, 10}}})
+	wallS := theScene.AddGeometry(&geometry.Box{[3]ray.Span{ray.Span{0, 10}, ray.Span{-0.1, 0}, ray.Span{0, 10}}})
 
-	theScene.InfinityMaterial = cieD65Emitter
+	theScene.InfinityMaterialIndex = cieD65Emitter
 	theScene.Elements = []*scene.SceneElement{
 		{
-			TheGeometry:  sphere,
-			TheMaterial:  cieAEmitter,
-			ModelToWorld: affinetransform.Compose(affinetransform.Translate(vec3.T{5, 4, 0}), affinetransform.Scale(1)),
+			GeometryIndex: sphere,
+			MaterialIndex: cieAEmitter,
+			ModelToWorld:  affinetransform.Compose(affinetransform.Translate(vec3.T{5, 4, 0}), affinetransform.Scale(1)),
 		},
 		{
-			TheGeometry:  sphere,
-			TheMaterial:  matte,
-			ModelToWorld: affinetransform.Compose(affinetransform.Translate(vec3.T{5, 6, 0}), affinetransform.Scale(1)),
+			GeometryIndex: sphere,
+			MaterialIndex: matte,
+			ModelToWorld:  affinetransform.Compose(affinetransform.Translate(vec3.T{5, 6, 0}), affinetransform.Scale(1)),
 		},
 		{
-			TheGeometry:  ground,
-			TheMaterial:  matte2,
-			ModelToWorld: affinetransform.Identity(),
+			GeometryIndex: ground,
+			MaterialIndex: matte2,
+			ModelToWorld:  affinetransform.Identity(),
 		},
 		{
-			TheGeometry:  roof,
-			TheMaterial:  matte2,
-			ModelToWorld: affinetransform.Identity(),
+			GeometryIndex: roof,
+			MaterialIndex: matte2,
+			ModelToWorld:  affinetransform.Identity(),
 		},
 		{
-			TheGeometry:  wallN,
-			TheMaterial:  matte2,
-			ModelToWorld: affinetransform.Identity(),
+			GeometryIndex: wallN,
+			MaterialIndex: matte2,
+			ModelToWorld:  affinetransform.Identity(),
 		},
 		{
-			TheGeometry:  wallW,
-			TheMaterial:  matte2,
-			ModelToWorld: affinetransform.Identity(),
+			GeometryIndex: wallW,
+			MaterialIndex: matte2,
+			ModelToWorld:  affinetransform.Identity(),
 		},
 		{
-			TheGeometry:  wallS,
-			TheMaterial:  matte2,
-			ModelToWorld: affinetransform.Identity(),
+			GeometryIndex: wallS,
+			MaterialIndex: matte2,
+			ModelToWorld:  affinetransform.Identity(),
 		},
 		{
-			TheGeometry:  centerBox,
-			TheMaterial:  glass,
-			ModelToWorld: affinetransform.Translate(vec3.T{3, 3, 0}),
+			GeometryIndex: centerBox,
+			MaterialIndex: glass,
+			ModelToWorld:  affinetransform.Translate(vec3.T{3, 3, 0}),
 		},
 	}
 
@@ -191,16 +191,17 @@ func do() error {
 
 	camera := &camera.PinholeCamera{
 		Center:          vec3.T{1, 1, 2},
-		ApertureToWorld: mat33.T{Elts: [9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}},
+		ApertureToWorld: mat33.T{1, 0, 0, 0, 1, 0, 0, 0, 1},
 		Aperture:        vec3.T{0.02, 0.018, 0.012},
 	}
 	camera.SetEye(vec3.SubVV(vec3.T{5, 5, 1}, camera.Center))
+	theScene.AddCamera(camera)
 
 	progress := func(cur, tot int) {
 		fmt.Fprintf(os.Stderr, "\r%d/%d %d%%", cur, tot, 100*cur/tot)
 	}
 
-	scene.RenderScene(theScene, options, sampleDB, camera, progress)
+	scene.RenderScene(theScene, options, sampleDB, progress)
 	fmt.Fprintf(os.Stderr, "\n")
 
 	out, err := os.Create(*outputFile)

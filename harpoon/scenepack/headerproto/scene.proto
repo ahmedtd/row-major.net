@@ -21,7 +21,7 @@ message Vec3 {
 message Scene {
   repeated Geometry geometry = 1;
   repeated Material material = 2;
-  Material infinity_material = 3;
+  int32 infinity_material_index = 3;
   repeated Element element = 4;
   repeated Camera camera = 5;
 }
@@ -39,7 +39,7 @@ message Geometry {
 }
 
 message Sphere {
-
+    MaterialCoordsMode material_coords_mode = 1;
 }
 
 message Box {
@@ -74,8 +74,8 @@ message Transform {
 }
 
 message Element {
-  int32 geometry = 1;
-  int32 material = 2;
+  int32 geometry_index = 1;
+  int32 material_index = 2;
   Transform model_to_world = 3;
 }
 
@@ -86,8 +86,9 @@ message Camera {
 }
 
 message PinholeCamera {
-    Vec3 eye = 1;
-    Vec3 left = 2;
+    Vec3 center = 1;
+    Vec3 eye = 2;
     Vec3 up = 3;
+    Vec3 aperture = 4;
 }
 

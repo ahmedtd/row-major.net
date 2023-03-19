@@ -21,8 +21,8 @@ import (
 )
 
 type SceneElement struct {
-	TheGeometry geometry.Geometry
-	TheMaterial material.Material
+	GeometryIndex int
+	MaterialIndex int
 
 	// The transform that takes model space to world space.
 	ModelToWorld affinetransform.AffineTransform
@@ -47,10 +47,40 @@ type CrushedSceneElement struct {
 }
 
 type Scene struct {
-	Elements         []*SceneElement
-	CrushedElements  []*CrushedSceneElement
-	InfinityMaterial material.Material
+	Geometries            []geometry.Geometry
+	Materials             []material.Material
+	InfinityMaterialIndex int
+
+	Elements        []*SceneElement
+	CrushedElements []*CrushedSceneElement
+
+	Cameras []camera.Camera
+
 	QueryAccelerator *kdtree.KDTree
+}
+
+// AddGeometry is a convenience function to register a geometry and get its
+// index.
+func (s *Scene) AddGeometry(g geometry.Geometry) int {
+	s.Geometries = append(s.Geometries, g)
+	return len(s.Geometries) - 1
+}
+
+// AddMaterial is a convenience function to register a material and get its
+// index.
+func (s *Scene) AddMaterial(m material.Material) int {
+	s.Materials = append(s.Materials, m)
+	return len(s.Materials) - 1
+}
+
+func (s *Scene) AddElement(e *SceneElement) int {
+	s.Elements = append(s.Elements, e)
+	return len(s.Elements) - 1
+}
+
+func (s *Scene) AddCamera(c camera.Camera) int {
+	s.Cameras = append(s.Cameras, c)
+	return len(s.Cameras) - 1
 }
 
 func (s *Scene) Crush(time float64) {
@@ -59,18 +89,24 @@ func (s *Scene) Crush(time float64) {
 	// crushes, objects should cache whether they have been crushed at the given
 	// key value (time).
 
-	s.InfinityMaterial.Crush(time)
+	for _, g := range s.Geometries {
+		g.Crush(time)
+	}
+
+	for _, m := range s.Materials {
+		m.Crush(time)
+	}
 
 	kdElements := []kdtree.KDElement{}
 	for i, element := range s.Elements {
-		element.TheGeometry.Crush(time)
-		element.TheMaterial.Crush(time)
+		g := s.Geometries[element.GeometryIndex]
+		m := s.Materials[element.MaterialIndex]
 
-		worldBounds := element.TheGeometry.GetAABox().Transform(element.ModelToWorld)
+		worldBounds := g.GetAABox().Transform(element.ModelToWorld)
 
 		crushedElement := &CrushedSceneElement{
-			TheGeometry:         element.TheGeometry,
-			TheMaterial:         element.TheMaterial,
+			TheGeometry:         g,
+			TheMaterial:         m,
 			WorldToModel:        element.ModelToWorld.Invert(),
 			ModelToWorld:        element.ModelToWorld,
 			ModelToWorldNormals: element.ModelToWorld.NormalTransformMat(),
@@ -135,7 +171,7 @@ func (s *Scene) ShadeRay(reflectedRay ray.Ray, curWavelength float32, rng *rand.
 			Mtl2: vec2.T{math.Atan2(reflectedRay.Slope[0], reflectedRay.Slope[1]), math.Acos(reflectedRay.Slope[2])},
 			Mtl3: p,
 		}
-		return s.InfinityMaterial.Shade(c, curWavelength, rng)
+		return s.Materials[s.InfinityMaterialIndex].Shade(c, curWavelength, rng)
 	}
 
 	return s.CrushedElements[hitIndex].TheMaterial.Shade(glbContact, curWavelength, rng)
@@ -177,8 +213,6 @@ type ChunkWorker struct {
 
 	colSrc int
 	colLim int
-
-	camera camera.Camera
 	scene  *Scene
 }
 
@@ -198,7 +232,7 @@ func (w *ChunkWorker) Render() {
 
 				for cs := 0; cs < samplesToAdd; cs++ {
 					curWavelength, _ := w.sampleDB.WavelengthBin(cw)
-					curQuery := w.camera.ImageToRay(cr, w.imgRows, cc, w.imgCols, w.rng)
+					curQuery := w.scene.Cameras[0].ImageToRay(cr, w.imgRows, cc, w.imgCols, w.rng)
 
 					// We get a power density sample in W / m^2
 					sampledPower := w.scene.SampleRay(curQuery, curWavelength, w.rng, w.maxDepth)
@@ -220,8 +254,7 @@ type RenderOptions struct {
 
 type ProgressFunction func(int, int)
 
-func RenderScene(scene *Scene, options *RenderOptions, sampleDB *spectralimage.SpectralImage,
-	camera camera.Camera, progressFunction ProgressFunction) {
+func RenderScene(scene *Scene, options *RenderOptions, sampleDB *spectralimage.SpectralImage, progressFunction ProgressFunction) {
 	curProgress := 0
 
 	// progressMutex locks both curProgress and sampleDB.
@@ -272,7 +305,6 @@ func RenderScene(scene *Scene, options *RenderOptions, sampleDB *spectralimage.S
 			rowLim:        rowLim,
 			colSrc:        0,
 			colLim:        sampleDB.ColSize,
-			camera:        camera,
 			scene:         scene,
 		}
 		worker.sampleDB = sampleDB.Cut(worker.rowSrc, worker.rowLim, 0, sampleDB.ColSize)

@@ -5,4 +5,17 @@ go_library(
     srcs = ["scenepack.go"],
     importpath = "row-major/harpoon/scenepack",
     visibility = ["//visibility:public"],
+    deps = [
+        "//harpoon/affinetransform:go_default_library",
+        "//harpoon/camera:go_default_library",
+        "//harpoon/densesignal:go_default_library",
+        "//harpoon/geometry:go_default_library",
+        "//harpoon/material:go_default_library",
+        "//harpoon/ray:go_default_library",
+        "//harpoon/scene:go_default_library",
+        "//harpoon/scenepack/headerproto:go_default_library",
+        "//harpoon/vmath/mat33:go_default_library",
+        "//harpoon/vmath/vec3:go_default_library",
+        "@org_golang_google_protobuf//proto:go_default_library",
+    ],
 )
