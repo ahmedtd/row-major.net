@@ -3,6 +3,7 @@ package webui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,6 +40,7 @@ func (u *WebUI) Register(m *http.ServeMux) {
 	m.HandleFunc("/list-patients", u.listPatientsHandler)
 	m.HandleFunc("/show-patient", u.showPatientHandler)
 	m.HandleFunc("/record-medication-refill", u.recordMedicationRefillHandler)
+	m.HandleFunc("/create-medication", u.createMedicationHandler)
 }
 
 // getLoggedInUser loads the user associated with the session cookie in the
@@ -62,6 +64,52 @@ func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (*dbtypes.
 	}
 
 	return user, nil
+}
+
+func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http.Request, redirectAfterLogin string) *dbtypes.User {
+	var sessionCookie *http.Cookie
+	for _, cookie := range r.Cookies() {
+		if cookie.Name == "MedTracker-Session" {
+			sessionCookie = cookie
+		}
+	}
+	if sessionCookie == nil {
+		// User is not logged in.  Send them to log in.
+		glog.Infof("No logged-in user because there was no session cookie.  Redirecting to login.")
+		http.Redirect(w, r, logInLink("", redirectAfterLogin), http.StatusFound)
+		return nil
+	}
+
+	user, err := u.db.UserFromSessionCookie(ctx, sessionCookie.Value)
+	if err != nil {
+		glog.Infof("Error while validating session cookie: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return nil
+	}
+	if user == nil {
+		// User is not logged in.  For example, there was a session cookie, but
+		// it corresponds to an expired session.
+		glog.Infof("Session cookie didn't correspond to an active session.")
+		http.Redirect(w, r, logInLink("", redirectAfterLogin), http.StatusFound)
+		return nil
+	}
+
+	return user
+}
+
+func (u *WebUI) checkUserAllowedToManagePatient(ctx context.Context, w http.ResponseWriter, r *http.Request, user *dbtypes.User, patientID string) bool {
+	err := u.db.CheckUserAllowedToManagePatient(ctx, user, patientID)
+	if errors.Is(err, dblayer.ErrPermissionDenied) {
+		glog.Errorf("User is not allowed to view patient %s", patientID)
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return false
+	} else if err != nil {
+		glog.Errorf("Error while checking that session is allowed to manage patient: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return false
+	}
+
+	return true
 }
 
 // homeHandler renders the home page.
@@ -252,7 +300,6 @@ func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, target, http.StatusFound)
-	return
 }
 
 // signInWithGoogleHandler accepts the "Sign In With Google" ID token POST.
@@ -309,7 +356,6 @@ func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	http.Redirect(w, r, target, http.StatusFound)
-	return
 }
 
 // patientsHandler renders the /patients list for the logged-in user.
@@ -321,16 +367,9 @@ func (u *WebUI) listPatientsHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	user, err := u.getLoggedInUser(ctx, r)
-	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
+	user := u.checkSession(ctx, w, r, "/list-patients")
 	if user == nil {
-		// User is not logged in.  Send them to log in.
-		http.Redirect(w, r, logInLink("", "/list-patients"), http.StatusFound)
+		// checkSession already wrote an error or redirect
 		return
 	}
 
@@ -343,7 +382,7 @@ func (u *WebUI) listPatientsHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			glog.Errorf("Error while iterating patients managed by user %q: %v", user.Email, err)
+			glog.Errorf("Error while iterating patients managed by user: %v", err)
 			http.Error(w, "Internal Error", http.StatusInternalServerError)
 			return
 		}
@@ -394,13 +433,6 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	user, err := u.getLoggedInUser(ctx, r)
-	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		glog.Errorf("Error while parsing form: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -409,14 +441,23 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 
 	patientID := r.Form.Get("id")
 
+	user := u.checkSession(ctx, w, r, ShowPatientLink(patientID))
 	if user == nil {
-		// User is not logged in.  Send them to log in.
-		http.Redirect(w, r, logInLink("", ShowPatientLink(patientID)), http.StatusFound)
+		// checkSession already wrote an error or redirect
+		return
+	}
+	if !u.checkUserAllowedToManagePatient(ctx, w, r, user, patientID) {
+		// The permissions check has already written a response.
 		return
 	}
 
 	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
 	patientDocSnap, err := patientDocRef.Get(ctx)
+	if err != nil {
+		glog.Errorf("Error while getting patient: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
 
 	patient := &dbtypes.Patient{}
 	if err := patientDocSnap.DataTo(patient); err != nil {
@@ -425,26 +466,14 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Permissions check --- is the user allowed to access this patient?
-	allowed := false
-	for _, mu := range patient.ManagingUsers {
-		if mu == user.ID {
-			allowed = true
-		}
+	params := &uitemplates.ShowPatientParams{
+		DisplayName:          patient.DisplayName,
+		CreateMedicationLink: createMedicationLink(patient.ID, ""),
+		SelfLink:             ShowPatientLink(patient.ID),
 	}
-	if !allowed {
-		glog.Errorf("User %s is not allowed to view patient %s", user.ID, patient.ID)
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	params := &uitemplates.ShowPatientParams{}
-	params.DisplayName = patient.DisplayName
-	params.SelfLink = ShowPatientLink(patient.ID)
 	for _, dbMed := range patient.Medications {
-
 		expiry := dbMed.PrescriptionLastFilledAt.Add(time.Duration(dbMed.PrescriptionLengthDays) * 24 * time.Hour)
-		remaining := expiry.Sub(time.Now())
+		remaining := time.Until(expiry)
 		remainingDays := remaining.Truncate(time.Hour).Nanoseconds() / 1000 / 1000 / 1000 / 86400
 
 		uiMed := &uitemplates.ShowPatientMedication{
@@ -509,13 +538,6 @@ func (u *WebUI) recordMedicationRefillHandler(w http.ResponseWriter, r *http.Req
 func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	user, err := u.getLoggedInUser(ctx, r)
-	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		glog.Errorf("Error while parsing form: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -525,37 +547,20 @@ func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.
 	patientID := r.Form.Get("patient-id")
 	medicationName := r.Form.Get("medication-name")
 
+	user := u.checkSession(ctx, w, r, recordMedicationRefillLink(patientID, medicationName, ""))
 	if user == nil {
-		// User is not logged in.  Send them to log in.
-		http.Redirect(w, r, recordMedicationRefillLink(patientID, medicationName, ""), http.StatusFound)
+		// checkSession already wrote an error or redirect
+		return
+	}
+	if !u.checkUserAllowedToManagePatient(ctx, w, r, user, patientID) {
+		// The permissions check has already written a response.
 		return
 	}
 
-	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
-	patientDocSnap, err := patientDocRef.Get(ctx)
+	patient, err := u.db.GetPatient(ctx, patientID)
 	if err != nil {
-		glog.Errorf("Errow while retrieving patient: %v", err)
+		glog.Errorf("Error while retrieving patient: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
-	patient := &dbtypes.Patient{}
-	if err := patientDocSnap.DataTo(patient); err != nil {
-		glog.Errorf("Error while unmarshaling patient: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Permissions check --- is the user allowed to access this patient?
-	allowed := false
-	for _, mu := range patient.ManagingUsers {
-		if mu == user.ID {
-			allowed = true
-		}
-	}
-	if !allowed {
-		glog.Errorf("User %s is not allowed to access patient %s", user.ID, patient.ID)
-		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
@@ -584,13 +589,6 @@ func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.
 func (u *WebUI) recordMedicationRefillPostHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	user, err := u.getLoggedInUser(ctx, r)
-	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		glog.Errorf("Error while parsing form: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -600,90 +598,151 @@ func (u *WebUI) recordMedicationRefillPostHandler(w http.ResponseWriter, r *http
 	patientID := r.Form.Get("patient-id")
 	medicationName := r.Form.Get("medication-name")
 
+	user := u.checkSession(ctx, w, r, recordMedicationRefillLink(patientID, medicationName, ""))
 	if user == nil {
-		// User is not logged in.  Send them to log in.
-		http.Redirect(w, r, recordMedicationRefillLink(patientID, medicationName, ""), http.StatusFound)
+		// checkSession already wrote an error or redirect
+		return
+	}
+	if !u.checkUserAllowedToManagePatient(ctx, w, r, user, patientID) {
+		// The permissions check has already written a response.
 		return
 	}
 
-	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
-	patientDocSnap, err := patientDocRef.Get(ctx)
-	if err != nil {
-		glog.Errorf("Error while retrieving patient: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
+	err := u.db.RecordMedicationRefill(ctx, patientID, r.Form.Get("medication-name"), r.Form.Get("refill-date"))
+	if errors.Is(err, dblayer.ErrCouldNotParseDate) {
+		http.Redirect(w, r, recordMedicationRefillLink(patientID, r.Form.Get("medication-name"), "Could not parse date"), http.StatusFound)
+		return
+	} else if errors.Is(err, dblayer.ErrMedicationNotFound) {
+		http.Redirect(w, r, recordMedicationRefillLink(patientID, r.Form.Get("medication-name"), "Medication not found"), http.StatusFound)
 		return
 	}
-
-	patient := &dbtypes.Patient{}
-	if err := patientDocSnap.DataTo(patient); err != nil {
-		glog.Errorf("Error while unmarshaling patient: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Permissions check --- is the user allowed to access this patient?
-	allowed := false
-	for _, mu := range patient.ManagingUsers {
-		if mu == user.ID {
-			allowed = true
-		}
-	}
-	if !allowed {
-		glog.Errorf("User %s is not allowed to access patient %s", user.ID, patient.ID)
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	userErr, err := u.doRecordMedicationRefill(ctx, patient.ID, r.Form.Get("medication-name"), r.Form.Get("refill-date"))
 	if err != nil {
 		glog.Errorf("Error while recording medication refill: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
-	if userErr != "" {
-		http.Redirect(w, r, recordMedicationRefillLink(patientID, r.Form.Get("medication-name"), userErr), http.StatusFound)
+	http.Redirect(w, r, ShowPatientLink(patientID), http.StatusFound)
+}
+
+func createMedicationLink(patientID, userError string) string {
+	q := url.Values{}
+	q.Add("patient-id", patientID)
+	if userError != "" {
+		q.Add("user-error", userError)
+	}
+	link := &url.URL{
+		Path:     "/create-medication",
+		RawQuery: q.Encode(),
+	}
+	return link.String()
+}
+
+func (u *WebUI) createMedicationHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/create-medication" {
+		glog.Errorf("Returning Not Found because createMedicationHandler doesn't support path %q", r.URL.Path)
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		u.createMedicationGetHandler(w, r)
+		return
+	case http.MethodPost:
+		u.createMedicationPostHandler(w, r)
+		return
+	default:
+		glog.Errorf("Returning Bad Request because createMedicationHandler doesn't support path %q", r.URL.Path)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+}
+
+func (u *WebUI) createMedicationGetHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("Error while parsing form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	patientID := r.Form.Get("patient-id")
+
+	user := u.checkSession(ctx, w, r, createMedicationLink(patientID, ""))
+	if user == nil {
+		// checkSession already wrote an error or redirect
+		return
+	}
+	if !u.checkUserAllowedToManagePatient(ctx, w, r, user, patientID) {
+		// The permissions check has already written a response.
+		return
+	}
+
+	patient, err := u.db.GetPatient(ctx, patientID)
+	if err != nil {
+		glog.Errorf("Error while retrieving patient: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	params := &uitemplates.CreateMedicationParams{
+		PatientID:          patient.ID,
+		PatientDisplayName: patient.DisplayName,
+		SelfLink:           createMedicationLink(patientID, ""),
+		UserError:          r.Form.Get("user-error"),
+	}
+
+	content := bytes.Buffer{}
+	if err := uitemplates.CreateMedicationTemplate.Execute(&content, params); err != nil {
+		glog.Errorf("Error while executing template: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := io.Copy(w, &content); err != nil {
+		// It's too late to write an error to the HTTP response.
+		glog.Errorf("Error while writing output: %v", err)
+		return
+	}
+}
+
+func (u *WebUI) createMedicationPostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("Error while parsing form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	patientID := r.Form.Get("patient-id")
+
+	user := u.checkSession(ctx, w, r, createMedicationLink(patientID, ""))
+	if user == nil {
+		// checkSession already wrote an error or redirect
+		return
+	}
+	if !u.checkUserAllowedToManagePatient(ctx, w, r, user, patientID) {
+		// The permissions check has already written a response.
+		return
+	}
+
+	err := u.db.CreateMedication(ctx, patientID, r.Form.Get("medication-name"), r.Form.Get("rx-length-days"), r.Form.Get("rx-filled-at"))
+	if errors.Is(err, dblayer.ErrCouldNotParseDate) {
+		http.Redirect(w, r, createMedicationLink(patientID, "Could not parse date"), http.StatusFound)
+		return
+	} else if errors.Is(err, dblayer.ErrMedicationAlreadyExists) {
+		http.Redirect(w, r, createMedicationLink(patientID, "Medication already exists"), http.StatusFound)
+		return
+	} else if errors.Is(err, dblayer.ErrCouldNotParsePrescriptionLength) {
+		http.Redirect(w, r, createMedicationLink(patientID, "Could not parse prescription length"), http.StatusFound)
+	} else if err != nil {
+		glog.Errorf("Error while creating medication: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	http.Redirect(w, r, ShowPatientLink(patientID), http.StatusFound)
-}
-
-func (u *WebUI) doRecordMedicationRefill(ctx context.Context, patientID, medicationName, refillDate string) (string, error) {
-	refillTime, err := time.Parse("2006-01-02", refillDate)
-	if err != nil {
-		return fmt.Sprintf("Could not parse date %q", refillDate), nil
-	}
-
-	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
-	patientDocSnap, err := patientDocRef.Get(ctx)
-	if err != nil {
-		return "", fmt.Errorf("while retrieving patient %s: %w", patientID, err)
-	}
-
-	patient := &dbtypes.Patient{}
-	if err := patientDocSnap.DataTo(patient); err != nil {
-		return "", fmt.Errorf("while unmarshaling patient %s: %w", patientID, err)
-	}
-
-	foundMed := false
-	for _, med := range patient.Medications {
-		if med.Name == medicationName {
-			foundMed = true
-			med.PrescriptionLastFilledAt = refillTime
-			med.Prescription2DayWarningSent = false
-			med.Prescription5DayWarningSent = false
-		}
-	}
-
-	if !foundMed {
-		return "No medication by that name", nil
-	}
-
-	_, err = patientDocRef.Update(ctx, []firestore.Update{{Path: "medications", Value: patient.Medications}}, firestore.LastUpdateTime(patientDocSnap.UpdateTime))
-	if err != nil {
-		return "", fmt.Errorf("while updating patient: %w", err)
-	}
-
-	return "", nil
 }

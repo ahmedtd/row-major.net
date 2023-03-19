@@ -8,7 +8,11 @@ type HomeParams struct {
 
 var homeText = `{{define "title"}}Home{{end}}
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">Home</a></li></ul>
+<ul class="breadcrumbs">
+  <li class="breadcrumbs-item">
+    <a href="/">Home</a>
+  </li>
+</ul>
 {{- end}}
 
 {{define "content"}}

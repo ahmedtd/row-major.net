@@ -10,7 +10,14 @@ type LogInParams struct {
 
 var logInText = `{{define "title"}}Log In{{end}}
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">Home</a></li><li class="breadcrumbs-item"><a href="/log-in">Log In</a></li></ul>
+<ul class="breadcrumbs">
+  <li class="breadcrumbs-item">
+    <a href="/">Home</a>
+  </li>
+  <li class="breadcrumbs-item">
+    <a href="/log-in">Log In</a>
+  </li>
+</ul>
 {{- end}}
 
 {{define "content"}}

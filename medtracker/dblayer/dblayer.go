@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"row-major/medtracker/dbtypes"
@@ -30,9 +31,17 @@ func New(firestoreClient *firestore.Client, googleOAuthClientID string) *DB {
 	}
 }
 
-var ErrEmailMustNotBeEmpty = errors.New("email must not be empty")
-var ErrPasswordMustNotBeEmpty = errors.New("password must not be empty")
-var ErrUnknownUserOrWrongPassword = errors.New("unknown user or wrong password")
+var (
+	ErrEmailMustNotBeEmpty             = errors.New("email must not be empty")
+	ErrPasswordMustNotBeEmpty          = errors.New("password must not be empty")
+	ErrUnknownUserOrWrongPassword      = errors.New("unknown user or wrong password")
+	ErrUserNotLoggedIn                 = errors.New("user is not logged in")
+	ErrPermissionDenied                = errors.New("permission denied")
+	ErrCouldNotParseDate               = errors.New("could not parse date")
+	ErrCouldNotParsePrescriptionLength = errors.New("could not parse prescription length")
+	ErrMedicationNotFound              = errors.New("no medication by that name")
+	ErrMedicationAlreadyExists         = errors.New("medication already exists")
+)
 
 // SessionFromPassword runs the password-based login process for a given user,
 // returning a session ID or an error.
@@ -202,4 +211,124 @@ func (db *DB) UserFromSessionCookie(ctx context.Context, cookie string) (*dbtype
 	}
 
 	return user, nil
+}
+
+func (db *DB) GetPatient(ctx context.Context, id string) (*dbtypes.Patient, error) {
+	docRef := db.firestoreClient.Collection("Patients").Doc(id)
+	docSnap, err := docRef.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("while retrieving patient: %w", err)
+	}
+
+	patient := &dbtypes.Patient{}
+	if err := docSnap.DataTo(patient); err != nil {
+		return nil, fmt.Errorf("while unmarshaling patient: %w", err)
+	}
+
+	return patient, nil
+}
+
+func (db *DB) CheckUserAllowedToManagePatient(ctx context.Context, user *dbtypes.User, patientID string) error {
+	patient, err := db.GetPatient(ctx, patientID)
+	if err != nil {
+		return fmt.Errorf("while getting patient: %w", err)
+	}
+
+	allowed := false
+	for _, mu := range patient.ManagingUsers {
+		if mu == user.ID {
+			allowed = true
+		}
+	}
+	if !allowed {
+		return ErrPermissionDenied
+	}
+
+	return nil
+}
+
+func (db *DB) RecordMedicationRefill(ctx context.Context, patientID, medicationName, refillDate string) error {
+	refillTime, err := time.Parse("2006-01-02", refillDate)
+	if err != nil {
+		return ErrCouldNotParseDate
+	}
+
+	patientDocRef := db.firestoreClient.Collection("Patients").Doc(patientID)
+	patientDocSnap, err := patientDocRef.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("while retrieving patient %s: %w", patientID, err)
+	}
+
+	patient := &dbtypes.Patient{}
+	if err := patientDocSnap.DataTo(patient); err != nil {
+		return fmt.Errorf("while unmarshaling patient %s: %w", patientID, err)
+	}
+
+	foundMed := false
+	for _, med := range patient.Medications {
+		if med.Name == medicationName {
+			foundMed = true
+			med.PrescriptionLastFilledAt = refillTime
+			med.Prescription2DayWarningSent = false
+			med.Prescription5DayWarningSent = false
+		}
+	}
+
+	if !foundMed {
+		return ErrMedicationNotFound
+	}
+
+	_, err = patientDocRef.Update(ctx, []firestore.Update{{Path: "medications", Value: patient.Medications}}, firestore.LastUpdateTime(patientDocSnap.UpdateTime))
+	if err != nil {
+		return fmt.Errorf("while updating patient: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) CreateMedication(ctx context.Context, patientID, medicationName, rxLengthDaysText, rxFilledAtText string) error {
+	rxFilledAt, err := time.Parse("2006-01-02", rxFilledAtText)
+	if err != nil {
+		return ErrCouldNotParseDate
+	}
+
+	rxLengthDays, err := strconv.Atoi(rxLengthDaysText)
+	if err != nil {
+		return ErrCouldNotParsePrescriptionLength
+	}
+
+	patientDocRef := db.firestoreClient.Collection("Patients").Doc(patientID)
+	patientDocSnap, err := patientDocRef.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("while retrieving patient %s: %w", patientID, err)
+	}
+
+	patient := &dbtypes.Patient{}
+	if err := patientDocSnap.DataTo(patient); err != nil {
+		return fmt.Errorf("while unmarshaling patient %s: %w", patientID, err)
+	}
+
+	foundMed := false
+	for _, med := range patient.Medications {
+		if med.Name == medicationName {
+			foundMed = true
+		}
+	}
+
+	if foundMed {
+		return ErrMedicationAlreadyExists
+	}
+
+	patient.Medications = append(patient.Medications, &dbtypes.Medication{
+		Name:                     medicationName,
+		PrescriptionLengthDays:   int64(rxLengthDays),
+		PrescriptionLastFilledAt: rxFilledAt,
+	})
+
+	_, err = patientDocRef.Update(ctx, []firestore.Update{{Path: "medications", Value: patient.Medications}}, firestore.LastUpdateTime(patientDocSnap.UpdateTime))
+	if err != nil {
+		return fmt.Errorf("while updating patient: %w", err)
+	}
+
+	return nil
 }

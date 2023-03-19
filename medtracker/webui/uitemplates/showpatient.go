@@ -3,9 +3,10 @@ package uitemplates
 import "html/template"
 
 type ShowPatientParams struct {
-	DisplayName string
-	SelfLink    string
-	Medications []*ShowPatientMedication
+	DisplayName          string
+	SelfLink             string
+	CreateMedicationLink string
+	Medications          []*ShowPatientMedication
 }
 
 type ShowPatientMedication struct {
@@ -20,7 +21,17 @@ var showPatientText = `
 {{define "title"}}Show Patient: {{.DisplayName}}{{end}}
 
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">Home</a></li><li><a href="/list-patients">List Patients</a></li><li><a href="{{.SelfLink}}">Show Patient: {{.DisplayName}}</a></li></ul>
+<ul class="breadcrumbs">
+  <li class="breadcrumbs-item">
+    <a href="/">Home</a>
+  </li>
+  <li>
+    <a href="/list-patients">List Patients</a>
+  </li>
+  <li>
+    <a href="{{.SelfLink}}">Show Patient: {{.DisplayName}}</a>
+  </li>
+</ul>
 {{- end}}
 
 {{define "content"}}
@@ -47,6 +58,8 @@ var showPatientText = `
 	{{end}}
   <tbody>
 </table>
+
+<a href="{{.CreateMedicationLink}}">Create New Medication</a>
 {{end}}
 `
 
