@@ -7,6 +7,8 @@
 #
 # kubectl create secret generic -n tuskten-barge-ester-reeds persistent-redis-aclfile
 
+# TODO: create a command to create the secrets?
+
 kind: Namespace
 apiVersion: v1
 metadata:
@@ -184,6 +186,7 @@ spec:
 
 ---
 
+# The persistent redis redis.conf
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -195,3 +198,96 @@ data:
   redis.conf: |
     dir /data
     aclfile /redis-configuration/users.acl
+
+---
+
+# The mastodon web worker.
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  namespace: tuskten-barge-ester-reeds
+  name: mastodon-web
+  labels:
+    app: mastodon-web
+spec:
+  selector:
+    matchLabels:
+      app: mastodon-web
+  template:
+    metadata:
+      labels:
+        app: mastodon-web
+    spec:
+      containers:
+      - name: rails
+        image: tootsuite/mastodon
+        ports:
+        - name: ui
+          containerPort: 3000
+        command: ["bash", "-c", "rm -f /mastodon/tmp/pids/server.pid; bundle exec rails s -p 3000"]
+        env:
+        - name: LOCAL_DOMAIN
+          value: mastodon-example.row-major.net
+        # Redis configuration.
+        - name: REDIS_HOST
+          value: persistent-redis-0.persistent-redis.svc
+        - name: REDIS_PORT
+          value: 6379
+        # Postgres configuration
+        - name: DB_HOST
+          value: postgres-0.postgres.svc
+        - name: DB_USER
+          value:
+        - name: DB_NAME
+          value:
+        - name: DB_PASS
+          valueFrom:
+        - name: DB_PORT
+          value: 5432
+        # Secrets --- need to be 64 character random hexadecimal strings.
+        - name: SECRET_KEY_BASE
+          valueFrom:
+        - name: OTP_SECRET
+          valueFrom:
+        # Webpush secrets --- `rake mastodon:webpush:generate_vapid_key`
+        #
+        # Seem to be some sort of base64-encoded ECDSA keypair.
+        - name: VAPID_PRIVATE_KEY
+          valueFrom:
+        - name: VAPID_PUBLIC_KEY
+          valueFrom:
+        # SMTP Configuration
+        - name: SMTP_SERVER
+          value:
+        - name: SMTP_PORT
+          value: 587
+        - name: SMTP_LOGIN
+          valueFrom:
+        - name: SMTP_PASSWORD
+          valueFrom:
+        - name: SMTP_FROM_ADDRESS
+          value: notifications@mastodon-example.row-major.net
+        # File storage (optional)
+        - name: S3_ENABLED
+          value: "true"
+        - name: S3_HOSTNAME
+          value: storage.googleapis.com
+        - name: S3_ENDPOINT
+          value: https://storage.googleapis.com
+        - name: S3_BUCKET
+          value: tuskten-barge-ester-reeds
+        - name: S3_REGION
+          value: us-west1
+        - name: S3_ALIAS_HOST
+          value: files.example.com
+        - name: S3_MULTIPART_THRESHOLD
+          value: 52428800
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom: # Generate and export an HMAC key for the service account
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom: # Generate and export an HMAC key for the service account
+        # IP and session retention.
+        - name: IP_RETENTION_PERIOD
+          value: "31556952"
+        - name: SESSION_RETENTION_PERIOD
+          value: "31556952"
