@@ -133,6 +133,7 @@ row-major-web/upload-images-and-update-manifest:
 
 deploy-manifest:
   stage: deploy
+  resource_group: prod # Only one instance of deploy-manifest can run at a time.
   environment:
     name: production
     url: https://row-major.net/
