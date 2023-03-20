@@ -1,14 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Comment to force rebuild
-
 bases:
   - ../base
 
 patchesStrategicMerge:
-  - medtracker-poller-production-images.merge.yaml
-  - medtracker-webui-production-images.merge.yaml
   - row-major-web-production-images.merge.yaml
   - rumor-mill-poller-production-images.merge.yaml
   - sharded-controller-production-images.merge.yaml

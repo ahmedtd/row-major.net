@@ -32,7 +32,7 @@ medtracker/upload-images-and-update-manifest:
     - "GOOGLE_APPLICATION_CREDENTIALS=${GCP_SA_KEY_FILE} IMAGE_REPO=bomsync-214520 IMAGE_TAG=${CI_COMMIT_SHA} ./bazel run //medtracker/cmd/webui:webui_push"
     - |
       ./bazel run //infra-tools/bump-manifest -- \
-        --merge-file=manifests/production/medtracker-poller-production-images.merge.yaml \
+        --merge-file=manifests/medtracker/production/medtracker-poller-production-images.merge.yaml \
         --namespace=medtracker \
         --name=poller \
         --container-name=main \
@@ -40,7 +40,7 @@ medtracker/upload-images-and-update-manifest:
         --container-image-tag=${CI_COMMIT_SHA}
     - |
       ./bazel run //infra-tools/bump-manifest -- \
-        --merge-file=manifests/production/medtracker-webui-production-images.merge.yaml \
+        --merge-file=manifests/medtracker/production/medtracker-webui-production-images.merge.yaml \
         --namespace=medtracker \
         --name=webui \
         --container-name=main \
@@ -131,6 +131,25 @@ row-major-web/upload-images-and-update-manifest:
         --container-image=gcr.io/bomsync-214520/webalator \
         --container-image-tag=${CI_COMMIT_SHA}
 
+deploy-medtracker-manifest:
+  stage: deploy
+  resource_group: medtracker-prod
+  environment:
+    name: production
+    url: https://medtracker.dev/
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^NO_APPLY_MANIFEST=/m"
+      when: never
+    - changes:
+        - manifests/medtracker/**/*
+      when: on_success 
+  needs: []
+  image: gcr.io/google.com/cloudsdktool/cloud-sdk
+  script:
+    - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
+    - "gcloud container clusters get-credentials --project=bomsync-214520 --zone=us-west1-a taahm-primary-cluster"
+    - "kubectl apply --kustomize=manifests/medtracker/production"
+
 deploy-manifest:
   stage: deploy
   resource_group: prod # Only one instance of deploy-manifest can run at a time.
@@ -141,7 +160,7 @@ deploy-manifest:
     - if: "$CI_COMMIT_MESSAGE =~ /^NO_APPLY_MANIFEST=/m"
       when: never
     - changes:
-        - manifests/**/*
+        - manifests/production/*
       when: on_success
   needs: []
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
