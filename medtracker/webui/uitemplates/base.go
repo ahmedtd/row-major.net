@@ -5,100 +5,38 @@ var baseText = `
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>{{block "title" .}}Title{{end}} - MedTracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{block "title" .}}Title{{end}} - MedTracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
 
     {{block "head" .}}{{end}}
-    <style>
-      #page-header {
-          height: 100px;
-      }
-
-      #page-header-logo {
-          display: inline-block;
-          vertical-align: middle;
-          height: 100%;
-      }
-
-      #page-header-title {
-          display: inline;
-          font-size: 28pt;
-          vertical-align: middle;
-      }
-
-      .nav {
-          display: block;
-          width: 100%;
-          left: 0px;
-      }
-
-      .breadcrumbs {
-          display: inline-block;
-          padding: 0px;
-          margin: 0px;
-          left: 0px;
-          list-style: none;
-      }
-
-      .breadcrumbs li {
-          display: inline;
-          padding-right: 0.5em;
-      }
-
-      .breadcrumbs li:not(:first-child):before {
-          content: '➛';
-          display: inline-block;
-          padding-right: 0.5em;
-      }
-
-      body {
-          max-width: 55em;
-          margin: auto;
-          font-family: Sans-Serif;
-          font-size: 10pt;
-      }
-
-      main h1 {
-          font-size: 20pt;
-      }
-
-      main h2 {
-          font-size: 14pt;
-      }
-
-      main figure {
-          padding: 10px;
-          margin-left: 0px;
-          margin-right: 0px;
-          background-color: bisque;
-          max-width: 100%;
-      }
-
-      main figure * {
-          max-width: 100%;
-      }
-
-      {{block "styles" .}}{{end}}
-    </style>
   </head>
   <body>
-    <header id="page-header"><img src=""
-           id="page-header-logo"><h1 id="page-header-title">MedTracker</h1></header>
+    <div class="container">
+      <nav class="navbar bg-body-tertiary">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="/">MedTracker</a>
+        </div>
+      </nav>
+  
+      <nav aria-label="breadcrumb" class="border-bottom mt-3 mb-3">
+        <ol class="breadcrumb">
+          {{block "breadcrumbs" .}}<li class="breadcrumb-item active" aria-current="page">Home</li>{{end}}
+        </ol>
+      </nav>
+  
+      <main>
+        {{block "content" .}}{{end}}
+      </main>
+  
+      <footer class="pt-3 my-5 border-top">
+        <address>
+	      <a href="mailto:admin@medtracker.dev">Contact</a>
+        </address>
+      </footer>
+    </div>
 
-    <hr>
-    <nav class="nav">{{block "breadcrumbs" .}}<nav class="nav"> <ul class="breadcrumbs"><li class="breadcrumbs-item"><a href="/">/root</a></li></ul> </nav>{{end}}</nav>
-    <hr>
-
-    <main>
-      {{block "content" .}}{{end}}
-    </main>
-
-    <footer>
-      <address>
-	    <a href="mailto:admin@medtracker.dev">Contact</a>
-      </address>
-    </footer>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
     {{block "scripts" .}}{{end}}
   </body>
 </html>

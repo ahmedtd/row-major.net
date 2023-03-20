@@ -18,38 +18,30 @@ type ShowPatientMedication struct {
 }
 
 var showPatientText = `
-{{define "title"}}Show Patient: {{.DisplayName}}{{end}}
+{{define "title"}}Show Person: {{.DisplayName}}{{end}}
 
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs">
-  <li class="breadcrumbs-item">
-    <a href="/">Home</a>
-  </li>
-  <li>
-    <a href="/list-patients">List Patients</a>
-  </li>
-  <li>
-    <a href="{{.SelfLink}}">Show Patient: {{.DisplayName}}</a>
-  </li>
-</ul>
+  <li class="breadcrumb-item"><a href="/">Home</a></li>
+  <li class="breadcrumb-item"><a href="/list-patients">List People</a></li>
+  <li class="breadcrumb-item active" aria-current="page"><a href="{{.SelfLink}}">Person: {{.DisplayName}}</a></li>
 {{- end}}
 
 {{define "content"}}
 <h1>Medications</h1>
-<table>
+<table class="table">
   <thead>
     <tr>
-	  <th>Medication</th>
-	  <th>Days Left</th>
-	  <th>Prescription Length (days)</th>
-	  <th>Last Filled On</th>
-	  <th>Record Refill</th>
+	  <th scope="col">Medication</th>
+	  <th scope="col">Days Left</th>
+	  <th scope="col">Prescription Length (days)</th>
+	  <th scope="col">Last Filled On</th>
+	  <th scope="col">Record Refill</th>
 	</tr>
   </thead>
   <tbody>
     {{range .Medications}}
     <tr>
-	  <td>{{.DisplayName}}</td>
+	  <th scope="row">{{.DisplayName}}</th>
 	  <td>{{.PrescriptionDaysLeft}}</td>
 	  <td>{{.PrescriptionLengthDays}}</td>
 	  <td>{{.PrescriptionLastFilledOn}}</td>

@@ -7,6 +7,7 @@ type RecordMedicationRefillParams struct {
 	MedicationName     string
 	PatientDisplayName string
 	SelfLink           string
+	ShowPatientLink    string
 
 	UserError string
 }
@@ -15,33 +16,27 @@ var recordMedicationRefillText = `
 {{define "title"}}Record Medication Refill{{end}}
 
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs">
-  <li class="breadcrumbs-item">
-    <a href="/">Home</a>
-  </li>
-  <li class="breadcrumbs-item">
-    <a href="{{.SelfLink}}">Record Medication Refill</a>
-  </li>
-</ul>
+  <li class="breadcrumb-item"><a href="/">Home</a></li>
+  <li class="breadcrumb-item"><a href="/list-patients">List Patients</a></li>
+  <li class="breadcrumb-item"><a href="{{.ShowPatientLink}}">Patient: {{.PatientDisplayName}}</a></li>
+  <li class="breadcrumb-item active" aria-current="page"><a href="{{.SelfLink}}">Record Medication Refill</a></li>
 {{- end}}
 
 {{define "content"}}
 
 {{if .UserError}}
-Error: {{.UserError}}
+  <div class="alert alert-danger" role="alert">
+    Error: {{.UserError}}
+  </div>
 {{end}}
 
 <form method="POST">
-  <label for="patient-id">Patient ID</label>
-  <input id="patient-id" type="text" name="patient-id" value={{.PatientID}} required>
-  
-  <label for="medication-name">Medication Name</label>
-  <input id="medication-name" type="text" name="medication-name" value={{.MedicationName}} required>
+  <div class="mb-3">
+    <label for="refill-date" class="form-label">Refill Date</label>
+    <input id="refill-date" type="text" name="refill-date" class="form-control" required>
+  </div>
 
-  <label for="refill-date">Refill Date</label>
-  <input id="refill-date" type="text" name="refill-date" required>
-
-  <input type="submit" value="Record">
+  <button type="submit" class="btn btn-primary">Record Refill</button>
 </form>
 {{end}}
 `

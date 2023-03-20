@@ -8,16 +8,12 @@ type HomeParams struct {
 
 var homeText = `{{define "title"}}Home{{end}}
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs">
-  <li class="breadcrumbs-item">
-    <a href="/">Home</a>
-  </li>
-</ul>
+  <li class="breadcrumb-item active" aria-current="page"><a href="/">Home</a></li>
 {{- end}}
 
 {{define "content"}}
 {{if .LoggedIn}}
-<a href="/list-patients">List Patients</a>
+<a href="/list-patients">List People</a>
 {{else}}
 <a href="/log-in">Log In</a>
 {{end}}

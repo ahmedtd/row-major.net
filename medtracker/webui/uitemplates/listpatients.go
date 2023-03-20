@@ -11,29 +11,31 @@ type ListPatientsPatient struct {
 	ShowPatientLink string
 }
 
-var listPatientsText = `{{define "title"}}Patients List{{end}}
+var listPatientsText = `
+{{define "title"}}People{{end}}
 {{define "breadcrumbs" -}}
-<ul class="breadcrumbs">
-  <li class="breadcrumbs-item">
-    <a href="/">Home</a>
-  </li>
-  <li>
-    <a href="/list-patients">List Patients</a>
-  </li>
-</ul>
+  <li class="breadcrumb-item"><a href="/">Home</a></li>
+  <li class="breadcrumb-item active" aria-current="page"><a href="/list-patients">List People</a></li>
 {{- end}}
 
 {{define "content"}}
-<table>
+
+<table class="table">
   <thead>
-    <tr><td>Patient Name</td></tr>
+    <tr>
+      <th scope="col">Name</th>
+    </tr>
   </thead>
   <tbody>
   {{range .Patients}}
-    <tr><td><a href="{{.ShowPatientLink}}">{{.DisplayName}}</a></td></tr>
+    <tr>
+      <td><a href="{{.ShowPatientLink}}">{{.DisplayName}}</a></td>
+    </tr>
   {{end}}
   </tbody>
 </table>
+
+<a href="/create-person">Add New Person</a>
 {{end}}
 `
 
