@@ -38,6 +38,7 @@ func (u *WebUI) Register(m *http.ServeMux) {
 	m.HandleFunc("/log-in", u.logInHandler)
 	m.HandleFunc("/sign-in-with-google", u.signInWithGoogleHandler)
 	m.HandleFunc("/list-patients", u.listPatientsHandler)
+	m.HandleFunc("/create-person", u.createPersonHandler)
 	m.HandleFunc("/show-patient", u.showPatientHandler)
 	m.HandleFunc("/record-medication-refill", u.recordMedicationRefillHandler)
 	m.HandleFunc("/create-medication", u.createMedicationHandler)
@@ -412,6 +413,101 @@ func (u *WebUI) listPatientsHandler(w http.ResponseWriter, r *http.Request) {
 		glog.Errorf("Error while writing output: %v", err)
 		return
 	}
+}
+
+func createPersonLink(userError string) string {
+	q := url.Values{}
+	if userError != "" {
+		q.Add("user-error", userError)
+	}
+	u := &url.URL{
+		Path:     "/create-person",
+		RawQuery: q.Encode(),
+	}
+	return u.String()
+}
+
+func (u *WebUI) createPersonHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/create-person" {
+		glog.Errorf("Returning Not Found because createPersonHandler doesn't support path %q", r.URL.Path)
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		u.createPersonGetHandler(w, r)
+		return
+	case http.MethodPost:
+		u.createPersonPostHandler(w, r)
+		return
+	default:
+		glog.Errorf("Returning Bad Request because recordMedicationRefillHandler doesn't support path %q", r.URL.Path)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+}
+
+func (u *WebUI) createPersonGetHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("Error while parsing form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+	}
+
+	user := u.checkSession(ctx, w, r, createPersonLink(r.Form.Get("user-error")))
+	if user == nil {
+		// checkSession already wrote an error redirect.
+	}
+	// No permissions check necessary.
+
+	params := &uitemplates.CreatePersonParams{
+		UserError: r.Form.Get("user-error"),
+	}
+	content, err := uitemplates.CreatePersonPage(params)
+	if err != nil {
+		glog.Errorf("Error while executing template: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := w.Write(content); err != nil {
+		// It's too late to write an error to the HTTP response.
+		glog.Errorf("Error while writing output: %v", err)
+		return
+	}
+}
+
+func (u *WebUI) createPersonPostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		glog.Errorf("Error while parsing form: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	user := u.checkSession(ctx, w, r, createPersonLink(r.Form.Get("user-error")))
+	if user == nil {
+		// checkSession already wrote an error or redirect.
+		return
+	}
+	// No permissions check.
+
+	person := &dbtypes.Patient{
+		DisplayName:   r.Form.Get("name"),
+		ManagingUsers: []string{user.ID},
+	}
+
+	err := u.db.CreatePerson(ctx, person)
+	if err != nil {
+		glog.Errorf("Error while creating person: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/list-patients", http.StatusFound)
 }
 
 func ShowPatientLink(id string) string {

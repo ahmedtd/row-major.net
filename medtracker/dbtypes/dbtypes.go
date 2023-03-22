@@ -31,8 +31,6 @@ type Patient struct {
 	// The set of users who can manage this patient.
 	ManagingUsers []string `firestore:"managingUsers"`
 
-	NotificationEmails []string `firestore:"notificationEmails"`
-
 	Medications []*Medication `firestore:"medications"`
 }
 

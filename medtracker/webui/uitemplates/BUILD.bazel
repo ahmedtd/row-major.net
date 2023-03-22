@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "base.go",
         "createmedication.go",
+        "createperson.go",
         "home.go",
         "listpatients.go",
         "login.go",

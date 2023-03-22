@@ -228,6 +228,15 @@ func (db *DB) GetPatient(ctx context.Context, id string) (*dbtypes.Patient, erro
 	return patient, nil
 }
 
+func (db *DB) CreatePerson(ctx context.Context, person *dbtypes.Patient) error {
+	newPersonRef := db.firestoreClient.Collection("Patients").NewDoc()
+	person.ID = newPersonRef.ID
+	if _, err := newPersonRef.Create(ctx, person); err != nil {
+		return fmt.Errorf("while creating person: %w", err)
+	}
+	return nil
+}
+
 func (db *DB) CheckUserAllowedToManagePatient(ctx context.Context, user *dbtypes.User, patientID string) error {
 	patient, err := db.GetPatient(ctx, patientID)
 	if err != nil {
