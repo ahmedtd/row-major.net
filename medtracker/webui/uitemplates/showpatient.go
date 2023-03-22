@@ -38,7 +38,7 @@ var showPatientText = `
 	  <th scope="col">Record Refill</th>
 	</tr>
   </thead>
-  <tbody>
+  <tbody class="table-group-divider">
     {{range .Medications}}
     <tr>
 	  <th scope="row">{{.DisplayName}}</th>

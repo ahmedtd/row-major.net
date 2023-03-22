@@ -31,7 +31,7 @@ var baseText = `
   
       <footer class="pt-3 my-5 border-top">
         <address>
-	      <a href="mailto:admin@medtracker.dev">Contact</a>
+          Contact: admin@medtracker.dev
         </address>
       </footer>
     </div>

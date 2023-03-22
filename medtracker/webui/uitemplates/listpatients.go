@@ -26,7 +26,7 @@ var listPatientsText = `
       <th scope="col">Name</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody class="table-group-divider">
   {{range .Patients}}
     <tr>
       <td><a href="{{.ShowPatientLink}}">{{.DisplayName}}</a></td>

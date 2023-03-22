@@ -12,11 +12,35 @@ var homeText = `{{define "title"}}Home{{end}}
 {{- end}}
 
 {{define "content"}}
-{{if .LoggedIn}}
-<a href="/list-patients">List People</a>
-{{else}}
-<a href="/log-in">Log In</a>
-{{end}}
+  <p>
+    Welcome to MedTracker, a tool that helps you stay on top of renewal dates for your
+	or your family members' prescriptions.  Use it when:
+	<ul>
+	  <li>Your pharmacy doesn't support auto-renew.</li>
+	  <li>You need to remind your doctor's office each time a renewal is needed.</li>
+	</ul>
+  </p>
+  
+  <p>
+    After creating an account, you can add one or more people you are keeping track of,
+	and then add information about their prescriptions.  MedTracker will send you reminder
+	emails five days and two days before the end of the prescription.  Once you have gotten
+	a refill, you can record it in MedTracker to reset the countdown.
+  </p>
+  
+  {{if .LoggedIn}}
+    <p>
+	  Welcome. Actions available:
+	  <ul>
+	    <li><a href="/list-patients">List People</a></li>
+		<li><a href="/log-out">Log Out</a></li>
+	  </ul>
+	</p>
+  {{else}}
+    <p>
+      To get started, <a href="/log-in">Log In</a>.
+    </p>
+  {{end}}
 {{end}}
 `
 
