@@ -18,7 +18,7 @@ import (
 )
 
 type MedicationAlert struct {
-	NotificationEmails       []string
+	NotifyUsers              []string
 	PrescriptionLengthAlerts []PrescriptionLengthAlert
 	ShowPatientLink          string
 }
@@ -115,8 +115,8 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 		// times, so it's important that we initialize the medication alert from
 		// scratch each time.
 		medicationAlert = &MedicationAlert{
-			NotificationEmails: patient.NotificationEmails,
-			ShowPatientLink:    webui.ShowPatientLink(patient.ID),
+			NotifyUsers:     patient.ManagingUsers,
+			ShowPatientLink: webui.ShowPatientLink(patient.ID),
 		}
 
 		for _, medication := range patient.Medications {
@@ -163,6 +163,32 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 	return nil
 }
 
+func (p *Poller) sendAlert(ctx context.Context, alert *MedicationAlert) error {
+	if len(alert.PrescriptionLengthAlerts) == 0 {
+		return nil
+	}
+
+	for _, userID := range alert.NotifyUsers {
+		userSnap, err := p.firestoreClient.Collection("Users").Doc(userID).Get(ctx)
+		if err != nil {
+			return fmt.Errorf("while retrieving user %s: %w", userID, err)
+		}
+
+		user := &dbtypes.User{}
+		if err := userSnap.DataTo(user); err != nil {
+			return fmt.Errorf("while unmarshaling user %s: %w", userID, err)
+		}
+
+		if user.Email != "" {
+			if err := p.sendEmailAlert(ctx, user, alert); err != nil {
+				return fmt.Errorf("while sending email alert: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
 const emailPlain = `
 {{- if .PrescriptionLengthAlerts -}}
 The following prescriptions are ending soon:
@@ -176,19 +202,13 @@ Manage in the Web UI: https://medtracker.dev{{.ShowPatientLink}}
 
 var emailPlainTemplate = template.Must(template.New("email").Parse(emailPlain))
 
-func (p *Poller) sendAlert(ctx context.Context, alert *MedicationAlert) error {
-	if len(alert.PrescriptionLengthAlerts) == 0 {
-		return nil
-	}
-
+func (p *Poller) sendEmailAlert(ctx context.Context, user *dbtypes.User, alert *MedicationAlert) error {
 	message := mail.NewV3Mail()
 	message.From = mail.NewEmail("MedTracker Bot", "bot@medtracker.dev")
-	message.Subject = fmt.Sprintf("Medtracker Alert")
+	message.Subject = "Medtracker Alert"
 
 	personalization := mail.NewPersonalization()
-	for _, addr := range alert.NotificationEmails {
-		personalization.To = append(personalization.To, mail.NewEmail("", addr))
-	}
+	personalization.To = append(personalization.To, mail.NewEmail("", user.Email))
 	message.Personalizations = append(message.Personalizations, personalization)
 
 	textContent := &bytes.Buffer{}
