@@ -9,6 +9,7 @@ go_library(
         "home.go",
         "listpatients.go",
         "login.go",
+        "logout.go",
         "recordmedicationrefill.go",
         "showpatient.go",
     ],

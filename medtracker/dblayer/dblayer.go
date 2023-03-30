@@ -165,6 +165,27 @@ func (db *DB) SessionFromGoogleFederation(ctx context.Context, idToken string) (
 	return session, nil
 }
 
+// DeleteSession deletes a session by its cookie.
+func (db *DB) DeleteSession(ctx context.Context, cookie string) error {
+	sessionIter := db.firestoreClient.Collection("Sessions").Where("cookie", "==", cookie).Documents(ctx)
+	for {
+		sessionSnapshot, err := sessionIter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("while looking up session: %w", err)
+		}
+
+		_, err = sessionSnapshot.Ref.Delete(ctx, firestore.LastUpdateTime(sessionSnapshot.UpdateTime))
+		if err != nil {
+			return fmt.Errorf("while deleting session: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // UserFromSessionCookie looks up a session from its cookie, and then returns
 // the corresponding user.
 func (db *DB) UserFromSessionCookie(ctx context.Context, cookie string) (*dbtypes.User, error) {

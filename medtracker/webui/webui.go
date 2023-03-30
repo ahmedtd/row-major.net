@@ -36,6 +36,7 @@ func New(firestoreClient *firestore.Client, db *dblayer.DB, googleOAuthClientID 
 func (u *WebUI) Register(m *http.ServeMux) {
 	m.HandleFunc("/", u.homeHandler)
 	m.HandleFunc("/log-in", u.logInHandler)
+	m.HandleFunc("/log-out", u.logOutHandler)
 	m.HandleFunc("/sign-in-with-google", u.signInWithGoogleHandler)
 	m.HandleFunc("/list-patients", u.listPatientsHandler)
 	m.HandleFunc("/create-person", u.createPersonHandler)
@@ -46,7 +47,7 @@ func (u *WebUI) Register(m *http.ServeMux) {
 
 // getLoggedInUser loads the user associated with the session cookie in the
 // request, if it exists.
-func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (*dbtypes.User, error) {
+func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (string, *dbtypes.User, error) {
 	var sessionCookie *http.Cookie
 	for _, cookie := range r.Cookies() {
 		if cookie.Name == "MedTracker-Session" {
@@ -56,15 +57,15 @@ func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (*dbtypes.
 	if sessionCookie == nil {
 		// No session cookie; user is not logged in.
 		glog.Infof("No logged-in user because there was no session cookie.")
-		return nil, nil
+		return "", nil, nil
 	}
 
 	user, err := u.db.UserFromSessionCookie(ctx, sessionCookie.Value)
 	if err != nil {
-		return nil, fmt.Errorf("while getting user from session cookie: %w", err)
+		return "", nil, fmt.Errorf("while getting user from session cookie: %w", err)
 	}
 
-	return user, nil
+	return "", user, nil
 }
 
 func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http.Request, redirectAfterLogin string) *dbtypes.User {
@@ -122,7 +123,7 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	params := &uitemplates.HomeParams{}
 
-	user, err := u.getLoggedInUser(r.Context(), r)
+	_, user, err := u.getLoggedInUser(r.Context(), r)
 	if err != nil {
 		glog.Errorf("Error while getting logged-in user: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -197,7 +198,7 @@ func signInWithGoogleTarget(redirectTarget string) string {
 func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	user, err := u.getLoggedInUser(ctx, r)
+	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
 		glog.Errorf("Error while getting logged-in user: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -243,7 +244,7 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	user, err := u.getLoggedInUser(ctx, r)
+	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
 		glog.Errorf("Error while getting logged-in user: %v", err)
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
@@ -301,6 +302,83 @@ func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, target, http.StatusFound)
+}
+
+func (u *WebUI) logOutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/log-out" {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		u.logOutGetHandler(w, r)
+		return
+	case http.MethodPost:
+		u.logOutPostHandler(w, r)
+		return
+	}
+}
+
+func (u *WebUI) logOutGetHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	_, user, err := u.getLoggedInUser(ctx, r)
+	if err != nil {
+		glog.Errorf("Error while getting logged-in user: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if user == nil {
+		// User is already logged out?
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	content, err := uitemplates.LogOutPage(&uitemplates.LogOutParams{})
+	if err != nil {
+		glog.Errorf("Error while executing template: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := w.Write(content); err != nil {
+		// It's too late to write an error to the HTTP response.
+		glog.Errorf("Error while writing output: %v", err)
+		return
+	}
+}
+
+func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	cookie, user, err := u.getLoggedInUser(ctx, r)
+	if err != nil {
+		glog.Errorf("Error while getting logged-in user: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if user == nil {
+		// User is already logged out.
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	err = u.db.DeleteSession(ctx, cookie)
+	if err != nil {
+		glog.Errorf("Error while deleting session: %v", err)
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:   "MedTracker-Session",
+		MaxAge: -1,
+	})
+
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 // signInWithGoogleHandler accepts the "Sign In With Google" ID token POST.
