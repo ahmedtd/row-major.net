@@ -65,7 +65,7 @@ func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (string, *
 		return "", nil, fmt.Errorf("while getting user from session cookie: %w", err)
 	}
 
-	return "", user, nil
+	return sessionCookie.Value, user, nil
 }
 
 func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http.Request, redirectAfterLogin string) *dbtypes.User {

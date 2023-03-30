@@ -56,6 +56,7 @@ func (db *DB) SessionFromPassword(ctx context.Context, email, password string) (
 
 	var userSnapshot *firestore.DocumentSnapshot
 	userIter := db.firestoreClient.Collection("Users").Where("email", "==", email).Documents(ctx)
+	defer userIter.Stop()
 	for {
 		var err error
 		userSnapshot, err = userIter.Next()
@@ -119,6 +120,7 @@ func (db *DB) SessionFromGoogleFederation(ctx context.Context, idToken string) (
 
 	var userSnapshot *firestore.DocumentSnapshot
 	userIter := db.firestoreClient.Collection("Users").Where("email", "==", email).Documents(ctx)
+	defer userIter.Stop()
 	for {
 		var err error
 		userSnapshot, err = userIter.Next()
@@ -168,6 +170,7 @@ func (db *DB) SessionFromGoogleFederation(ctx context.Context, idToken string) (
 // DeleteSession deletes a session by its cookie.
 func (db *DB) DeleteSession(ctx context.Context, cookie string) error {
 	sessionIter := db.firestoreClient.Collection("Sessions").Where("cookie", "==", cookie).Documents(ctx)
+	defer sessionIter.Stop()
 	for {
 		sessionSnapshot, err := sessionIter.Next()
 		if err == iterator.Done {
@@ -191,6 +194,7 @@ func (db *DB) DeleteSession(ctx context.Context, cookie string) error {
 func (db *DB) UserFromSessionCookie(ctx context.Context, cookie string) (*dbtypes.User, error) {
 	var sessionSnapshot *firestore.DocumentSnapshot
 	sessionIter := db.firestoreClient.Collection("Sessions").Where("cookie", "==", cookie).Documents(ctx)
+	defer sessionIter.Stop()
 	for {
 		var err error
 		sessionSnapshot, err = sessionIter.Next()
