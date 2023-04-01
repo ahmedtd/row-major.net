@@ -147,7 +147,7 @@ deploy-medtracker-manifest:
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
-    - "gcloud container clusters get-credentials --project=bomsync-214520 --zone=us-west1-a taahm-primary-cluster"
+    - "gcloud container clusters get-credentials --project=bomsync-214520 --zone=us-west1 cell-us-west1"
     - "kubectl apply --kustomize=manifests/medtracker/production"
 
 deploy-manifest:
@@ -166,5 +166,5 @@ deploy-manifest:
   image: gcr.io/google.com/cloudsdktool/cloud-sdk
   script:
     - "gcloud auth activate-service-account --key-file=${GCP_SA_KEY_FILE}"
-    - "gcloud container clusters get-credentials --project=bomsync-214520 --zone=us-west1-a taahm-primary-cluster"
+    - "gcloud container clusters get-credentials --project=bomsync-214520 --zone=us-west1 cell-us-west1"
     - "kubectl apply --kustomize=manifests/production"
