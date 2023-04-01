@@ -39,8 +39,13 @@ spec:
         ports:
         - containerPort: 8001
         resources:
+          requests:
+            cpu: 250m
+            ephemeral-storage: 10Mi
+            memory: 512Mi
           limits:
-            memory: 100Mi
+            ephemeral-storage: 10Mi
+            memory: 512Mi
         livenessProbe:
           httpGet:
             path: /healthz

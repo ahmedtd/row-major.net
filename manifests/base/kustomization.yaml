@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
 - infra-gateway.yaml
-- mastodon-tenant.yaml
+# - mastodon-tenant.yaml
 - row-major-web.yaml
 - rumor-mill.yaml
-- sharded-controller.yaml
+# - sharded-controller.yaml
