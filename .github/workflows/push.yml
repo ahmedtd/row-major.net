@@ -35,6 +35,9 @@ jobs:
     - run: 'gcloud auth configure-docker gcr.io'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //medtracker/cmd/poller:poller_push'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //medtracker/cmd/webui:webui_push'
+    - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //shardedcontroller:push'
+    - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //rumor-mill/cmd/poller:poller_push'
+    - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //webalator:webalator_push'
   
   deploy-medtracker-manifest:
     if: "contains(github.event.head_commit.message, 'COMMIT_TYPE=deploy')"
