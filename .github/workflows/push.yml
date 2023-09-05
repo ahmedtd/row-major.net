@@ -53,6 +53,7 @@ jobs:
     - uses: google-github-actions/setup-gcloud@v1
       with:
         version: '>= 390.0.0'
+    - run: 'gcloud components install gke-gcloud-auth-plugin'
     - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-214520 --zone=us-west1 cell-us-west1'
     - run: 'kubectl apply --kustomize=manifests/medtracker/production'  
 
@@ -71,6 +72,7 @@ jobs:
     - uses: google-github-actions/setup-gcloud@v1
       with:
         version: '>= 390.0.0'
+    - run: 'gcloud components install gke-gcloud-auth-plugin'
     - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-214520 --zone=us-west1 cell-us-west1'
     - run: 'kubectl apply --kustomize=manifests/medtracker/production'
       
