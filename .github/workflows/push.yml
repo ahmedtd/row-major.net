@@ -13,7 +13,7 @@ jobs:
       uses: 'google-github-actions/auth@v1'
       with:
         workload_identity_provider: 'projects/508647401058/locations/global/workloadIdentityPools/ci-federation/providers/github-actions'
-        #service_account: 'my-service-account@my-project.iam.gserviceaccount.com'
+        service_account: 'github-actions@row-major-ci.iam.gserviceaccount.com'
 
     - name: 'Set up Cloud SDK'
       uses: 'google-github-actions/setup-gcloud@v1'
