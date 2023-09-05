@@ -1,0 +1,23 @@
+name: build
+on: [push]
+jobs:
+  ping-gcp:
+    # Add "id-token" with the intended permissions.
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - id: 'auth'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: 'projects/508647401058/locations/global/workloadIdentityPools/ci-federation/providers/github-actions'
+        #service_account: 'my-service-account@my-project.iam.gserviceaccount.com'
+
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 390.0.0'
+
+    - name: 'Use gcloud CLI'
+      run: 'gcloud container clusters list --project=bomsync-214520'
