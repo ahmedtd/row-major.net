@@ -2,6 +2,7 @@ name: build
 on: [push]
 jobs:
   ping-gcp:
+    runs-on: ubuntu-latest
     # Add "id-token" with the intended permissions.
     permissions:
       contents: 'read'
