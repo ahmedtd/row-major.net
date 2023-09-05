@@ -9,7 +9,10 @@ jobs:
       id-token: 'write'
 
     steps:
-    - id: 'auth'
+    - name: "Checkout"
+      uses: actions/checkout@v3
+      
+    - name: 'Setup Google Cloud Authentication'
       uses: 'google-github-actions/auth@v1'
       with:
         workload_identity_provider: 'projects/508647401058/locations/global/workloadIdentityPools/ci-federation/providers/github-actions'
