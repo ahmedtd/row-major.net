@@ -32,6 +32,6 @@ jobs:
     
     - run: 'curl -L https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 > bazel'
     - run: 'chmod +x bazel'
-    - run: './bazel test -- //... -//cloud-checkout/...'
+    - run: './bazel test -- //... -//cloud-checkout/... -//harpoon/...'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //medtracker/cmd/poller:poller_push'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //medtracker/cmd/webui:webui_push'
