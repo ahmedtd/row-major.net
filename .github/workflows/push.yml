@@ -53,7 +53,7 @@ jobs:
     - uses: google-github-actions/setup-gcloud@v1
       with:
         version: '>= 390.0.0'
-    - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-24520 --zone=us-west1 cell-us-west-1'
+    - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-214520 --zone=us-west1 cell-us-west-1'
     - run: 'kubectl apply --kustomize=manifests/medtracker/production'  
 
   deploy-manifest:
@@ -71,6 +71,6 @@ jobs:
     - uses: google-github-actions/setup-gcloud@v1
       with:
         version: '>= 390.0.0'
-    - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-24520 --zone=us-west1 cell-us-west-1'
+    - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-214520 --zone=us-west1 cell-us-west-1'
     - run: 'kubectl apply --kustomize=manifests/medtracker/production'
       
