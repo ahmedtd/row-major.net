@@ -9,6 +9,7 @@ require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.1
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.20.1
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v0.20.1
+	github.com/boltdb/bolt v1.3.1
 	github.com/dgraph-io/badger v1.6.2
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
