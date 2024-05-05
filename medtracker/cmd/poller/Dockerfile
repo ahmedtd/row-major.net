@@ -5,6 +5,6 @@ FROM gcr.io/distroless/static-debian11
 
 # The complicated name is for compatibility with the original
 # bazel-built images.
-COPY webui /app/medtracker/cmd/poller/poller
+COPY poller /app/medtracker/cmd/poller/poller
 
 CMD ["/app/medtracker/cmd/poller/poller"]
