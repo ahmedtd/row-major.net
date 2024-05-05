@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -29,6 +30,7 @@ var (
 func main() {
 	flag.Parse()
 
+	log.Printf("Starting up")
 	glog.Infof("flags:")
 	glog.Infof("debug-listen: %v", *debugListen)
 	glog.Infof("ui-listen: %v", *uiListen)

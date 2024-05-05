@@ -5,6 +5,25 @@ env:
   BAZEL_VERSION: "5.1.0"
 
 jobs:
+  build-medtracker:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: 'Setup Google Cloud Authentication'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: 'projects/508647401058/locations/global/workloadIdentityPools/ci-federation/providers/github-actions'
+        service_account: 'github-actions@row-major-ci.iam.gserviceaccount.com'
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 390.0.0'
+    - run: 'gcloud auth configure-docker gcr.io'
+    - run: docker build --tag gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA -f medtracker-webui.Dockerfile
+    - run: docker push gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA
+    - run: echo "image=gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA" >> $GITHUB_OUTPUT 
+
   test-and-upload:
     if: "!contains(github.event.head_commit.message, 'COMMIT_TYPE=deploy')"
 
@@ -33,7 +52,7 @@ jobs:
     - run: './bazel test -- //... -//cloud-checkout/... -//harpoon/...'
     - run: 'gcloud auth configure-docker gcr.io'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //medtracker/cmd/poller:poller_push'
-    - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //medtracker/cmd/webui:webui_push'
+    # - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //medtracker/cmd/webui:webui_push'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //shardedcontroller:push'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //rumor-mill/cmd/poller:poller_push'
     - run: 'IMAGE_REPO=bomsync-214520 IMAGE_TAG=${GITHUB_SHA} ./bazel run //webalator:webalator_push'

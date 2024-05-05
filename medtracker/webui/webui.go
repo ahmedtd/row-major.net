@@ -40,6 +40,7 @@ func (u *WebUI) Register(m *http.ServeMux) {
 	m.HandleFunc("/sign-in-with-google", u.signInWithGoogleHandler)
 	m.HandleFunc("/list-people", u.listPeopleHandler)
 	m.HandleFunc("/create-person", u.createPersonHandler)
+	m.HandleFunc("/delete-person", u.deletePersonHandler)
 	m.HandleFunc("/show-patient", u.showPatientHandler)
 	m.HandleFunc("/record-medication-refill", u.recordMedicationRefillHandler)
 	m.HandleFunc("/create-medication", u.createMedicationHandler)
@@ -474,8 +475,8 @@ func (u *WebUI) listPeopleHandler(w http.ResponseWriter, r *http.Request) {
 
 		params.People = append(params.People, uitemplates.ListPeoplePerson{
 			DisplayName:      dbPatient.DisplayName,
-			ShowPersonLink:   showPersonLink(dbPatient.ID),
-			DeletePersonLink: deletePersonLink(dbPatient.ID),
+			ShowPersonLink:   ShowPersonLink(dbPatient.ID),
+			DeletePersonLink: deletePersonLink(dbPatient.ID, ""),
 		})
 	}
 
@@ -590,7 +591,7 @@ func (u *WebUI) createPersonPostHandler(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/list-patients", http.StatusFound)
 }
 
-func showPersonLink(id string) string {
+func ShowPersonLink(id string) string {
 	q := url.Values{}
 	q.Add("id", id)
 	showPatientLink := &url.URL{
@@ -617,7 +618,7 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 
 	patientID := r.Form.Get("id")
 
-	user := u.checkSession(ctx, w, r, showPersonLink(patientID))
+	user := u.checkSession(ctx, w, r, ShowPersonLink(patientID))
 	if user == nil {
 		// checkSession already wrote an error or redirect
 		return
@@ -645,7 +646,7 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 	params := &uitemplates.ShowPatientParams{
 		DisplayName:          patient.DisplayName,
 		CreateMedicationLink: createMedicationLink(patient.ID, ""),
-		SelfLink:             showPersonLink(patient.ID),
+		SelfLink:             ShowPersonLink(patient.ID),
 	}
 	for _, dbMed := range patient.Medications {
 		expiry := dbMed.PrescriptionLastFilledAt.Add(time.Duration(dbMed.PrescriptionLengthDays) * 24 * time.Hour)
@@ -729,30 +730,30 @@ func (u *WebUI) deletePersonGetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	person, err := u.db.GetPatient(ctx, r.Form.Get("patient-id"))
-	if err != nil {
-		glog.Errorf("Error while getting patient: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
+	// person, err := u.db.GetPatient(ctx, r.Form.Get("patient-id"))
+	// if err != nil {
+	// 	glog.Errorf("Error while getting patient: %v", err)
+	// 	http.Error(w, "Internal Error", http.StatusInternalServerError)
+	// 	return
+	// }
 
-	params := &uitemplates.DeletePersonParams{
-		PersonName:     person.DisplayName,
-		ShowPersonLink: showPersonLink(r.Form.Get("person-id")),
-		UserError:      r.Form.Get("user-error"),
-	}
-	content, err := uitemplates.DeletePersonPage(params)
-	if err != nil {
-		glog.Errorf("Error while executing template: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
+	// params := &uitemplates.DeletePersonParams{
+	// 	PersonName:     person.DisplayName,
+	// 	ShowPersonLink: showPersonLink(r.Form.Get("person-id")),
+	// 	UserError:      r.Form.Get("user-error"),
+	// }
+	// content, err := uitemplates.DeletePersonPage(params)
+	// if err != nil {
+	// 	glog.Errorf("Error while executing template: %v", err)
+	// 	http.Error(w, "Internal Error", http.StatusInternalServerError)
+	// 	return
+	// }
 
-	if _, err := w.Write(content); err != nil {
-		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
-		return
-	}
+	// if _, err := w.Write(content); err != nil {
+	// 	// It's too late to write an error to the HTTP response.
+	// 	glog.Errorf("Error while writing output: %v", err)
+	// 	return
+	// }
 }
 
 func (u *WebUI) deletePersonPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -774,12 +775,12 @@ func (u *WebUI) deletePersonPostHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err := u.db.DeletePerson(ctx, r.Form.Get("person-id"))
-	if err != nil {
-		glog.Errorf("Error while deleting person: %v", err)
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
+	// err := u.db.DeletePerson(ctx, r.Form.Get("person-id"))
+	// if err != nil {
+	// 	glog.Errorf("Error while deleting person: %v", err)
+	// 	http.Error(w, "Internal Error", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	http.Redirect(w, r, "/list-patients", http.StatusFound)
 }
@@ -906,7 +907,7 @@ func (u *WebUI) recordMedicationRefillPostHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	http.Redirect(w, r, showPersonLink(patientID), http.StatusFound)
+	http.Redirect(w, r, ShowPersonLink(patientID), http.StatusFound)
 }
 
 func createMedicationLink(patientID, userError string) string {
@@ -1028,5 +1029,5 @@ func (u *WebUI) createMedicationPostHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	http.Redirect(w, r, showPersonLink(patientID), http.StatusFound)
+	http.Redirect(w, r, ShowPersonLink(patientID), http.StatusFound)
 }

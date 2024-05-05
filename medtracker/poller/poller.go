@@ -116,7 +116,7 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 		// scratch each time.
 		medicationAlert = &MedicationAlert{
 			NotifyUsers:     patient.ManagingUsers,
-			ShowPatientLink: webui.ShowPatientLink(patient.ID),
+			ShowPatientLink: webui.ShowPersonLink(patient.ID),
 		}
 
 		for _, medication := range patient.Medications {
