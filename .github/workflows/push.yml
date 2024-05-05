@@ -20,9 +20,9 @@ jobs:
         go-version: 1.22
     - run: go vet -v ./medtracker/...
     - run: go test -v ./medtracker/...
-    - run: CGO_ENABLED=0 go build -o medtracker/cmd/webui/webui ./medtracker/cmd/webui
+    - run: CGO_ENABLED=0 go build -trimpath -o medtracker/cmd/webui/webui ./medtracker/cmd/webui
     - run: docker build --tag gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA ./medtracker/cmd/webui
-    - run: CGO_ENABLED=0 go build -o medtracker/cmd/poller/poller ./medtracker/cmd/poller
+    - run: CGO_ENABLED=0 go build -trimpath -o medtracker/cmd/poller/poller ./medtracker/cmd/poller
     - run: docker build --tag gcr.io/bomsync-214520/medtracker/poller:$GITHUB_SHA ./medtracker/cmd/poller
     - name: 'Setup Google Cloud Authentication'
       uses: 'google-github-actions/auth@v1'
