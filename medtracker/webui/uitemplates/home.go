@@ -32,7 +32,7 @@ var homeText = `{{define "title"}}Home{{end}}
     <p>
 	  Welcome. Actions available:
 	  <ul>
-	    <li><a href="/list-patients">List People</a></li>
+	    <li><a href="/list-people">List People</a></li>
 		<li><a href="/log-out">Log Out</a></li>
 	  </ul>
 	</p>

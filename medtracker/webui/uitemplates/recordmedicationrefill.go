@@ -17,7 +17,7 @@ var recordMedicationRefillText = `
 
 {{define "breadcrumbs" -}}
   <li class="breadcrumb-item"><a href="/">Home</a></li>
-  <li class="breadcrumb-item"><a href="/list-patients">List People</a></li>
+  <li class="breadcrumb-item"><a href="/list-people">List People</a></li>
   <li class="breadcrumb-item"><a href="{{.ShowPatientLink}}">Person: {{.PatientDisplayName}}</a></li>
   <li class="breadcrumb-item active" aria-current="page"><a href="{{.SelfLink}}">Record Medication Refill</a></li>
 {{- end}}

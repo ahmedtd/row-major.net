@@ -15,7 +15,7 @@ var createPersonText = `
 
 {{define "breadcrumbs" -}}
   <li class="breadcrumb-item"><a href="/">Home</a></li>
-  <li class="breadcrumb-item"><a href="/list-patients">List People</a></li>
+  <li class="breadcrumb-item"><a href="/list-people">List People</a></li>
   <li class="breadcrumb-item active" aria-current="page"><a href="/create-person">Add New Person</a></li>
 {{- end}}
 

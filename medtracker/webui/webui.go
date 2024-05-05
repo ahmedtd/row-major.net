@@ -588,7 +588,7 @@ func (u *WebUI) createPersonPostHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	http.Redirect(w, r, "/list-patients", http.StatusFound)
+	http.Redirect(w, r, "/list-people", http.StatusFound)
 }
 
 func ShowPersonLink(id string) string {
@@ -782,7 +782,7 @@ func (u *WebUI) deletePersonPostHandler(w http.ResponseWriter, r *http.Request) 
 	// 	return
 	// }
 
-	http.Redirect(w, r, "/list-patients", http.StatusFound)
+	http.Redirect(w, r, "/list-people", http.StatusFound)
 }
 
 func recordMedicationRefillLink(patientID, medicationName, userError string) string {
