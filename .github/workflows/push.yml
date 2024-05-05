@@ -27,6 +27,7 @@ jobs:
       with:
         version: '>= 390.0.0'
     - run: 'gcloud auth configure-docker gcr.io'
+    - run: ls
     - run: go install .
     - run: go vet -v ./medtracker/...
     - run: go test -v ./medtracker/...
