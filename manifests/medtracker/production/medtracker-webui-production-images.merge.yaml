@@ -11,4 +11,4 @@ spec:
     spec:
       containers:
       - name: main
-        image: gcr.io/bomsync-214520/medtracker/webui:300f0888e07de0f9068dfaf92df60289098815ba
+        image: gcr.io/bomsync-214520/medtracker/webui:e1f9e921f66a48dc99de7a65d618add90c35d223
