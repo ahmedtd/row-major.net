@@ -23,7 +23,7 @@ jobs:
       with:
         version: '>= 390.0.0'
     - run: 'gcloud auth configure-docker gcr.io'
-    - run: docker build --tag gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA -f medtracker-webui.Dockerfile
+    - run: docker build --tag gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA -f medtracker-webui.Dockerfile .
     - run: docker push gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA
     - run: echo "image=gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA" >> $GITHUB_OUTPUT 
 
