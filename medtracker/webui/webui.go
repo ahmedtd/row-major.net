@@ -34,16 +34,22 @@ func New(firestoreClient *firestore.Client, db *dblayer.DB, googleOAuthClientID 
 }
 
 func (u *WebUI) Register(m *http.ServeMux) {
-	m.HandleFunc("/", u.homeHandler)
-	m.HandleFunc("/log-in", u.logInHandler)
-	m.HandleFunc("/log-out", u.logOutHandler)
-	m.HandleFunc("/sign-in-with-google", u.signInWithGoogleHandler)
-	m.HandleFunc("/list-people", u.listPeopleHandler)
-	m.HandleFunc("/create-person", u.createPersonHandler)
-	m.HandleFunc("/delete-person", u.deletePersonHandler)
-	m.HandleFunc("/show-patient", u.showPatientHandler)
-	m.HandleFunc("/record-medication-refill", u.recordMedicationRefillHandler)
-	m.HandleFunc("/create-medication", u.createMedicationHandler)
+	m.HandleFunc("GET /", u.homeHandler)
+	m.HandleFunc("GET /log-in", u.logInGetHandler)
+	m.HandleFunc("POST /log-in", u.logInPostHandler)
+	m.HandleFunc("GET /log-out", u.logOutGetHandler)
+	m.HandleFunc("POST /log-out", u.logOutPostHandler)
+	m.HandleFunc("POST /sign-in-with-google", u.signInWithGooglePostHandler)
+	m.HandleFunc("GET /list-people", u.listPeopleHandler)
+	m.HandleFunc("GET /create-person", u.createPersonGetHandler)
+	m.HandleFunc("POST /create-person", u.createPersonPostHandler)
+	m.HandleFunc("GET /delete-person", u.deletePersonGetHandler)
+	m.HandleFunc("POST /delete-person", u.deletePersonPostHandler)
+	m.HandleFunc("GET /show-patient", u.showPatientHandler)
+	m.HandleFunc("GET /record-medication-refill", u.recordMedicationRefillGetHandler)
+	m.HandleFunc("POST /record-medication-refill", u.recordMedicationRefillPostHandler)
+	m.HandleFunc("GET /create-medication", u.createMedicationGetHandler)
+	m.HandleFunc("POST /create-medication", u.createMedicationPostHandler)
 }
 
 // getLoggedInUser loads the user associated with the session cookie in the
@@ -161,27 +167,6 @@ func logInLink(userError, redirectTarget string) string {
 		RawQuery: q.Encode(),
 	}
 	return link.String()
-}
-
-// logInHandler renders the login page.
-func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/log-in" {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		u.logInGetHandler(w, r)
-		return
-	case http.MethodPost:
-		u.logInPostHandler(w, r)
-		return
-	default:
-		glog.Errorf("Returning Bad Request because logInHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
 }
 
 func signInWithGoogleTarget(redirectTarget string) string {
@@ -305,22 +290,6 @@ func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusFound)
 }
 
-func (u *WebUI) logOutHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/log-out" {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		u.logOutGetHandler(w, r)
-		return
-	case http.MethodPost:
-		u.logOutPostHandler(w, r)
-		return
-	}
-}
-
 func (u *WebUI) logOutGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -380,24 +349,6 @@ func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	http.Redirect(w, r, "/", http.StatusFound)
-}
-
-// signInWithGoogleHandler accepts the "Sign In With Google" ID token POST.
-func (u *WebUI) signInWithGoogleHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/sign-in-with-google" {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodPost:
-		u.signInWithGooglePostHandler(w, r)
-		return
-	default:
-		glog.Errorf("Returning Bad Request because signInWithGoogleHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
 }
 
 func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Request) {
@@ -504,27 +455,6 @@ func createPersonLink(userError string) string {
 		RawQuery: q.Encode(),
 	}
 	return u.String()
-}
-
-func (u *WebUI) createPersonHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/create-person" {
-		glog.Errorf("Returning Not Found because createPersonHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		u.createPersonGetHandler(w, r)
-		return
-	case http.MethodPost:
-		u.createPersonPostHandler(w, r)
-		return
-	default:
-		glog.Errorf("Returning Bad Request because createPersonHandler doesn't support method %q", r.Method)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
 }
 
 func (u *WebUI) createPersonGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -690,27 +620,6 @@ func deletePersonLink(id, userError string) string {
 	return link.String()
 }
 
-func (u *WebUI) deletePersonHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/delete-person" {
-		glog.Errorf("Returning Not Found because deletePersonHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		u.deletePersonGetHandler(w, r)
-		return
-	case http.MethodPost:
-		u.deletePersonPostHandler(w, r)
-		return
-	default:
-		glog.Errorf("Returning Bad Request because deletePersonHandler doesn't support method %q", r.Method)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-}
-
 func (u *WebUI) deletePersonGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -797,27 +706,6 @@ func recordMedicationRefillLink(patientID, medicationName, userError string) str
 		RawQuery: q.Encode(),
 	}
 	return showPatientLink.String()
-}
-
-func (u *WebUI) recordMedicationRefillHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/record-medication-refill" {
-		glog.Errorf("Returning Not Found because recordMedicationRefillHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		u.recordMedicationRefillGetHandler(w, r)
-		return
-	case http.MethodPost:
-		u.recordMedicationRefillPostHandler(w, r)
-		return
-	default:
-		glog.Errorf("Returning Bad Request because recordMedicationRefillHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
 }
 
 func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -921,27 +809,6 @@ func createMedicationLink(patientID, userError string) string {
 		RawQuery: q.Encode(),
 	}
 	return link.String()
-}
-
-func (u *WebUI) createMedicationHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/create-medication" {
-		glog.Errorf("Returning Not Found because createMedicationHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		u.createMedicationGetHandler(w, r)
-		return
-	case http.MethodPost:
-		u.createMedicationPostHandler(w, r)
-		return
-	default:
-		glog.Errorf("Returning Bad Request because createMedicationHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
 }
 
 func (u *WebUI) createMedicationGetHandler(w http.ResponseWriter, r *http.Request) {
