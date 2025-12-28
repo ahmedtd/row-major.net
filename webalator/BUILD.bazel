@@ -14,7 +14,7 @@ container_push(
     name = "webalator_push",
     format = "Docker",
     image = ":webalator_image",
-    registry = "gcr.io",
+    registry = "us-west1-docker.pkg.dev",
     repository = "{STABLE_IMAGE_REPO}/webalator",
     tag = "{STABLE_IMAGE_TAG}",
 )

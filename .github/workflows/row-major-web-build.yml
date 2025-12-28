@@ -1,0 +1,25 @@
+name: row-major-web-build
+on:
+  push:
+
+jobs:
+  build-row-major-web:
+    if: "!contains(github.event.head_commit.message, 'COMMIT_TYPE=deploy')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: 'Setup Google Cloud Authentication'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: 'projects/508647401058/locations/global/workloadIdentityPools/ci-federation/providers/github-actions'
+        service_account: 'github-actions@row-major-ci.iam.gserviceaccount.com'
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 390.0.0'
+    - run: 'gcloud auth configure-docker us-west1-docker.pkg.dev'
+    - run: 'IMAGE_REPO=row-major-ci/row-major-net-images IMAGE_TAG=${GITHUB_SHA} bazelisk run //webalator:webalator_push'

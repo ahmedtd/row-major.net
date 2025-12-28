@@ -1,6 +1,3 @@
-# This file is overwritten by CI.
-#
-# Refer to //infra-tools/bump-manifest to see how it is generated.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,4 +8,4 @@ spec:
     spec:
       containers:
       - name: row-major-web-content
-        image: gcr.io/bomsync-214520/webalator:2b1af10898d2b9ea0ee12211864b98dcd93c35f6
+        image: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/webalator:2b1af10898d2b9ea0ee12211864b98dcd93c35f6
