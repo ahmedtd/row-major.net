@@ -22,4 +22,4 @@ jobs:
       with:
         version: '>= 390.0.0'
     - run: 'gcloud auth configure-docker us-west1-docker.pkg.dev'
-    - run: 'IMAGE_REPO=row-major-ci/row-major-net-images IMAGE_TAG=${GITHUB_SHA} bazelisk run //webalator:webalator_push'
+    - run: 'BAZEL_VERSION=4.x IMAGE_REPO=row-major-ci/row-major-net-images IMAGE_TAG=${GITHUB_SHA} bazelisk run //webalator:webalator_push'
