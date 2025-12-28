@@ -8,4 +8,4 @@ spec:
     spec:
       containers:
       - name: row-major-web-content
-        image: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/webalator:2b1af10898d2b9ea0ee12211864b98dcd93c35f6
+        image: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/webalator:b97a2ca4f20bc4ddc28cd4ca9624c2acbe9f5407
