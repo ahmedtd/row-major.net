@@ -5,6 +5,5 @@ bases:
   - ../base
 
 patchesStrategicMerge:
-  - row-major-web-production-images.merge.yaml
   - rumor-mill-poller-production-images.merge.yaml
 # - sharded-controller-production-images.merge.yaml
