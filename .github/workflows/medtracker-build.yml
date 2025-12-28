@@ -19,9 +19,9 @@ jobs:
     - run: go vet -v ./medtracker/...
     - run: go test -v ./medtracker/...
     - run: CGO_ENABLED=0 go build -trimpath -o medtracker/cmd/webui/webui ./medtracker/cmd/webui
-    - run: docker build --tag gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA ./medtracker/cmd/webui
+    - run: docker build --tag us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/webui:$GITHUB_SHA ./medtracker/cmd/webui
     - run: CGO_ENABLED=0 go build -trimpath -o medtracker/cmd/poller/poller ./medtracker/cmd/poller
-    - run: docker build --tag gcr.io/bomsync-214520/medtracker/poller:$GITHUB_SHA ./medtracker/cmd/poller
+    - run: docker build --tag us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/poller:$GITHUB_SHA ./medtracker/cmd/poller
     - name: 'Setup Google Cloud Authentication'
       uses: 'google-github-actions/auth@v1'
       with:
@@ -31,9 +31,9 @@ jobs:
       uses: 'google-github-actions/setup-gcloud@v1'
       with:
         version: '>= 390.0.0'
-    - run: 'gcloud auth configure-docker gcr.io'
-    - run: docker push gcr.io/bomsync-214520/medtracker/webui:$GITHUB_SHA
-    - run: docker push gcr.io/bomsync-214520/medtracker/poller:$GITHUB_SHA
+    - run: 'gcloud auth configure-docker us-west1-docker.pkg.dev'
+    - run: docker push us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/webui:$GITHUB_SHA
+    - run: docker push us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/poller:$GITHUB_SHA
 
   # test-and-upload:
   #   if: "!contains(github.event.head_commit.message, 'COMMIT_TYPE=deploy')"
