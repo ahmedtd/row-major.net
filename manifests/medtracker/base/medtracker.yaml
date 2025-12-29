@@ -186,23 +186,3 @@ spec:
     kind: Service
     name: webui
 
----
-
-apiVersion: networking.gke.io/v1
-kind: HealthCheckPolicy
-metadata:
-  name: webui-debug-healthcheck
-  namespace: medtracker
-spec:
-  default:
-    logConfig:
-      enabled: true
-    config:
-      type: HTTP
-      httpHealthCheck:
-        requestPath: /healthz
-        port: 8001
-  targetRef:
-    group: ""
-    kind: Service
-    name: webui
