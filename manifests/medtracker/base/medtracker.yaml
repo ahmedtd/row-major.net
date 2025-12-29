@@ -180,9 +180,9 @@ spec:
       type: HTTP
       httpHealthCheck:
         requestPath: /
-        port: http
+        port: 8000
   targetRef:
-    group:
+    group: ""
     kind: Service
     name: webui
 
@@ -201,8 +201,8 @@ spec:
       type: HTTP
       httpHealthCheck:
         requestPath: /healthz
-        port: debug
+        port: 8001
   targetRef:
-    group:
+    group: ""
     kind: Service
     name: webui
