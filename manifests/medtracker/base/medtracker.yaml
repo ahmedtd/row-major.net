@@ -164,3 +164,45 @@ spec:
  - backendRefs:
    - name: webui
      port: 8000
+
+---
+
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: webui-ui-healthcheck
+  namespace: medtracker
+spec:
+  default:
+    logConfig:
+      enabled: true
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /heath
+  targetRef:
+    group:
+    kind: Service
+    name: webui
+    port: http
+
+---
+
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: webui-debug-healthcheck
+  namespace: medtracker
+spec:
+  default:
+    logConfig:
+      enabled: true
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /healthz
+  targetRef:
+    group:
+    kind: Service
+    name: webui
+    port: debug
