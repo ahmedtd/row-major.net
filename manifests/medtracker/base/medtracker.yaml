@@ -63,7 +63,6 @@ spec:
         command:
         - /app/medtracker/cmd/poller/poller
         - --debug-listen=0.0.0.0:8001
-        - --logtostderr=true
         - --data-project=medtracker-314520-data-prod
         - --sendgrid-key-secret=sendgrid-api-key
         - --recheck-period=12h
@@ -120,7 +119,6 @@ spec:
         - /app/medtracker/cmd/webui/webui
         - --ui-listen=0.0.0.0:8000
         - --debug-listen=0.0.0.0:8001
-        - --logtostderr=true
         - --data-project=medtracker-314520-data-prod
         - --google-oauth-client-id=661674165474-bc4n829285mfe6tjc9l9gnmnar54jttj.apps.googleusercontent.com
 
