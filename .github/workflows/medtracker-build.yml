@@ -4,7 +4,7 @@ on:
 
 jobs:
   build-medtracker:
-    if: "!contains(github.event.head_commit.message, 'COMMIT_TYPE=deploy')"
+    if: "contains(github.event.head_commit.message, 'Build-MedTracker: True')"
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
