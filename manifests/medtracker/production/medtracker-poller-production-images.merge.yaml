@@ -11,4 +11,4 @@ spec:
     spec:
       containers:
       - name: main
-        image: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/poller:1a475ff11abfee4dc9602258099aa1e66e9c389a
+        image: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/poller:7375536e8a98363f999d7370e52619153bc6bbe4
