@@ -29,7 +29,16 @@ var (
 func main() {
 	flag.Parse()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource: true,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// GCP Cloud Logging prefers "message"
+			if a.Key == "msg" {
+				a.Key = "message"
+			}
+			return a
+		},
+	}))
 	slog.SetDefault(logger)
 
 	slog.Info("Starting up")
@@ -48,6 +57,21 @@ func main() {
 		slog.ErrorContext(ctx, "Error", slog.Any("err", err))
 		os.Exit(255)
 	}
+}
+
+func GCPCloudLoggingHTTPMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+
+		slog.InfoContext(
+			r.Context(),
+			"Processed HTTP Request",
+			slog.Group(
+				"httpRequest",
+				slog.String("requestMethod", r.Method),
+				slog.String("requestURL", r.URL.String()),
+			))
+	})
 }
 
 func do(ctx context.Context) error {
@@ -79,7 +103,7 @@ func do(ctx context.Context) error {
 	uiServeMux := http.NewServeMux()
 	uiServer := &http.Server{
 		Addr:    *uiListen,
-		Handler: uiServeMux,
+		Handler: GCPCloudLoggingHTTPMiddleware(uiServeMux),
 
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,
