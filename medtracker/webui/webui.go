@@ -72,6 +72,13 @@ func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (string, *
 		return "", nil, fmt.Errorf("while getting user from session cookie: %w", err)
 	}
 
+	slog.InfoContext(ctx, "Determined logged-in user",
+		slog.Group("user",
+			slog.String("id", user.ID),
+			slog.String("email", user.Email),
+		),
+	)
+
 	return sessionCookie.Value, user, nil
 }
 
