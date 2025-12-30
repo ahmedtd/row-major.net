@@ -11,4 +11,4 @@ spec:
     spec:
       containers:
       - name: main
-        image: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/webui:5656266881420c34993881403e71c3b21ef87aab
+        image: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images/medtracker/webui:1a475ff11abfee4dc9602258099aa1e66e9c389a
