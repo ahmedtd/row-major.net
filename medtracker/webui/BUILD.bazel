@@ -9,7 +9,6 @@ go_library(
         "//medtracker/dblayer:go_default_library",
         "//medtracker/dbtypes:go_default_library",
         "//medtracker/webui/uitemplates:go_default_library",
-        "@com_github_golang_glog//:go_default_library",
         "@com_google_cloud_go_firestore//:go_default_library",
         "@org_golang_google_api//iterator:go_default_library",
     ],

@@ -7,7 +7,7 @@ go_library(
         "createmedication.go",
         "createperson.go",
         "home.go",
-        "listpatients.go",
+        "listpeople.go",
         "login.go",
         "logout.go",
         "recordmedicationrefill.go",

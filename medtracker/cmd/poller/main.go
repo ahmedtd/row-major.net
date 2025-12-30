@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -16,7 +17,6 @@ import (
 
 	"cloud.google.com/go/firestore"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
-	"github.com/golang/glog"
 	"github.com/sendgrid/sendgrid-go"
 	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
@@ -31,17 +31,21 @@ var (
 func main() {
 	flag.Parse()
 
-	glog.Infof("flags:")
-	glog.Infof("debug-listen: %v", *debugListen)
-	glog.Infof("recheck-period: %v", *recheckPeriod)
-	glog.Infof("data-project: %v", *dataProject)
-	glog.Infof("sendgrid-key-secret: %v", *sendgridKeySecret)
+	slog.Info("Starting up")
+	slog.Info(
+		"Flags",
+		slog.String("debug-listen", *debugListen),
+		slog.Duration("recheck-period", *recheckPeriod),
+		slog.String("data-project", *dataProject),
+		slog.String("sendgrid-key-secret", *sendgridKeySecret),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if err := do(ctx); err != nil {
-		glog.Exitf("Error: %v", err)
+		slog.ErrorContext(ctx, "Error", slog.Any("err", err))
+		os.Exit(255)
 	}
 }
 
@@ -77,7 +81,8 @@ func do(ctx context.Context) error {
 
 	go func() {
 		if err := debugServer.ListenAndServe(); err != nil {
-			glog.Fatalf("Debug server died: %v", err)
+			slog.ErrorContext(ctx, "Debug server died", slog.Any("err", err))
+			os.Exit(255)
 		}
 	}()
 
@@ -88,8 +93,6 @@ func do(ctx context.Context) error {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 	<-signalCh
-
-	glog.Flush()
 
 	return nil
 }

@@ -7,13 +7,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
 	"row-major/medtracker/dbtypes"
 
 	"cloud.google.com/go/firestore"
-	"github.com/golang/glog"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/idtoken"
 	"google.golang.org/api/iterator"
@@ -210,7 +210,7 @@ func (db *DB) UserFromSessionCookie(ctx context.Context, cookie string) (*dbtype
 	}
 	if sessionSnapshot == nil {
 		// Session object must have been cleaned up due to expiration; user is not logged in.
-		glog.Infof("No logged-in user because there was no session object corresponding to the cookie in the database.")
+		slog.InfoContext(ctx, "No logged-in user because there was no session object corresponding to the cookie in the database.")
 		return nil, nil
 	}
 
@@ -221,7 +221,7 @@ func (db *DB) UserFromSessionCookie(ctx context.Context, cookie string) (*dbtype
 
 	if session.Expires.Before(time.Now()) {
 		// Session object is expired; user is not logged in.
-		glog.Infof("No logged-in user because the session object in the database was expired.")
+		slog.InfoContext(ctx, "No logged-in user because the session object in the database was expired.")
 		return nil, nil
 	}
 

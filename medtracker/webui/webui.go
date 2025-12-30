@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"row-major/medtracker/webui/uitemplates"
 
 	"cloud.google.com/go/firestore"
-	"github.com/golang/glog"
 	"google.golang.org/api/iterator"
 )
 
@@ -34,22 +34,22 @@ func New(firestoreClient *firestore.Client, db *dblayer.DB, googleOAuthClientID 
 }
 
 func (u *WebUI) Register(m *http.ServeMux) {
-	m.HandleFunc("GET /", u.homeHandler)
-	m.HandleFunc("GET /log-in", u.logInGetHandler)
-	m.HandleFunc("POST /log-in", u.logInPostHandler)
-	m.HandleFunc("GET /log-out", u.logOutGetHandler)
-	m.HandleFunc("POST /log-out", u.logOutPostHandler)
-	m.HandleFunc("POST /sign-in-with-google", u.signInWithGooglePostHandler)
-	m.HandleFunc("GET /list-people", u.listPeopleHandler)
-	m.HandleFunc("GET /create-person", u.createPersonGetHandler)
-	m.HandleFunc("POST /create-person", u.createPersonPostHandler)
-	m.HandleFunc("GET /delete-person", u.deletePersonGetHandler)
-	m.HandleFunc("POST /delete-person", u.deletePersonPostHandler)
-	m.HandleFunc("GET /show-patient", u.showPatientHandler)
-	m.HandleFunc("GET /record-medication-refill", u.recordMedicationRefillGetHandler)
-	m.HandleFunc("POST /record-medication-refill", u.recordMedicationRefillPostHandler)
-	m.HandleFunc("GET /create-medication", u.createMedicationGetHandler)
-	m.HandleFunc("POST /create-medication", u.createMedicationPostHandler)
+	m.HandleFunc("GET /{$}", u.homeHandler)
+	m.HandleFunc("GET /log-in/{$}", u.logInGetHandler)
+	m.HandleFunc("POST /log-in/{$}", u.logInPostHandler)
+	m.HandleFunc("GET /log-out/{$}", u.logOutGetHandler)
+	m.HandleFunc("POST /log-out/{$}", u.logOutPostHandler)
+	m.HandleFunc("POST /sign-in-with-google/{$}", u.signInWithGooglePostHandler)
+	m.HandleFunc("GET /list-people/{$}", u.listPeopleHandler)
+	m.HandleFunc("GET /create-person/{$}", u.createPersonGetHandler)
+	m.HandleFunc("POST /create-person/{$}", u.createPersonPostHandler)
+	m.HandleFunc("GET /delete-person/{$}", u.deletePersonGetHandler)
+	m.HandleFunc("POST /delete-person/{$}", u.deletePersonPostHandler)
+	m.HandleFunc("GET /show-patient/{$}", u.showPatientHandler)
+	m.HandleFunc("GET /record-medication-refill/{$}", u.recordMedicationRefillGetHandler)
+	m.HandleFunc("POST /record-medication-refill/{$}", u.recordMedicationRefillPostHandler)
+	m.HandleFunc("GET /create-medication/{$}", u.createMedicationGetHandler)
+	m.HandleFunc("POST /create-medication/{$}", u.createMedicationPostHandler)
 }
 
 // getLoggedInUser loads the user associated with the session cookie in the
@@ -63,7 +63,7 @@ func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (string, *
 	}
 	if sessionCookie == nil {
 		// No session cookie; user is not logged in.
-		glog.Infof("No logged-in user because there was no session cookie.")
+		slog.InfoContext(ctx, "No logged-in user because there was no session cookie.")
 		return "", nil, nil
 	}
 
@@ -84,21 +84,21 @@ func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http
 	}
 	if sessionCookie == nil {
 		// User is not logged in.  Send them to log in.
-		glog.Infof("No logged-in user because there was no session cookie.  Redirecting to login.")
+		slog.InfoContext(ctx, "No logged-in user because there was no session cookie.  Redirecting to login.")
 		http.Redirect(w, r, logInLink("", redirectAfterLogin), http.StatusFound)
 		return nil
 	}
 
 	user, err := u.db.UserFromSessionCookie(ctx, sessionCookie.Value)
 	if err != nil {
-		glog.Infof("Error while validating session cookie: %v", err)
+		slog.ErrorContext(ctx, "Error while validating session cookie", slog.Any("err", err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return nil
 	}
 	if user == nil {
 		// User is not logged in.  For example, there was a session cookie, but
 		// it corresponds to an expired session.
-		glog.Infof("Session cookie didn't correspond to an active session.")
+		slog.InfoContext(ctx, "Session cookie didn't correspond to an active session.")
 		http.Redirect(w, r, logInLink("", redirectAfterLogin), http.StatusFound)
 		return nil
 	}
@@ -109,11 +109,11 @@ func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http
 func (u *WebUI) checkUserAllowedToManagePatient(ctx context.Context, w http.ResponseWriter, r *http.Request, user *dbtypes.User, patientID string) bool {
 	err := u.db.CheckUserAllowedToManagePatient(ctx, user, patientID)
 	if errors.Is(err, dblayer.ErrPermissionDenied) {
-		glog.Errorf("User is not allowed to view patient %s", patientID)
+		slog.ErrorContext(ctx, "User is not allowed to view patient", slog.String("patient", patientID))
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return false
 	} else if err != nil {
-		glog.Errorf("Error while checking that session is allowed to manage patient: %v", err)
+		slog.ErrorContext(ctx, "Error while checking that session is allowed to manage patient", slog.Any("err", err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return false
 	}
@@ -123,16 +123,13 @@ func (u *WebUI) checkUserAllowedToManagePatient(ctx context.Context, w http.Resp
 
 // homeHandler renders the home page.
 func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
+	ctx := r.Context()
 
 	params := &uitemplates.HomeParams{}
 
 	_, user, err := u.getLoggedInUser(r.Context(), r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -142,14 +139,14 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	content := bytes.Buffer{}
 	if err := uitemplates.HomeTemplate.Execute(&content, params); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := io.Copy(w, &content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -186,13 +183,13 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -215,14 +212,14 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	content := bytes.Buffer{}
 	if err := uitemplates.LogInTemplate.Execute(&content, params); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := io.Copy(w, &content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -232,13 +229,13 @@ func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -267,7 +264,7 @@ func (u *WebUI) logInPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		glog.Errorf("Error while processing log in form: %v", err)
+		slog.ErrorContext(ctx, "Error while processing log in form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -295,7 +292,7 @@ func (u *WebUI) logOutGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -308,14 +305,14 @@ func (u *WebUI) logOutGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	content, err := uitemplates.LogOutPage(&uitemplates.LogOutParams{})
 	if err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := w.Write(content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -325,7 +322,7 @@ func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	cookie, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -338,7 +335,7 @@ func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = u.db.DeleteSession(ctx, cookie)
 	if err != nil {
-		glog.Errorf("Error while deleting session: %v", err)
+		slog.ErrorContext(ctx, "Error while deleting session", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -355,7 +352,7 @@ func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -366,7 +363,7 @@ func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err != nil {
-		glog.Errorf("Error while processing log in form: %v", err)
+		slog.ErrorContext(ctx, "Error while processing log in form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -390,11 +387,6 @@ func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Reque
 }
 
 func (u *WebUI) listPeopleHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/list-people" {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
 	ctx := r.Context()
 
 	user := u.checkSession(ctx, w, r, "/list-people")
@@ -412,14 +404,14 @@ func (u *WebUI) listPeopleHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			glog.Errorf("Error while iterating patients managed by user: %v", err)
+			slog.ErrorContext(ctx, "Error while iterating patients managed by user", slog.Any("err", err))
 			http.Error(w, "Internal Error", http.StatusInternalServerError)
 			return
 		}
 
 		dbPatient := &dbtypes.Patient{}
 		if err := patientSnapshot.DataTo(dbPatient); err != nil {
-			glog.Errorf("Error while extracting patient %s: %v", patientSnapshot.Ref.ID, err)
+			slog.ErrorContext(ctx, "Error while extracting patient", slog.String("patient", patientSnapshot.Ref.ID), slog.Any("err", err))
 			http.Error(w, "Internal Error", http.StatusInternalServerError)
 			return
 		}
@@ -433,14 +425,14 @@ func (u *WebUI) listPeopleHandler(w http.ResponseWriter, r *http.Request) {
 
 	content, err := uitemplates.ListPeoplePage(params)
 	if err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := w.Write(content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -461,7 +453,7 @@ func (u *WebUI) createPersonGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -478,14 +470,14 @@ func (u *WebUI) createPersonGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	content, err := uitemplates.CreatePersonPage(params)
 	if err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := w.Write(content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -494,7 +486,7 @@ func (u *WebUI) createPersonPostHandler(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -513,7 +505,7 @@ func (u *WebUI) createPersonPostHandler(w http.ResponseWriter, r *http.Request) 
 
 	err := u.db.CreatePerson(ctx, person)
 	if err != nil {
-		glog.Errorf("Error while creating person: %v", err)
+		slog.ErrorContext(ctx, "Error while creating person", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -532,16 +524,10 @@ func ShowPersonLink(id string) string {
 }
 
 func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/show-patient" {
-		glog.Errorf("Returning Not Found because showPatientHandler doesn't support path %q", r.URL.Path)
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -561,14 +547,14 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 	patientDocRef := u.firestoreClient.Collection("Patients").Doc(patientID)
 	patientDocSnap, err := patientDocRef.Get(ctx)
 	if err != nil {
-		glog.Errorf("Error while getting patient: %v", err)
+		slog.ErrorContext(ctx, "Error while getting patient", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	patient := &dbtypes.Patient{}
 	if err := patientDocSnap.DataTo(patient); err != nil {
-		glog.Errorf("Error while unmarshaling patient: %v", err)
+		slog.ErrorContext(ctx, "Error while unmarshaling patient", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -595,14 +581,14 @@ func (u *WebUI) showPatientHandler(w http.ResponseWriter, r *http.Request) {
 
 	content := bytes.Buffer{}
 	if err := uitemplates.ShowPatientTemplate.Execute(&content, params); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := io.Copy(w, &content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -624,7 +610,7 @@ func (u *WebUI) deletePersonGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -641,7 +627,7 @@ func (u *WebUI) deletePersonGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	// person, err := u.db.GetPatient(ctx, r.Form.Get("patient-id"))
 	// if err != nil {
-	// 	glog.Errorf("Error while getting patient: %v", err)
+	// 	slog.ErrorContext(ctx, "Error while getting patient: %v", err)
 	// 	http.Error(w, "Internal Error", http.StatusInternalServerError)
 	// 	return
 	// }
@@ -653,14 +639,14 @@ func (u *WebUI) deletePersonGetHandler(w http.ResponseWriter, r *http.Request) {
 	// }
 	// content, err := uitemplates.DeletePersonPage(params)
 	// if err != nil {
-	// 	glog.Errorf("Error while executing template: %v", err)
+	// 	slog.ErrorContext(ctx, "Error while executing template: %v", err)
 	// 	http.Error(w, "Internal Error", http.StatusInternalServerError)
 	// 	return
 	// }
 
 	// if _, err := w.Write(content); err != nil {
 	// 	// It's too late to write an error to the HTTP response.
-	// 	glog.Errorf("Error while writing output: %v", err)
+	// 	slog.ErrorContext(ctx, "Error while writing output: %v", err)
 	// 	return
 	// }
 }
@@ -669,7 +655,7 @@ func (u *WebUI) deletePersonPostHandler(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -686,7 +672,7 @@ func (u *WebUI) deletePersonPostHandler(w http.ResponseWriter, r *http.Request) 
 
 	// err := u.db.DeletePerson(ctx, r.Form.Get("person-id"))
 	// if err != nil {
-	// 	glog.Errorf("Error while deleting person: %v", err)
+	// 	slog.ErrorContext(ctx, "Error while deleting person: %v", err)
 	// 	http.Error(w, "Internal Error", http.StatusInternalServerError)
 	// 	return
 	// }
@@ -712,7 +698,7 @@ func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -732,7 +718,7 @@ func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.
 
 	patient, err := u.db.GetPatient(ctx, patientID)
 	if err != nil {
-		glog.Errorf("Error while retrieving patient: %v", err)
+		slog.ErrorContext(ctx, "Error while retrieving patient", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -747,14 +733,14 @@ func (u *WebUI) recordMedicationRefillGetHandler(w http.ResponseWriter, r *http.
 
 	content := bytes.Buffer{}
 	if err := uitemplates.RecordMedicationRefillTemplate.Execute(&content, params); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := io.Copy(w, &content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -763,7 +749,7 @@ func (u *WebUI) recordMedicationRefillPostHandler(w http.ResponseWriter, r *http
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -790,7 +776,7 @@ func (u *WebUI) recordMedicationRefillPostHandler(w http.ResponseWriter, r *http
 		return
 	}
 	if err != nil {
-		glog.Errorf("Error while recording medication refill: %v", err)
+		slog.ErrorContext(ctx, "Error while recording medication refill", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -815,7 +801,7 @@ func (u *WebUI) createMedicationGetHandler(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -834,7 +820,7 @@ func (u *WebUI) createMedicationGetHandler(w http.ResponseWriter, r *http.Reques
 
 	patient, err := u.db.GetPatient(ctx, patientID)
 	if err != nil {
-		glog.Errorf("Error while retrieving patient: %v", err)
+		slog.ErrorContext(ctx, "Error while retrieving patient", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -848,14 +834,14 @@ func (u *WebUI) createMedicationGetHandler(w http.ResponseWriter, r *http.Reques
 
 	content := bytes.Buffer{}
 	if err := uitemplates.CreateMedicationTemplate.Execute(&content, params); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := io.Copy(w, &content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -864,7 +850,7 @@ func (u *WebUI) createMedicationPostHandler(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -891,7 +877,7 @@ func (u *WebUI) createMedicationPostHandler(w http.ResponseWriter, r *http.Reque
 	} else if errors.Is(err, dblayer.ErrCouldNotParsePrescriptionLength) {
 		http.Redirect(w, r, createMedicationLink(patientID, "Could not parse prescription length"), http.StatusFound)
 	} else if err != nil {
-		glog.Errorf("Error while creating medication: %v", err)
+		slog.ErrorContext(ctx, "Error while creating medication", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}

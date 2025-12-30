@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"text/template"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"row-major/medtracker/webui"
 
 	"cloud.google.com/go/firestore"
-	"github.com/golang/glog"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"google.golang.org/api/iterator"
@@ -52,7 +52,7 @@ func (p *Poller) Run(ctx context.Context) error {
 	// Poll once right away --- ticker doesn't fire until the tick period has
 	// elapsed.
 	if err := p.pollPatients(ctx); err != nil {
-		glog.Errorf("Error during poller pass: %v", err)
+		slog.ErrorContext(ctx, "Error during poller pass", slog.Any("err", err))
 	}
 
 	for {
@@ -63,15 +63,15 @@ func (p *Poller) Run(ctx context.Context) error {
 		}
 
 		if err := p.pollPatients(ctx); err != nil {
-			glog.Errorf("Error during poller pass: %v", err)
+			slog.ErrorContext(ctx, "Error during poller pass", slog.Any("err", err))
 		}
 	}
 }
 
 func (p *Poller) pollPatients(ctx context.Context) error {
-	glog.Infof("Starting poller pass")
+	slog.InfoContext(ctx, "Starting poller pass")
 	defer func() {
-		glog.Infof("Finished poller pass")
+		slog.InfoContext(ctx, "Finished poller pass")
 	}()
 
 	patientsCollection := p.firestoreClient.Collection("Patients")
@@ -85,7 +85,7 @@ func (p *Poller) pollPatients(ctx context.Context) error {
 			return fmt.Errorf("while iterating patients: %w", err)
 		}
 
-		glog.Infof("Polling medications for patient %s", patientDocRef.ID)
+		slog.InfoContext(ctx, "Polling medications for patient", slog.String("patient", patientDocRef.ID))
 
 		if err := p.processPatient(ctx, patientDocRef); err != nil {
 			return fmt.Errorf("while polling medications for patient %s: %w", patientDocRef.ID, err)
@@ -155,7 +155,7 @@ func (p *Poller) processPatient(ctx context.Context, patientDocRef *firestore.Do
 		return fmt.Errorf("while executing transaction: %w", err)
 	}
 
-	glog.Infof("Sending medication alert %#v", medicationAlert)
+	slog.InfoContext(ctx, "Sending medication alert", slog.Any("alert", medicationAlert))
 	if err := p.sendAlert(ctx, medicationAlert); err != nil {
 		return fmt.Errorf("while sending medication alert: %w", err)
 	}
@@ -216,7 +216,7 @@ func (p *Poller) sendEmailAlert(ctx context.Context, user *dbtypes.User, alert *
 		return fmt.Errorf("while templating plain-text email content: %w", err)
 	}
 
-	message.Content = append(message.Content, mail.NewContent("text/plain", string(textContent.Bytes())))
+	message.Content = append(message.Content, mail.NewContent("text/plain", textContent.String()))
 
 	resp, err := p.sendgridClient.SendWithContext(ctx, message)
 	if err != nil {
