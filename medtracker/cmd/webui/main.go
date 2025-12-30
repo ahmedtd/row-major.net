@@ -114,6 +114,7 @@ func GCPCloudLoggingHTTPMiddleware(next http.Handler) http.Handler {
 				slog.String("requestUrl", r.URL.String()),
 				slog.Int("status", sc.statusCode),
 			),
+			slog.String("other-random-attribute", "foo"),
 		)
 	})
 }
