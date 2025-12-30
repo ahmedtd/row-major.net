@@ -32,7 +32,7 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		AddSource: true,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			// GCP Cloud Logging prefers "message"
+			// GCP Cloud Logging gives "message" nicer handling in the overview pane.
 			if a.Key == "msg" {
 				a.Key = "message"
 			}
@@ -59,18 +59,62 @@ func main() {
 	}
 }
 
+// statusCatcher safely catches properties of the HTTP response.
+//
+// See https://www.alexedwards.net/blog/how-to-use-the-http-responsecontroller-type
+type statusCatcher struct {
+	http.ResponseWriter
+	statusCode    int
+	headerWritten bool
+}
+
+func newStatusCatcher(w http.ResponseWriter) *statusCatcher {
+	return &statusCatcher{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+	}
+}
+
+func (mw *statusCatcher) WriteHeader(statusCode int) {
+	mw.ResponseWriter.WriteHeader(statusCode)
+
+	if !mw.headerWritten {
+		mw.statusCode = statusCode
+		mw.headerWritten = true
+	}
+}
+
+func (mw *statusCatcher) Write(b []byte) (int, error) {
+	mw.headerWritten = true
+	return mw.ResponseWriter.Write(b)
+}
+
+func (mw *statusCatcher) Unwrap() http.ResponseWriter {
+	return mw.ResponseWriter
+}
+
 func GCPCloudLoggingHTTPMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
+		sc := newStatusCatcher(w)
+
+		next.ServeHTTP(sc, r)
 
 		slog.InfoContext(
 			r.Context(),
-			"Processed HTTP Request",
+			"HTTP Request",
+
+			// Cloud Logging has slightly special handling for "httpRequest".
+			// Not sure if it actually adds anything over just putting a similar
+			// struct in jsonPayload.
+			//
+			// https://docs.cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#httprequest
 			slog.Group(
 				"httpRequest",
 				slog.String("requestMethod", r.Method),
-				slog.String("requestURL", r.URL.String()),
-			))
+				slog.String("requestUrl", r.URL.String()),
+				slog.Int("status", sc.statusCode),
+			),
+		)
 	})
 }
 
