@@ -110,6 +110,13 @@ func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http
 		return nil
 	}
 
+	slog.InfoContext(ctx, "Determined logged-in user",
+		slog.Group("user",
+			slog.String("id", user.ID),
+			slog.String("email", user.Email),
+		),
+	)
+
 	return user
 }
 
