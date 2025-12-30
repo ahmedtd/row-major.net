@@ -29,6 +29,9 @@ var (
 func main() {
 	flag.Parse()
 
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	slog.SetDefault(logger)
+
 	slog.Info("Starting up")
 	slog.Info(
 		"Flags",
