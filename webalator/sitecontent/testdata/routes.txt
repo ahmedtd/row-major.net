@@ -5,7 +5,6 @@
 #   static    <serving path>  <content type>
 #   template  <serving path>  <template path>
 #   redirect  <serving path>  <location>
-redirect		/
 redirect	/articles/2019-07-21-program-trace-analysis-with-wireshark	/articles/2019-07-21-program-trace-analysis-with-wireshark/
 redirect	/articles/2020-02-22-word-squares	/articles/2020-02-22-word-squares/
 redirect	/articles/2020-04-01-mona-lisa-life-revisited	/articles/2020-04-01-mona-lisa-life-revisited/
@@ -25,8 +24,6 @@ static	/articles/2019-07-21-program-trace-analysis-with-wireshark/packet_dump.pc
 static	/articles/2019-07-21-program-trace-analysis-with-wireshark/unmodified-example-program.cc	text/x-c++src; charset=utf-8
 static	/articles/2019-07-21-program-trace-analysis-with-wireshark/wireshark-custom-dissector-example.png	image/png
 static	/articles/2019-07-21-program-trace-analysis-with-wireshark/wireshark-custom-dissector.png	image/png
-static	/articles/2020-02-22-word-squares/.keep	
-static	/articles/2020-03-01-mona-lisa-life-revisited/.keep	
 static	/articles/2020-05-12-interactive-word-squares/ui.js	text/javascript; charset=utf-8
 static	/articles/2020-09-19-fluid/fluid.js	text/javascript; charset=utf-8
 static	/articles/2020-09-19-fluid/ui.js	text/javascript; charset=utf-8
@@ -34,7 +31,6 @@ static	/articles/rl-force-tube/Chart.js	text/javascript; charset=utf-8
 static	/articles/rl-force-tube/rl-force-tube.js	text/javascript; charset=utf-8
 static	/ballistae/angry-bunny.jpeg	image/jpeg
 static	/ballistae/crystal-bunny.jpeg	image/jpeg
-static	/frustum/.keep	
 static	/masters-thesis-presentation/an-spy.jpeg	image/jpeg
 static	/masters-thesis-presentation/captured-elements.svg	image/svg+xml
 static	/masters-thesis-presentation/classical-pattern.svg	image/svg+xml
@@ -55,83 +51,83 @@ static	/masters-thesis-presentation/find-maximal-interval.svg	image/svg+xml
 static	/masters-thesis-presentation/index.html	text/html; charset=utf-8
 static	/masters-thesis-presentation/katex/README.md	text/markdown; charset=utf-8
 static	/masters-thesis-presentation/katex/contrib/auto-render.min.js	text/javascript; charset=utf-8
-static	/masters-thesis-presentation/katex/fonts/KaTeX_AMS-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_AMS-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_AMS-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_AMS-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_AMS-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Bold.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Bold.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Bold.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Bold.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Bold.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Caligraphic-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Bold.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Bold.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Bold.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Bold.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Bold.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Fraktur-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Bold.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Bold.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Bold.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Bold.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Bold.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Italic.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Italic.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Italic.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Italic.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Italic.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Main-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-BoldItalic.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-BoldItalic.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-BoldItalic.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-BoldItalic.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-BoldItalic.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Italic.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Italic.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Italic.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Italic.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Italic.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Math-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Bold.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Bold.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Bold.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Bold.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Bold.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Italic.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Italic.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Italic.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Italic.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Italic.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_SansSerif-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Script-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Script-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Script-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Script-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Script-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Size1-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Size1-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size1-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size1-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size1-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Size2-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Size2-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size2-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size2-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size2-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Size3-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Size3-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size3-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size3-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size3-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Size4-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Size4-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size4-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size4-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Size4-Regular.woff2	font/woff2
-static	/masters-thesis-presentation/katex/fonts/KaTeX_Typewriter-Regular.eot	
+static	/masters-thesis-presentation/katex/fonts/KaTeX_Typewriter-Regular.eot	application/vnd.ms-fontobject
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Typewriter-Regular.ttf	font/ttf
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Typewriter-Regular.woff	font/woff
 static	/masters-thesis-presentation/katex/fonts/KaTeX_Typewriter-Regular.woff2	font/woff2
@@ -153,7 +149,6 @@ static	/masters-thesis-presentation/trial-1-results.png	image/png
 static	/masters-thesis-presentation/trial-2-results.png	image/png
 static	/masters-thesis-presentation/unsteered-specific-pattern.svg	image/svg+xml
 static	/masters-thesis-presentation/white.css	text/css; charset=utf-8
-static	/resume/.keep	
 static	/row-major-logo-optimized.svg	image/svg+xml
 static	/row-major-logo-optimized.svgz	image/svg+xml-compressed
 static	/row-major-logo-plain.svgz	image/svg+xml-compressed
@@ -163,9 +158,9 @@ static	/toys/ants/main.js	text/javascript; charset=utf-8
 static	/toys/ants/matter.js	text/javascript; charset=utf-8
 static	/toys/webgl-fluid/fluid.js	text/javascript; charset=utf-8
 static	/toys/webgl-fluid/ui.js	text/javascript; charset=utf-8
-static	/webgl-raytracer/raytracer.frag	
+static	/webgl-raytracer/raytracer.frag	text/plain; charset=utf-8
 static	/webgl-raytracer/raytracer.js	text/javascript; charset=utf-8
-static	/webgl-raytracer/raytracer.vert	
+static	/webgl-raytracer/raytracer.vert	text/plain; charset=utf-8
 template	/	index.html.tmpl
 template	/articles/2019-07-21-program-trace-analysis-with-wireshark/	articles/2019-07-21-program-trace-analysis-with-wireshark/index.html.tmpl
 template	/articles/2020-02-22-word-squares/	articles/2020-02-22-word-squares/index.html.tmpl
