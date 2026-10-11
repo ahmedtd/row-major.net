@@ -22,7 +22,7 @@ func New(contentPack *contentpack.Handler) (*Site, error) {
 
 	// Individual API calls are wired up below.
 
-	wordgridHandler, err := wordgrid.NewHandlerFromFile("wordgrid/sgb-words.txt")
+	wordgridHandler, err := wordgrid.NewHandlerFromSGBWords()
 	if err != nil {
 		return nil, fmt.Errorf("while creating wordgrid handler: %w", err)
 	}

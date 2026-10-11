@@ -6,7 +6,7 @@ go_library(
         "handler.go",
         "wordgrid.go",
     ],
-    data = [":sgb-words.txt"],
+    embedsrcs = ["sgb-words.txt"],
     importpath = "row-major/wordgrid",
     visibility = ["//visibility:public"],
     deps = [

@@ -19,8 +19,8 @@ func NewHandler(e *Evaluator) *Handler {
 	}
 }
 
-func NewHandlerFromFile(wordsFile string) (*Handler, error) {
-	ev, err := NewFromFile(wordsFile)
+func NewHandlerFromSGBWords() (*Handler, error) {
+	ev, err := NewFromSGBWords()
 	if err != nil {
 		return nil, err
 	}

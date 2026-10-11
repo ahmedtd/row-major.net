@@ -138,3 +138,14 @@ func TestOverConstrained(t *testing.T) {
 		t.Fatalf("Yielded solution %+v", e.SolutionAsGrid())
 	}
 }
+
+func TestSGBWords(t *testing.T) {
+	ev, err := NewFromSGBWords()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if got, want := len(ev.Words), 5757; got != want {
+		t.Errorf("Wrong number of words; got %d, want %d", got, want)
+	}
+}

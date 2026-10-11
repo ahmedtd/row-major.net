@@ -2,8 +2,8 @@ package wordgrid
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -81,13 +81,15 @@ func New(words []string) (*Evaluator, error) {
 	}, nil
 }
 
-func NewFromFile(wordsFile string) (*Evaluator, error) {
-	wordsData, err := ioutil.ReadFile(wordsFile)
-	if err != nil {
-		return nil, fmt.Errorf("while reading file %q: %w", wordsFile, err)
-	}
+// sgbWords is the list of five-letter words from the Stanford GraphBase.
+//
+//go:embed sgb-words.txt
+var sgbWords string
 
-	words := strings.Split(string(wordsData), "\n")
+// NewFromSGBWords creates an Evaluator over the Stanford GraphBase five-letter
+// word list.
+func NewFromSGBWords() (*Evaluator, error) {
+	words := strings.Split(sgbWords, "\n")
 	if len(words[len(words)-1]) == 0 {
 		words = words[0 : len(words)-1]
 	}
