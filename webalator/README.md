@@ -1,5 +1,8 @@
 Run with:
 
 ```bash
-bazel run //webalator -- --listen=127.0.0.1:8080 --debug-listen=127.0.0.1:8081 --content-pack=file://webalator/row_major_content.webalator.zip
+go run ./webalator --listen=127.0.0.1:8080 --debug-listen=127.0.0.1:8081 --logtostderr=true
 ```
+
+Site content lives in `sitecontent/static` and `sitecontent/templates`, and is
+embedded into the binary.

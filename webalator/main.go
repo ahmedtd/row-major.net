@@ -1,20 +1,18 @@
 package main
 
 import (
-	"archive/zip"
 	"context"
 	"flag"
 	"net/http"
 	"os"
 	"os/signal"
-	"row-major/webalator/contentpack"
 	"row-major/webalator/healthz"
 	"row-major/webalator/httpmetrics"
 	"row-major/webalator/imgalator"
 	"row-major/webalator/mdredir"
 	"row-major/webalator/proxyipreflect"
 	"row-major/webalator/site"
-	"strings"
+	"row-major/webalator/sitecontent"
 	"syscall"
 	"time"
 
@@ -29,7 +27,10 @@ import (
 var (
 	listen      = flag.String("listen", "0.0.0.0:8080", "Where should we listen for incoming connections?")
 	debugListen = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
-	contentPack = flag.String("content-pack", "", "URL of the content pack to serve.")
+
+	// Deprecated: Site content is now embedded in the binary.  This flag is
+	// ignored, and remains only so that existing deployments keep working.
+	_ = flag.String("content-pack", "", "Deprecated and ignored.")
 
 	enableProfiling = flag.Bool("enable-profiling", false, "")
 	enableTracing   = flag.Bool("enable-tracing", false, "")
@@ -47,7 +48,6 @@ func main() {
 	glog.Infof("flags:")
 	glog.Infof("listen: %v", *listen)
 	glog.Infof("debug-listen: %v", *debugListen)
-	glog.Infof("content-pack: %v", *contentPack)
 	glog.Infof("enable-profiling: %v", *enableProfiling)
 	glog.Infof("enable-tracing: %v", *enableTracing)
 	glog.Infof("tracing-ratio: %v", *tracingRatio)
@@ -100,25 +100,12 @@ func main() {
 	}
 	glog.Infof("Running from: %s", dir)
 
-	var contentPackReader *zip.ReadCloser
-	if strings.HasPrefix(*contentPack, "file://") {
-		filePath := strings.TrimPrefix(*contentPack, "file://")
-		reader, err := zip.OpenReader(filePath)
-		if err != nil {
-			glog.Fatalf("Error opening content pack: %v", err)
-		}
-		contentPackReader = reader
-	} else {
-		glog.Fatalf("Unsupported content pack: %v", *contentPack)
-	}
-	defer contentPackReader.Close()
-
-	contentPackHandler, err := contentpack.NewHandler(&contentPackReader.Reader)
+	contentHandler, err := sitecontent.NewEmbeddedHandler()
 	if err != nil {
-		glog.Fatalf("Error while creating content pack handler: %v", err)
+		glog.Fatalf("Error while creating site content handler: %v", err)
 	}
 
-	site, err := site.New(contentPackHandler)
+	site, err := site.New(contentHandler)
 	if err != nil {
 		glog.Fatalf("Error creating site: %v", err)
 	}

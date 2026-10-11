@@ -4,21 +4,19 @@ import (
 	"fmt"
 	"net/http"
 
-	"row-major/webalator/contentpack"
 	"row-major/wordgrid"
 )
 
 type Site struct {
-	Mux         *http.ServeMux
-	ContentPack *contentpack.Handler
+	Mux *http.ServeMux
 }
 
-func New(contentPack *contentpack.Handler) (*Site, error) {
+func New(content http.Handler) (*Site, error) {
 	s := &Site{
 		Mux: http.NewServeMux(),
 	}
 
-	s.Mux.Handle("/", contentPack)
+	s.Mux.Handle("/", content)
 
 	// Individual API calls are wired up below.
 
