@@ -31,22 +31,28 @@ func New(firestoreClient *firestore.Client, db *dblayer.DB) *WebUI {
 	}
 }
 
-func (u *WebUI) Register(m *http.ServeMux) {
-	m.HandleFunc("GET /{$}", u.homeHandler)
-	m.HandleFunc("GET /log-in", u.logInGetHandler)
-	m.HandleFunc("POST /log-in", u.logInPostHandler)
-	m.HandleFunc("GET /log-out", u.logOutGetHandler)
-	m.HandleFunc("POST /log-out", u.logOutPostHandler)
-	m.HandleFunc("GET /list-people", u.listPeopleHandler)
-	m.HandleFunc("GET /create-person", u.createPersonGetHandler)
-	m.HandleFunc("POST /create-person", u.createPersonPostHandler)
-	m.HandleFunc("GET /delete-person", u.deletePersonGetHandler)
-	m.HandleFunc("POST /delete-person", u.deletePersonPostHandler)
-	m.HandleFunc("GET /show-patient", u.showPatientHandler)
-	m.HandleFunc("GET /record-medication-refill", u.recordMedicationRefillGetHandler)
-	m.HandleFunc("POST /record-medication-refill", u.recordMedicationRefillPostHandler)
-	m.HandleFunc("GET /create-medication", u.createMedicationGetHandler)
-	m.HandleFunc("POST /create-medication", u.createMedicationPostHandler)
+// Register adds the UI's handlers to m.  If host is non-empty, the handlers
+// only match requests with that Host header.
+func (u *WebUI) Register(m *http.ServeMux, host string) {
+	m.HandleFunc("GET "+host+"/{$}", u.homeHandler)
+	m.HandleFunc("GET "+host+"/log-in", u.logInGetHandler)
+	m.HandleFunc("POST "+host+"/log-in", u.logInPostHandler)
+	m.HandleFunc("GET "+host+"/log-out", u.logOutGetHandler)
+	m.HandleFunc("POST "+host+"/log-out", u.logOutPostHandler)
+	m.HandleFunc("GET "+host+"/list-people", u.listPeopleHandler)
+	m.HandleFunc("GET "+host+"/create-person", u.createPersonGetHandler)
+	m.HandleFunc("POST "+host+"/create-person", u.createPersonPostHandler)
+	m.HandleFunc("GET "+host+"/delete-person", u.deletePersonGetHandler)
+	m.HandleFunc("POST "+host+"/delete-person", u.deletePersonPostHandler)
+	m.HandleFunc("GET "+host+"/show-patient", u.showPatientHandler)
+	m.HandleFunc("GET "+host+"/record-medication-refill", u.recordMedicationRefillGetHandler)
+	m.HandleFunc("POST "+host+"/record-medication-refill", u.recordMedicationRefillPostHandler)
+	m.HandleFunc("GET "+host+"/create-medication", u.createMedicationGetHandler)
+	m.HandleFunc("POST "+host+"/create-medication", u.createMedicationPostHandler)
+
+	// Catch-all so that requests for this host never fall through to other
+	// sites registered on the same mux.
+	m.HandleFunc(host+"/", http.NotFound)
 }
 
 // getLoggedInUser loads the user associated with the session cookie in the

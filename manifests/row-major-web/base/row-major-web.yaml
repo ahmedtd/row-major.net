@@ -77,6 +77,7 @@ spec:
           args:
             - --listen=0.0.0.0:8080
             - --debug-listen=0.0.0.0:8081
+            - --medtracker-data-project=medtracker-314520-data-prod
           resources:
             requests:
               cpu: 250m

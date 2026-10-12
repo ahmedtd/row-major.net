@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"row-major/medtracker/dblayer"
+	"row-major/medtracker/webui"
 	"row-major/webalator/healthz"
 	"row-major/webalator/mdredir"
 	"row-major/webalator/proxyipreflect"
@@ -14,11 +16,15 @@ import (
 	"row-major/webalator/sitecontent"
 	"syscall"
 	"time"
+
+	"cloud.google.com/go/firestore"
 )
 
 var (
 	listen      = flag.String("listen", "0.0.0.0:8080", "Where should we listen for incoming connections?")
 	debugListen = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
+
+	medtrackerDataProject = flag.String("medtracker-data-project", "", "GCP project that contains the medtracker application state.")
 )
 
 func main() {
@@ -41,6 +47,7 @@ func main() {
 		"Flags",
 		slog.String("listen", *listen),
 		slog.String("debug-listen", *debugListen),
+		slog.String("medtracker-data-project", *medtrackerDataProject),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -65,6 +72,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	medtrackerFirestore, err := firestore.NewClient(ctx, *medtrackerDataProject)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error creating medtracker FireStore client", slog.Any("err", err))
+		os.Exit(1)
+	}
+	medtrackerUI := webui.New(medtrackerFirestore, dblayer.New(medtrackerFirestore))
+
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
 	debugServeMux.Handle("/readyz", healthz.New())
@@ -83,6 +97,7 @@ func main() {
 	serveMux.Handle("/proxy-ip-reflect", proxyipreflect.New())
 	serveMux.Handle("/healthz", healthz.New())
 	serveMux.Handle("/readyz", healthz.New())
+	medtrackerUI.Register(serveMux, "medtracker.dev")
 
 	server := &http.Server{
 		Addr: *listen,

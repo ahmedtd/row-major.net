@@ -151,7 +151,7 @@ func do(ctx context.Context) error {
 		WriteTimeout:   30 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	ui.Register(uiServeMux)
+	ui.Register(uiServeMux, "")
 
 	go func() {
 		if err := debugServer.ListenAndServe(); err != nil {
