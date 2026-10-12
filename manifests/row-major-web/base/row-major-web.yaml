@@ -78,10 +78,6 @@ spec:
             - --listen=0.0.0.0:8080
             - --debug-listen=0.0.0.0:8081
             - --logtostderr=true
-            - --enable-profiling
-            - --enable-tracing
-            - --tracing-ratio=1.0
-            - --enable-metrics
           resources:
             requests:
               cpu: 250m
