@@ -5,7 +5,6 @@ on:
 
 jobs:
   deploy-medtracker:
-    if: "github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Deploy-MedTracker: True')"
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
