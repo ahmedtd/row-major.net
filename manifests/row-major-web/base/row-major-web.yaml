@@ -77,7 +77,6 @@ spec:
           args:
             - --listen=0.0.0.0:8080
             - --debug-listen=0.0.0.0:8081
-            - --logtostderr=true
           resources:
             requests:
               cpu: 250m

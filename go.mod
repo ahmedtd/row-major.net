@@ -5,7 +5,6 @@ go 1.25
 require (
 	cloud.google.com/go v0.82.0
 	cloud.google.com/go/firestore v1.1.0
-	cloud.google.com/go/storage v1.10.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.20.1
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v0.20.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b

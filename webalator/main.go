@@ -3,61 +3,66 @@ package main
 import (
 	"context"
 	"flag"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"row-major/webalator/healthz"
-	"row-major/webalator/imgalator"
 	"row-major/webalator/mdredir"
 	"row-major/webalator/proxyipreflect"
 	"row-major/webalator/site"
 	"row-major/webalator/sitecontent"
 	"syscall"
 	"time"
-
-	"github.com/golang/glog"
 )
 
 var (
 	listen      = flag.String("listen", "0.0.0.0:8080", "Where should we listen for incoming connections?")
 	debugListen = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
-
-	imgalatorBucket = flag.String("imgalator-bucket", "", "Bucket to access using imgalator")
 )
 
 func main() {
 	flag.Parse()
 
-	glog.CopyStandardLogTo("INFO")
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource: true,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// GCP Cloud Logging gives "message" nicer handling in the overview pane.
+			if a.Key == "msg" {
+				a.Key = "message"
+			}
+			return a
+		},
+	}))
+	slog.SetDefault(logger)
 
-	glog.Infof("flags:")
-	glog.Infof("listen: %v", *listen)
-	glog.Infof("debug-listen: %v", *debugListen)
+	slog.Info("Starting up")
+	slog.Info(
+		"Flags",
+		slog.String("listen", *listen),
+		slog.String("debug-listen", *debugListen),
+	)
 
-	glog.Infof("imgalator-bucket: %v", *imgalatorBucket)
-
-	_, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	dir, err := os.Getwd()
 	if err != nil {
-		glog.Fatalf("Error getting current workind dir: %v", err)
+		slog.ErrorContext(ctx, "Error getting current working dir", slog.Any("err", err))
+		os.Exit(1)
 	}
-	glog.Infof("Running from: %s", dir)
+	slog.InfoContext(ctx, "Running from", slog.String("dir", dir))
 
 	contentHandler, err := sitecontent.NewEmbeddedHandler()
 	if err != nil {
-		glog.Fatalf("Error while creating site content handler: %v", err)
+		slog.ErrorContext(ctx, "Error while creating site content handler", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	site, err := site.New(contentHandler)
 	if err != nil {
-		glog.Fatalf("Error creating site: %v", err)
-	}
-
-	imgalator, err := imgalator.New(context.Background(), "/imgalator", *imgalatorBucket)
-	if err != nil {
-		glog.Fatalf("Error creating imgalator: %v", err)
+		slog.ErrorContext(ctx, "Error creating site", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	debugServeMux := http.NewServeMux()
@@ -73,7 +78,6 @@ func main() {
 
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/", site.Mux)
-	serveMux.Handle("/imgalator/", imgalator)
 	serveMux.Handle("/metadata-redirect", mdredir.New())
 	serveMux.Handle("/proxy-ip-reflect", proxyipreflect.New())
 	serveMux.Handle("/healthz", healthz.New())
@@ -91,19 +95,19 @@ func main() {
 
 	go func() {
 		if err := debugServer.ListenAndServe(); err != nil {
-			glog.Fatalf("Debug server died: %v", err)
+			slog.ErrorContext(ctx, "Debug server died", slog.Any("err", err))
+			os.Exit(1)
 		}
 	}()
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			glog.Fatalf("Error while serving http: %v", err)
+			slog.ErrorContext(ctx, "Error while serving http", slog.Any("err", err))
+			os.Exit(1)
 		}
 	}()
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 	<-signalCh
-
-	glog.Flush()
 }
