@@ -4,14 +4,22 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-row-major-manifest:
-    if: "contains(github.event.head_commit.message, 'Deploy-RowMajorWeb: True')"
+  deploy-row-major-web:
+    if: "github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Deploy-RowMajorWeb: True')"
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
+    env:
+      KO_DOCKER_REPO: us-west1-docker.pkg.dev/row-major-ci/row-major-net-images
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+    - run: go vet ./webalator/... ./wordgrid/...
+    - run: go test ./webalator/... ./wordgrid/...
+    - run: go install github.com/google/ko@v0.19.1
     - uses: google-github-actions/auth@v1
       with:
         workload_identity_provider: 'projects/508647401058/locations/global/workloadIdentityPools/ci-federation/providers/github-actions'
@@ -19,6 +27,12 @@ jobs:
     - uses: google-github-actions/setup-gcloud@v1
       with:
         version: '>= 390.0.0'
+    - run: 'gcloud auth configure-docker us-west1-docker.pkg.dev'
     - run: 'gcloud components install gke-gcloud-auth-plugin'
     - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-214520 --zone=us-west1 cell-us-west1'
-    - run: 'kubectl apply --kustomize=manifests/row-major-web/production'  
+    # Build and push an image for each ko:// reference, and replace the
+    # reference with the pushed image's digest.
+    - run: 'kubectl kustomize manifests/row-major-web/production > row-major-web.yaml'
+    - run: 'ko resolve --base-import-paths --tags=${GITHUB_SHA} -f row-major-web.yaml > row-major-web.resolved.yaml'
+    - run: 'cat row-major-web.resolved.yaml'
+    - run: 'kubectl apply -f row-major-web.resolved.yaml'
