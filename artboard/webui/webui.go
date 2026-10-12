@@ -10,7 +10,8 @@ import (
 	"row-major/artboard/dblayer"
 	"row-major/artboard/dbtypes"
 	"row-major/artboard/webui/uitemplates"
-	glog "row-major/bazel-row-major.net/external/com_github_golang_glog"
+
+	"github.com/golang/glog"
 )
 
 type WebUI struct {
