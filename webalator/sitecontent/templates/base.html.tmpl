@@ -84,6 +84,11 @@
           max-width: 100%;
       }
 
+      .build-revision {
+          color: gray;
+          font-size: 8pt;
+      }
+
       {{block "styles" .}}{{end}}
     </style>
   </head>
@@ -103,6 +108,7 @@
       <address>
         <a href="mailto:ahmed.taahir@gmail.com">Taahir Ahmed</a>
       </address>
+      <p class="build-revision">Build: {{buildRevision}}</p>
     </footer>
 
     {{block "scripts" .}}{{end}}

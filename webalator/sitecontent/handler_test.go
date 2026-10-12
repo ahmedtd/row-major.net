@@ -173,3 +173,20 @@ func TestStaticRange(t *testing.T) {
 		t.Errorf("Wrong body; got %q, want %q", got, want)
 	}
 }
+
+func TestTemplatesShowBuildRevision(t *testing.T) {
+	h, err := newHandler(Static(), Templates(), "0123456789abcdef")
+	if err != nil {
+		t.Fatalf("Error creating handler: %v", err)
+	}
+
+	for _, r := range loadRoutes(t) {
+		if r.kind != "template" {
+			continue
+		}
+		rec := serve(h, http.MethodGet, r.servingPath)
+		if want := "Build: 0123456789abcdef"; !strings.Contains(rec.Body.String(), want) {
+			t.Errorf("GET %v: body doesn't contain %q", r.servingPath, want)
+		}
+	}
+}

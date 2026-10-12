@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"runtime/debug"
 	"strings"
 )
 
@@ -67,6 +68,10 @@ func NewEmbeddedHandler() (*Handler, error) {
 // NewHandler creates a Handler that serves static files from staticFS and
 // templates from templatesFS.
 func NewHandler(staticFS, templatesFS fs.FS) (*Handler, error) {
+	return newHandler(staticFS, templatesFS, buildRevision())
+}
+
+func newHandler(staticFS, templatesFS fs.FS, revision string) (*Handler, error) {
 	h := &Handler{
 		routes: map[string]http.Handler{},
 	}
@@ -75,7 +80,11 @@ func NewHandler(staticFS, templatesFS fs.FS) (*Handler, error) {
 		return nil, fmt.Errorf("while adding static files: %w", err)
 	}
 
-	if err := h.addTemplates(templatesFS); err != nil {
+	funcs := template.FuncMap{
+		"buildRevision": func() string { return revision },
+	}
+
+	if err := h.addTemplates(templatesFS, funcs); err != nil {
 		return nil, fmt.Errorf("while adding templates: %w", err)
 	}
 
@@ -100,7 +109,33 @@ func (h *Handler) addStatics(staticFS fs.FS) error {
 	})
 }
 
-func (h *Handler) addTemplates(templatesFS fs.FS) error {
+// buildRevision returns the VCS revision that the binary was built from, as
+// stamped by the Go toolchain, with a "-dirty" suffix if the working tree had
+// local modifications.
+func buildRevision() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+
+	revision := "unknown"
+	modified := false
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			revision = setting.Value
+		case "vcs.modified":
+			modified = setting.Value == "true"
+		}
+	}
+
+	if modified {
+		revision += "-dirty"
+	}
+	return revision
+}
+
+func (h *Handler) addTemplates(templatesFS fs.FS, funcs template.FuncMap) error {
 	baseText, err := fs.ReadFile(templatesFS, baseTemplateName)
 	if err != nil {
 		return fmt.Errorf("while reading base template: %w", err)
@@ -117,7 +152,7 @@ func (h *Handler) addTemplates(templatesFS fs.FS) error {
 			return fmt.Errorf("template %v is not named %v", name, indexTemplateName)
 		}
 
-		tmpl, err := template.New(name).Parse(string(baseText))
+		tmpl, err := template.New(name).Funcs(funcs).Parse(string(baseText))
 		if err != nil {
 			return fmt.Errorf("while parsing base template for %v: %w", name, err)
 		}
