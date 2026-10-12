@@ -67,6 +67,7 @@ func main() {
 
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
+	debugServeMux.Handle("/readyz", healthz.New())
 	debugServer := &http.Server{
 		Addr:    *debugListen,
 		Handler: debugServeMux,
@@ -86,7 +87,7 @@ func main() {
 	server := &http.Server{
 		Addr: *listen,
 
-		Handler: serveMux,
+		Handler: GCPCloudLoggingHTTPMiddleware(serveMux),
 
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,
@@ -110,4 +111,63 @@ func main() {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 	<-signalCh
+}
+
+// statusCatcher safely catches properties of the HTTP response.
+//
+// See https://www.alexedwards.net/blog/how-to-use-the-http-responsecontroller-type
+type statusCatcher struct {
+	http.ResponseWriter
+	statusCode    int
+	headerWritten bool
+}
+
+func newStatusCatcher(w http.ResponseWriter) *statusCatcher {
+	return &statusCatcher{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+	}
+}
+
+func (mw *statusCatcher) WriteHeader(statusCode int) {
+	mw.ResponseWriter.WriteHeader(statusCode)
+
+	if !mw.headerWritten {
+		mw.statusCode = statusCode
+		mw.headerWritten = true
+	}
+}
+
+func (mw *statusCatcher) Write(b []byte) (int, error) {
+	mw.headerWritten = true
+	return mw.ResponseWriter.Write(b)
+}
+
+func (mw *statusCatcher) Unwrap() http.ResponseWriter {
+	return mw.ResponseWriter
+}
+
+func GCPCloudLoggingHTTPMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sc := newStatusCatcher(w)
+
+		next.ServeHTTP(sc, r)
+
+		slog.InfoContext(
+			r.Context(),
+			"HTTP Request",
+
+			// Cloud Logging has slightly special handling for "httpRequest".
+			// Not sure if it actually adds anything over just putting a similar
+			// struct in jsonPayload.
+			//
+			// https://docs.cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#httprequest
+			slog.Group(
+				"httpRequest",
+				slog.String("requestMethod", r.Method),
+				slog.String("requestUrl", r.URL.String()),
+				slog.Int("status", sc.statusCode),
+			),
+		)
+	})
 }
