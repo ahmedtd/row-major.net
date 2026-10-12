@@ -28,10 +28,6 @@ var (
 	listen      = flag.String("listen", "0.0.0.0:8080", "Where should we listen for incoming connections?")
 	debugListen = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
 
-	// Deprecated: Site content is now embedded in the binary.  This flag is
-	// ignored, and remains only so that existing deployments keep working.
-	_ = flag.String("content-pack", "", "Deprecated and ignored.")
-
 	enableProfiling = flag.Bool("enable-profiling", false, "")
 	enableTracing   = flag.Bool("enable-tracing", false, "")
 	tracingRatio    = flag.Float64("tracing-ratio", 0.001, "")
