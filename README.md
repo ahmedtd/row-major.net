@@ -1,6 +1,8 @@
-# Update vendor
+# row-major.net
+
+A monorepo for [row-major.net](https://row-major.net) and a few other projects.
+Everything is built with the standard Go toolchain.
+
+After changing dependencies, run:
 
     go mod tidy
-    bazel run //:gazelle
-    bazel run //:gazelle -- update-repos -from_file=go.mod
-
