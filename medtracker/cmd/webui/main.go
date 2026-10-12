@@ -20,10 +20,9 @@ import (
 )
 
 var (
-	debugListen         = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
-	uiListen            = flag.String("ui-listen", "127.0.0.1:8000", "Server address:port for ui endpoint.")
-	dataProject         = flag.String("data-project", "", "GCP project that contains the application state.")
-	googleOAuthClientID = flag.String("google-oauth-client-id", "", "Google OAuth Client ID for the application.  Used for Sign In With Google.")
+	debugListen = flag.String("debug-listen", "127.0.0.1:8001", "Server address:port for debug endpoint.")
+	uiListen    = flag.String("ui-listen", "127.0.0.1:8000", "Server address:port for ui endpoint.")
+	dataProject = flag.String("data-project", "", "GCP project that contains the application state.")
 )
 
 func main() {
@@ -47,7 +46,6 @@ func main() {
 		slog.String("debug-listen", *debugListen),
 		slog.String("ui-listen", *uiListen),
 		slog.String("data-project", *dataProject),
-		slog.String("google-oauth-client-id", *googleOAuthClientID),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -124,7 +122,7 @@ func do(ctx context.Context) error {
 		return fmt.Errorf("while creating FireStore client: %w", err)
 	}
 
-	db := dblayer.New(fstore, *googleOAuthClientID)
+	db := dblayer.New(fstore)
 
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
@@ -143,7 +141,7 @@ func do(ctx context.Context) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	ui := webui.New(fstore, db, *googleOAuthClientID)
+	ui := webui.New(fstore, db)
 	uiServeMux := http.NewServeMux()
 	uiServer := &http.Server{
 		Addr:    *uiListen,

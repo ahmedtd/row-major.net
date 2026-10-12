@@ -20,16 +20,14 @@ import (
 )
 
 type WebUI struct {
-	firestoreClient     *firestore.Client
-	db                  *dblayer.DB
-	googleOAuthClientID string
+	firestoreClient *firestore.Client
+	db              *dblayer.DB
 }
 
-func New(firestoreClient *firestore.Client, db *dblayer.DB, googleOAuthClientID string) *WebUI {
+func New(firestoreClient *firestore.Client, db *dblayer.DB) *WebUI {
 	return &WebUI{
-		firestoreClient:     firestoreClient,
-		db:                  db,
-		googleOAuthClientID: googleOAuthClientID,
+		firestoreClient: firestoreClient,
+		db:              db,
 	}
 }
 
@@ -39,7 +37,6 @@ func (u *WebUI) Register(m *http.ServeMux) {
 	m.HandleFunc("POST /log-in", u.logInPostHandler)
 	m.HandleFunc("GET /log-out", u.logOutGetHandler)
 	m.HandleFunc("POST /log-out", u.logOutPostHandler)
-	m.HandleFunc("POST /sign-in-with-google", u.signInWithGooglePostHandler)
 	m.HandleFunc("GET /list-people", u.listPeopleHandler)
 	m.HandleFunc("GET /create-person", u.createPersonGetHandler)
 	m.HandleFunc("POST /create-person", u.createPersonPostHandler)
@@ -180,18 +177,6 @@ func logInLink(userError, redirectTarget string) string {
 	return link.String()
 }
 
-func signInWithGoogleTarget(redirectTarget string) string {
-	q := url.Values{}
-	if redirectTarget != "" {
-		q.Add("redirect-target", redirectTarget)
-	}
-	link := &url.URL{
-		Path:     "/sign-in-with-google",
-		RawQuery: q.Encode(),
-	}
-	return link.String()
-}
-
 func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -219,9 +204,7 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := &uitemplates.LogInParams{
-		UserError:            r.Form.Get("user-error"),
-		GoogleOAuthClientID:  u.googleOAuthClientID,
-		SignInWithGoogleLink: signInWithGoogleTarget(r.Form.Get("redirect-target")),
+		UserError: r.Form.Get("user-error"),
 	}
 
 	content := bytes.Buffer{}
@@ -360,44 +343,6 @@ func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	http.Redirect(w, r, "/", http.StatusFound)
-}
-
-func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	if err := r.ParseForm(); err != nil {
-		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
-	session, err := u.db.SessionFromGoogleFederation(ctx, r.PostForm.Get("credential"))
-	if err == dblayer.ErrUnknownUserOrWrongPassword {
-		http.Redirect(w, r, logInLink("Unknown user or wrong password", r.Form.Get("redirect-target")), http.StatusFound)
-		return
-	}
-	if err != nil {
-		slog.ErrorContext(ctx, "Error while processing log in form", slog.Any("err", err))
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
-	cookie := &http.Cookie{
-		Name:     "MedTracker-Session",
-		Value:    session.Cookie,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  session.Expires,
-	}
-
-	// User successfully logged in
-	http.SetCookie(w, cookie)
-
-	target := r.Form.Get("redirect-target")
-	if target == "" {
-		target = "/"
-	}
-
-	http.Redirect(w, r, target, http.StatusFound)
 }
 
 func (u *WebUI) listPeopleHandler(w http.ResponseWriter, r *http.Request) {

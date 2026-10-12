@@ -15,19 +15,16 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"golang.org/x/crypto/bcrypt"
-	"google.golang.org/api/idtoken"
 	"google.golang.org/api/iterator"
 )
 
 type DB struct {
-	firestoreClient     *firestore.Client
-	googleOAuthClientID string
+	firestoreClient *firestore.Client
 }
 
-func New(firestoreClient *firestore.Client, googleOAuthClientID string) *DB {
+func New(firestoreClient *firestore.Client) *DB {
 	return &DB{
-		firestoreClient:     firestoreClient,
-		googleOAuthClientID: googleOAuthClientID,
+		firestoreClient: firestoreClient,
 	}
 }
 
@@ -83,67 +80,6 @@ func (db *DB) SessionFromPassword(ctx context.Context, email, password string) (
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, ErrUnknownUserOrWrongPassword
 	}
-
-	sessionCookieBytes := make([]byte, 32)
-	if _, err := rand.Read(sessionCookieBytes); err != nil {
-		return nil, fmt.Errorf("while generating session cookie: %w", err)
-	}
-
-	sessionCookie := base64.StdEncoding.EncodeToString(sessionCookieBytes)
-
-	expires := time.Now().Add(18 * time.Hour)
-
-	sessions := db.firestoreClient.Collection("Sessions")
-	session := &dbtypes.Session{
-		Cookie:  sessionCookie,
-		User:    userSnapshot.Ref,
-		Expires: expires,
-	}
-	if _, _, err := sessions.Add(ctx, session); err != nil {
-		return nil, fmt.Errorf("while storing session cookie: %w", err)
-	}
-
-	return session, nil
-}
-
-// SessionFromGoogleFederation signs in a user based on a Google identity token
-// returned from the "Sign in with Google" process.
-func (db *DB) SessionFromGoogleFederation(ctx context.Context, idToken string) (*dbtypes.Session, error) {
-	payload, err := idtoken.Validate(ctx, idToken, db.googleOAuthClientID)
-	if err != nil {
-		return nil, fmt.Errorf("while validating ID token: %w", err)
-	}
-
-	email := payload.Claims["email"]
-	// displayName := payload.Claims["name"]
-	// picture := payload.Claims["picture"]
-
-	var userSnapshot *firestore.DocumentSnapshot
-	userIter := db.firestoreClient.Collection("Users").Where("email", "==", email).Documents(ctx)
-	defer userIter.Stop()
-	for {
-		var err error
-		userSnapshot, err = userIter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("while looking up user with email %q: %w", email, err)
-		}
-
-		// We only consider a single user.
-		break
-	}
-
-	// TODO: Autocreate user?  Populate display name and profile picture?
-	if userSnapshot == nil {
-		return nil, ErrUnknownUserOrWrongPassword
-	}
-
-	// TODO: Mark user as a "Sign In With Google" user and deactivate their password?
-
-	// Now we've found the user.  We know they authenticated successfully with
-	// Google, so it's time to create their session.
 
 	sessionCookieBytes := make([]byte, 32)
 	if _, err := rand.Read(sessionCookieBytes); err != nil {
