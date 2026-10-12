@@ -59,7 +59,7 @@ spec:
       serviceAccountName: webalator
       containers:
         - name: row-major-web-content
-          image: gcr.io/bomsync-214520/webalator:1599365705
+          image: ko://row-major/webalator
           ports:
             - containerPort: 8080
           livenessProbe:
@@ -74,9 +74,7 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
-          command:
-            - /app/webalator/webalator
-            - --content-pack=file://webalator/row_major_content.webalator.zip
+          args:
             - --listen=0.0.0.0:8080
             - --debug-listen=0.0.0.0:8081
             - --logtostderr=true

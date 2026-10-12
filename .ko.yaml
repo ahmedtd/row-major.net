@@ -1,0 +1,10 @@
+# Configuration for ko (https://ko.build), which builds container images for
+# Go binaries referenced as ko://<import path> in manifests.
+
+defaultBaseImage: gcr.io/distroless/static-debian13
+
+defaultPlatforms:
+  - linux/amd64
+
+defaultFlags:
+  - -trimpath
