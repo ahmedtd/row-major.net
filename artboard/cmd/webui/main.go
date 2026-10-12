@@ -68,7 +68,7 @@ func do(ctx context.Context) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	ui := webui.New(fstore, db, *googleOAuthClientID)
+	ui := webui.New(db, *googleOAuthClientID)
 	uiServeMux := http.NewServeMux()
 	uiServer := &http.Server{
 		Addr:    *uiListen,
