@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -16,7 +17,6 @@ import (
 	"row-major/webalator/healthz"
 
 	"cloud.google.com/go/firestore"
-	"github.com/golang/glog"
 )
 
 var (
@@ -29,17 +29,33 @@ var (
 func main() {
 	flag.Parse()
 
-	glog.Infof("flags:")
-	glog.Infof("debug-listen: %v", *debugListen)
-	glog.Infof("ui-listen: %v", *uiListen)
-	glog.Infof("data-project: %v", *dataProject)
-	glog.Infof("google-oauth-client-id: %v", *googleOAuthClientID)
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource: true,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// GCP Cloud Logging gives "message" nicer handling in the overview pane.
+			if a.Key == "msg" {
+				a.Key = "message"
+			}
+			return a
+		},
+	}))
+	slog.SetDefault(logger)
+
+	slog.Info("Starting up")
+	slog.Info(
+		"Flags",
+		slog.String("debug-listen", *debugListen),
+		slog.String("ui-listen", *uiListen),
+		slog.String("data-project", *dataProject),
+		slog.String("google-oauth-client-id", *googleOAuthClientID),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if err := do(ctx); err != nil {
-		glog.Exitf("Error: %v", err)
+		slog.ErrorContext(ctx, "Error", slog.Any("err", err))
+		os.Exit(255)
 	}
 }
 
@@ -82,21 +98,21 @@ func do(ctx context.Context) error {
 
 	go func() {
 		if err := debugServer.ListenAndServe(); err != nil {
-			glog.Fatalf("Debug server died: %v", err)
+			slog.ErrorContext(ctx, "Debug server died", slog.Any("err", err))
+			os.Exit(255)
 		}
 	}()
 
 	go func() {
 		if err := uiServer.ListenAndServe(); err != nil {
-			glog.Fatalf("UI server died: %v", err)
+			slog.ErrorContext(ctx, "UI server died", slog.Any("err", err))
+			os.Exit(255)
 		}
 	}()
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 	<-signalCh
-
-	glog.Flush()
 
 	return nil
 }

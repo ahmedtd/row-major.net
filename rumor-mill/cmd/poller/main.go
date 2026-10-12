@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -21,7 +22,6 @@ import (
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	cloudmetrics "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
 	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
-	"github.com/golang/glog"
 	"github.com/sendgrid/sendgrid-go"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
@@ -43,19 +43,30 @@ var (
 func main() {
 	flag.Parse()
 
-	glog.CopyStandardLogTo("INFO")
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource: true,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// GCP Cloud Logging gives "message" nicer handling in the overview pane.
+			if a.Key == "msg" {
+				a.Key = "message"
+			}
+			return a
+		},
+	}))
+	slog.SetDefault(logger)
 
-	glog.Infof("flags:")
-	glog.Infof("debug-listen: %v", *debugListen)
-	glog.Infof("user-agent: %v", *userAgent)
-	glog.Infof("scrape-period: %v", *scrapePeriod)
-
-	glog.Infof("data-project: %v", *dataProject)
-	glog.Infof("sendgrid-key-secret: %v", *sendgridKeySecret)
-
-	glog.Infof("monitoring: %v", *monitoring)
-	glog.Infof("monitoring-project: %v", *monitoringProject)
-	glog.Infof("monitoring-trace-ratio: %v", *monitoringTraceRatio)
+	slog.Info("Starting up")
+	slog.Info(
+		"Flags",
+		slog.String("debug-listen", *debugListen),
+		slog.String("user-agent", *userAgent),
+		slog.Duration("scrape-period", *scrapePeriod),
+		slog.String("data-project", *dataProject),
+		slog.String("sendgrid-key-secret", *sendgridKeySecret),
+		slog.Bool("monitoring", *monitoring),
+		slog.String("monitoring-project", *monitoringProject),
+		slog.Float64("monitoring-trace-ratio", *monitoringTraceRatio),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -70,13 +81,15 @@ func main() {
 
 		_, traceShutdown, err := cloudtrace.InstallNewPipeline(traceOpts, sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)))
 		if err != nil {
-			glog.Fatalf("Failed to install Cloud Trace OpenTelemetry trace pipeline: %v", err)
+			slog.ErrorContext(ctx, "Failed to install Cloud Trace OpenTelemetry trace pipeline", slog.Any("err", err))
+			os.Exit(255)
 		}
 		defer traceShutdown()
 
 		pusher, err := cloudmetrics.InstallNewPipeline(metricsOpts)
 		if err != nil {
-			glog.Fatalf("Failed to install Cloud Metrics OpenTelemetry meter pipeline: %v", err)
+			slog.ErrorContext(ctx, "Failed to install Cloud Metrics OpenTelemetry meter pipeline", slog.Any("err", err))
+			os.Exit(255)
 		}
 		defer pusher.Stop(ctx)
 	}
@@ -103,12 +116,14 @@ func main() {
 
 	sg, err := newSendgridClient(ctx)
 	if err != nil {
-		glog.Fatalf("Failed to create Sendgrid client: %v", err)
+		slog.ErrorContext(ctx, "Failed to create Sendgrid client", slog.Any("err", err))
+		os.Exit(255)
 	}
 
 	fstore, err := firestore.NewClient(ctx, *dataProject)
 	if err != nil {
-		glog.Fatalf("Failed to create FireStore client: %v", err)
+		slog.ErrorContext(ctx, "Failed to create FireStore client", slog.Any("err", err))
+		os.Exit(255)
 	}
 
 	scr := scraper.New(
@@ -121,7 +136,8 @@ func main() {
 
 	go func() {
 		if err := debugServer.ListenAndServe(); err != nil {
-			glog.Fatalf("Debug server died: %v", err)
+			slog.ErrorContext(ctx, "Debug server died", slog.Any("err", err))
+			os.Exit(255)
 		}
 	}()
 
@@ -132,8 +148,6 @@ func main() {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 	<-signalCh
-
-	glog.Flush()
 }
 
 func newSendgridClient(ctx context.Context) (*sendgrid.Client, error) {

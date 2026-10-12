@@ -5,13 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"row-major/artboard/dblayer"
 	"row-major/artboard/dbtypes"
 	"row-major/artboard/webui/uitemplates"
-
-	"github.com/golang/glog"
 )
 
 type WebUI struct {
@@ -45,7 +44,7 @@ func (u *WebUI) getLoggedInUser(ctx context.Context, r *http.Request) (string, *
 	}
 	if sessionCookie == nil {
 		// No session cookie; user is not logged in.
-		glog.Infof("No logged-in user because there was no session cookie.")
+		slog.InfoContext(ctx, "No logged-in user because there was no session cookie.")
 		return "", nil, nil
 	}
 
@@ -66,21 +65,21 @@ func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http
 	}
 	if sessionCookie == nil {
 		// User is not logged in.  Send them to log in.
-		glog.Infof("No logged-in user because there was no session cookie.  Redirecting to login.")
+		slog.InfoContext(ctx, "No logged-in user because there was no session cookie.  Redirecting to login.")
 		http.Redirect(w, r, logInLink("", redirectAfterLogin), http.StatusFound)
 		return nil
 	}
 
 	user, err := u.db.UserFromSessionCookie(ctx, sessionCookie.Value)
 	if err != nil {
-		glog.Infof("Error while validating session cookie: %v", err)
+		slog.ErrorContext(ctx, "Error while validating session cookie", slog.Any("err", err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return nil
 	}
 	if user == nil {
 		// User is not logged in.  For example, there was a session cookie, but
 		// it corresponds to an expired session.
-		glog.Infof("Session cookie didn't correspond to an active session.")
+		slog.InfoContext(ctx, "Session cookie didn't correspond to an active session.")
 		http.Redirect(w, r, logInLink("", redirectAfterLogin), http.StatusFound)
 		return nil
 	}
@@ -90,6 +89,8 @@ func (u *WebUI) checkSession(ctx context.Context, w http.ResponseWriter, r *http
 
 // homeHandler renders the home page.
 func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	if r.URL.Path != "/" {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
@@ -97,9 +98,9 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	params := &uitemplates.HomeParams{}
 
-	_, user, err := u.getLoggedInUser(r.Context(), r)
+	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -109,14 +110,14 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	content := bytes.Buffer{}
 	if err := uitemplates.HomeTemplate.Execute(&content, params); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := io.Copy(w, &content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -151,7 +152,7 @@ func (u *WebUI) logInHandler(w http.ResponseWriter, r *http.Request) {
 	// 	u.logInPostHandler(w, r)
 	// 	return
 	default:
-		glog.Errorf("Returning Bad Request because logInHandler doesn't support path %q", r.URL.Path)
+		slog.ErrorContext(r.Context(), "Returning Bad Request because logInHandler doesn't support path", slog.String("path", r.URL.Path))
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
@@ -174,13 +175,13 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -203,14 +204,14 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	content := bytes.Buffer{}
 	if err := uitemplates.LogInTemplate.Execute(&content, params); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := io.Copy(w, &content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -220,13 +221,13 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 
 // 	_, user, err := u.getLoggedInUser(ctx, r)
 // 	if err != nil {
-// 		glog.Errorf("Error while getting logged-in user: %v", err)
+// 		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 // 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 // 		return
 // 	}
 
 // 	if err := r.ParseForm(); err != nil {
-// 		glog.Errorf("Error while parsing form: %v", err)
+// 		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 // 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 // 		return
 // 	}
@@ -255,7 +256,7 @@ func (u *WebUI) logInGetHandler(w http.ResponseWriter, r *http.Request) {
 // 		return
 // 	}
 // 	if err != nil {
-// 		glog.Errorf("Error while processing log in form: %v", err)
+// 		slog.ErrorContext(ctx, "Error while processing log in form", slog.Any("err", err))
 // 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 // 		return
 // 	}
@@ -299,7 +300,7 @@ func (u *WebUI) logOutGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -312,14 +313,14 @@ func (u *WebUI) logOutGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	content, err := uitemplates.LogOutPage(&uitemplates.LogOutParams{})
 	if err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
 
 	if _, err := w.Write(content); err != nil {
 		// It's too late to write an error to the HTTP response.
-		glog.Errorf("Error while writing output: %v", err)
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
 }
@@ -329,7 +330,7 @@ func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	cookie, user, err := u.getLoggedInUser(ctx, r)
 	if err != nil {
-		glog.Errorf("Error while getting logged-in user: %v", err)
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -342,7 +343,7 @@ func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = u.db.DeleteSession(ctx, cookie)
 	if err != nil {
-		glog.Errorf("Error while deleting session: %v", err)
+		slog.ErrorContext(ctx, "Error while deleting session", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -367,7 +368,7 @@ func (u *WebUI) signInWithGoogleHandler(w http.ResponseWriter, r *http.Request) 
 		u.signInWithGooglePostHandler(w, r)
 		return
 	default:
-		glog.Errorf("Returning Bad Request because signInWithGoogleHandler doesn't support path %q", r.URL.Path)
+		slog.ErrorContext(r.Context(), "Returning Bad Request because signInWithGoogleHandler doesn't support path", slog.String("path", r.URL.Path))
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
@@ -377,7 +378,7 @@ func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		glog.Errorf("Error while parsing form: %v", err)
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
@@ -388,7 +389,7 @@ func (u *WebUI) signInWithGooglePostHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err != nil {
-		glog.Errorf("Error while processing log in form: %v", err)
+		slog.ErrorContext(ctx, "Error while processing log in form", slog.Any("err", err))
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}

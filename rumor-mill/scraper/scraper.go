@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"sort"
@@ -18,7 +19,6 @@ import (
 	"row-major/rumor-mill/hackernews"
 
 	"cloud.google.com/go/firestore"
-	"github.com/golang/glog"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"go.opentelemetry.io/otel"
@@ -108,19 +108,19 @@ func (s *Scraper) Run(ctx context.Context) {
 
 	// Scrape right away
 	if err := s.scraperPass(ctx); err != nil {
-		glog.Errorf("Error while running scraper pass: %v", err)
+		slog.ErrorContext(ctx, "Error while running scraper pass", slog.Any("err", err))
 	}
 
 	ticker := time.NewTicker(s.scrapePeriod)
 	for {
 		select {
 		case <-ctx.Done():
-			glog.Infof("Shutting down scraper")
+			slog.InfoContext(ctx, "Shutting down scraper")
 			return
 		case <-ticker.C:
 		}
 		if err := s.scraperPass(ctx); err != nil {
-			glog.Errorf("Error while running scraper pass: %v", err)
+			slog.ErrorContext(ctx, "Error while running scraper pass", slog.Any("err", err))
 		}
 	}
 }
@@ -142,7 +142,7 @@ func (s *Scraper) scraperPass(ctx context.Context) error {
 		return fmt.Errorf("while sending alerts: %w", err)
 	}
 
-	glog.Infof("Successfully completed scraper pass")
+	slog.InfoContext(ctx, "Successfully completed scraper pass")
 
 	return nil
 }
@@ -460,13 +460,13 @@ func (s *Scraper) debugHandlerTrackedArticles(w http.ResponseWriter, req *http.R
 
 	tmplData, err := s.debugHandlerTrackedArticlesData(ctx)
 	if err != nil {
-		glog.Errorf("Error while retrieving tracked article data: %v", err)
+		slog.ErrorContext(ctx, "Error while retrieving tracked article data", slog.Any("err", err))
 		http.Error(w, "error retrieving tracked article data", http.StatusInternalServerError)
 		return
 	}
 
 	if err := articlesTemplate.Execute(w, tmplData); err != nil {
-		glog.Errorf("Error while executing template: %v", err)
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
 		return
 	}
 }
