@@ -1,10 +1,13 @@
 name: medtracker-deploy
 on:
   push:
+    branches: [master]
   workflow_dispatch:
 
 jobs:
   deploy-medtracker:
+    # Manual runs can be started against any branch, so check here too.
+    if: "github.ref == 'refs/heads/master'"
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'

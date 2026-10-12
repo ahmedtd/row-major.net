@@ -1,10 +1,13 @@
 name: row-major-web-deploy
 on:
   push:
+    branches: [master]
   workflow_dispatch:
 
 jobs:
   deploy-row-major-web:
+    # Manual runs can be started against any branch, so check here too.
+    if: "github.ref == 'refs/heads/master'"
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
