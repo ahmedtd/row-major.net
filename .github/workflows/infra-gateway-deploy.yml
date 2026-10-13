@@ -1,0 +1,28 @@
+name: infra-gateway-deploy
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy-infra-gateway:
+    # Manual runs can be started against any branch, so check here too.
+    if: "github.ref == 'refs/heads/master'"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+    - uses: actions/checkout@v4
+    - uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: 'projects/508647401058/locations/global/workloadIdentityPools/ci-federation/providers/github-actions'
+        service_account: 'github-actions@row-major-ci.iam.gserviceaccount.com'
+    - uses: google-github-actions/setup-gcloud@v1
+      with:
+        version: '>= 390.0.0'
+    - run: 'gcloud components install gke-gcloud-auth-plugin'
+    - run: 'gcloud container clusters get-credentials --project=bomsync-214520 --billing-project=bomsync-214520 --zone=us-west1 cell-us-west1'
+    - run: 'kubectl kustomize manifests/base > infra-gateway.yaml'
+    - run: 'cat infra-gateway.yaml'
+    - run: 'kubectl apply -f infra-gateway.yaml'
