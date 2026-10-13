@@ -168,6 +168,8 @@ func GCPCloudLoggingHTTPMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(sc, r)
 
+		r.URL.Host = r.Host
+
 		slog.InfoContext(
 			r.Context(),
 			"HTTP Request",
