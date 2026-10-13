@@ -27,7 +27,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            row-major.net/gateway-application: "medtracker-dev"
+            row-major.net/gateway-application: "row-major-net"
     tls:
       mode: Terminate
       options:

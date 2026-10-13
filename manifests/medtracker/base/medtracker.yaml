@@ -143,25 +143,6 @@ spec:
 
 ---
 
-kind: HTTPRoute
-apiVersion: gateway.networking.k8s.io/v1beta1
-metadata:
-  name: webui
-  namespace: medtracker
-spec:
- parentRefs:
- - kind: Gateway
-   namespace: infra-gateway
-   name: external-http
- hostnames:
- - "medtracker.dev"
- rules:
- - backendRefs:
-   - name: webui
-     port: 8000
-
----
-
 apiVersion: networking.gke.io/v1
 kind: HealthCheckPolicy
 metadata:
