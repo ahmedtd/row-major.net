@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	artboarddblayer "row-major/artboard/dblayer"
+	artboardwebui "row-major/artboard/webui"
 	"row-major/medtracker/dblayer"
 	"row-major/medtracker/webui"
 	"row-major/webalator/healthz"
@@ -25,6 +27,7 @@ var (
 	debugListen = flag.String("debug-listen", "0.0.0.0:8081", "Where should we listen for the debug interface?")
 
 	medtrackerDataProject = flag.String("medtracker-data-project", "", "GCP project that contains the medtracker application state.")
+	artboardDataProject   = flag.String("artboard-data-project", "", "GCP project that contains the artboard application state.  If empty, artboard is not served.")
 )
 
 func main() {
@@ -48,6 +51,7 @@ func main() {
 		slog.String("listen", *listen),
 		slog.String("debug-listen", *debugListen),
 		slog.String("medtracker-data-project", *medtrackerDataProject),
+		slog.String("artboard-data-project", *artboardDataProject),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -79,6 +83,16 @@ func main() {
 	}
 	medtrackerUI := webui.New(medtrackerFirestore, dblayer.New(medtrackerFirestore))
 
+	var artboardUI *artboardwebui.WebUI
+	if *artboardDataProject != "" {
+		artboardFirestore, err := firestore.NewClient(ctx, *artboardDataProject)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error creating artboard FireStore client", slog.Any("err", err))
+			os.Exit(1)
+		}
+		artboardUI = artboardwebui.New(artboarddblayer.New(artboardFirestore))
+	}
+
 	debugServeMux := http.NewServeMux()
 	debugServeMux.Handle("/healthz", healthz.New())
 	debugServeMux.Handle("/readyz", healthz.New())
@@ -98,6 +112,9 @@ func main() {
 	serveMux.Handle("/healthz", healthz.New())
 	serveMux.Handle("/readyz", healthz.New())
 	medtrackerUI.Register(serveMux, "medtracker.dev")
+	if artboardUI != nil {
+		artboardUI.Register(serveMux, "rumor-mill.dev")
+	}
 
 	server := &http.Server{
 		Addr: *listen,

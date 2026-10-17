@@ -32,6 +32,22 @@ spec:
       mode: Terminate
       options:
         networking.gke.io/pre-shared-certs: medtracker-dev # Created out of band.
+  - name: rumor-mill-dev-https
+    protocol: HTTPS
+    port: 443
+    hostname: rumor-mill.dev
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            row-major.net/gateway-application: "row-major-net"
+    tls:
+      mode: Terminate
+      options:
+        networking.gke.io/pre-shared-certs: rumor-mill-dev # Created out of band.
   - name: www-row-major-net-https
     protocol: HTTPS
     port: 443

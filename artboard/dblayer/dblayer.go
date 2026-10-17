@@ -12,19 +12,17 @@ import (
 	"row-major/artboard/dbtypes"
 
 	"cloud.google.com/go/firestore"
-	"google.golang.org/api/idtoken"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/iterator"
 )
 
 type DB struct {
-	firestoreClient     *firestore.Client
-	googleOAuthClientID string
+	firestoreClient *firestore.Client
 }
 
-func New(firestoreClient *firestore.Client, googleOAuthClientID string) *DB {
+func New(firestoreClient *firestore.Client) *DB {
 	return &DB{
-		firestoreClient:     firestoreClient,
-		googleOAuthClientID: googleOAuthClientID,
+		firestoreClient: firestoreClient,
 	}
 }
 
@@ -36,17 +34,16 @@ var (
 	ErrPermissionDenied           = errors.New("permission denied")
 )
 
-// SessionFromGoogleFederation signs in a user based on a Google identity token
-// returned from the "Sign in with Google" process.
-func (db *DB) SessionFromGoogleFederation(ctx context.Context, idToken string) (*dbtypes.Session, error) {
-	payload, err := idtoken.Validate(ctx, idToken, db.googleOAuthClientID)
-	if err != nil {
-		return nil, fmt.Errorf("while validating ID token: %w", err)
+// SessionFromPassword runs the password-based login process for a given user,
+// returning a session ID or an error.
+func (db *DB) SessionFromPassword(ctx context.Context, email, password string) (*dbtypes.Session, error) {
+	if email == "" {
+		return nil, ErrEmailMustNotBeEmpty
 	}
 
-	email := payload.Claims["email"]
-	// displayName := payload.Claims["name"]
-	// picture := payload.Claims["picture"]
+	if password == "" {
+		return nil, ErrPasswordMustNotBeEmpty
+	}
 
 	var userSnapshot *firestore.DocumentSnapshot
 	userIter := db.firestoreClient.Collection("Users").Where("email", "==", email).Documents(ctx)
@@ -65,15 +62,18 @@ func (db *DB) SessionFromGoogleFederation(ctx context.Context, idToken string) (
 		break
 	}
 
-	// TODO: Autocreate user?  Populate display name and profile picture?
 	if userSnapshot == nil {
 		return nil, ErrUnknownUserOrWrongPassword
 	}
 
-	// TODO: Mark user as a "Sign In With Google" user and deactivate their password?
+	user := &dbtypes.User{}
+	if err := userSnapshot.DataTo(user); err != nil {
+		return nil, fmt.Errorf("while unmarshaling user %q: %w", email, err)
+	}
 
-	// Now we've found the user.  We know they authenticated successfully with
-	// Google, so it's time to create their session.
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return nil, ErrUnknownUserOrWrongPassword
+	}
 
 	sessionCookieBytes := make([]byte, 32)
 	if _, err := rand.Read(sessionCookieBytes); err != nil {

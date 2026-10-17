@@ -6,7 +6,7 @@ var baseText = `
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{block "title" .}}Title{{end}} - RefBoard</title>
+    <title>{{block "title" .}}Title{{end}} - Art Mood Board</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
 
     {{block "head" .}}{{end}}
@@ -15,7 +15,7 @@ var baseText = `
     <div class="container">
       <nav class="navbar bg-body-tertiary">
         <div class="container-fluid">
-          <a class="navbar-brand" href="/">RefBoard</a>
+          <a class="navbar-brand" href="/">Art Mood Board</a>
         </div>
       </nav>
   
@@ -31,7 +31,7 @@ var baseText = `
   
       <footer class="pt-3 my-5 border-top">
         <address>
-          Contact: admin@refboard.dev
+          Contact: admin@rumor-mill.dev
         </address>
       </footer>
     </div>

@@ -12,11 +12,12 @@ var homeText = `{{define "title"}}Home{{end}}
 {{- end}}
 
 {{define "content"}}
+  <h1>Art Mood Board</h1>
+
   {{if .LoggedIn}}
     <p>
 	  Welcome. Actions available:
 	  <ul>
-	    <li><a href="/list-collections">List Collections</a></li>
 		<li><a href="/log-out">Log Out</a></li>
 	  </ul>
 	</p>

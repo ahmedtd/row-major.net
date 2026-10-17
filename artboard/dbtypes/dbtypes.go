@@ -8,8 +8,9 @@ import (
 
 // User represents a person registered and interacting with the application.
 type User struct {
-	ID    string `firestore:"id"`
-	Email string `firestore:"email"`
+	ID           string `firestore:"id"`
+	Email        string `firestore:"email"`
+	PasswordHash string `firestore:"passwordHash"`
 }
 
 // Session represents a log-in session for a User.

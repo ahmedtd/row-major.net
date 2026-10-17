@@ -78,6 +78,7 @@ spec:
             - --listen=0.0.0.0:8080
             - --debug-listen=0.0.0.0:8081
             - --medtracker-data-project=medtracker-314520-data-prod
+            - --artboard-data-project=artboard-314520-data-prod
           resources:
             requests:
               cpu: 250m
@@ -121,6 +122,25 @@ spec:
    name: external-http
  hostnames:
  - "medtracker.dev"
+ rules:
+ - backendRefs:
+   - name: row-major-web-content-service
+     port: 8001
+
+---
+
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: rumor-mill-dev
+  namespace: row-major-web
+spec:
+ parentRefs:
+ - kind: Gateway
+   namespace: infra-gateway
+   name: external-http
+ hostnames:
+ - "rumor-mill.dev"
  rules:
  - backendRefs:
    - name: row-major-web-content-service
