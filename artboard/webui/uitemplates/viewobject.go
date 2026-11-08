@@ -3,7 +3,6 @@ package uitemplates
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 )
 
 type ViewObjectParams struct {
@@ -147,7 +146,7 @@ var viewObjectText = `
 {{end}}
 `
 
-var viewObjectTemplate = template.Must(template.Must(template.New("base").Parse(baseText)).Parse(viewObjectText))
+var viewObjectTemplate = newPageTemplate(viewObjectText)
 
 func ViewObjectPage(params *ViewObjectParams) ([]byte, error) {
 	b := bytes.Buffer{}

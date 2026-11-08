@@ -3,7 +3,6 @@ package uitemplates
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 )
 
 type ShowCollectionParams struct {
@@ -107,7 +106,7 @@ var showCollectionText = `
 {{end}}
 `
 
-var showCollectionTemplate = template.Must(template.Must(template.New("base").Parse(baseText)).Parse(showCollectionText))
+var showCollectionTemplate = newPageTemplate(showCollectionText)
 
 func ShowCollectionPage(params *ShowCollectionParams) ([]byte, error) {
 	b := bytes.Buffer{}

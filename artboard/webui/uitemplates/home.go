@@ -1,7 +1,5 @@
 package uitemplates
 
-import "html/template"
-
 type HomeParams struct {
 	LoggedIn    bool
 	Collections []HomeCollection
@@ -82,4 +80,4 @@ var homeText = `{{define "title"}}Home{{end}}
 {{end}}
 `
 
-var HomeTemplate = template.Must(template.Must(template.New("base").Parse(baseText)).Parse(homeText))
+var HomeTemplate = newPageTemplate(homeText)

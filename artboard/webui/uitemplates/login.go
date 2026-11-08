@@ -1,7 +1,5 @@
 package uitemplates
 
-import "html/template"
-
 type LogInParams struct {
 	UserError string
 }
@@ -24,4 +22,4 @@ Error: {{.UserError}}
 {{end}}
 `
 
-var LogInTemplate = template.Must(template.Must(template.New("base").Parse(baseText)).Parse(logInText))
+var LogInTemplate = newPageTemplate(logInText)

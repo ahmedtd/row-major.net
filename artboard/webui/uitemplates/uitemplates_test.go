@@ -153,3 +153,13 @@ func TestViewObjectPageNoTags(t *testing.T) {
 		t.Errorf("output unexpectedly contains an error alert")
 	}
 }
+
+func TestBuildRevisionFooter(t *testing.T) {
+	out, err := LogOutPage(&LogOutParams{})
+	if err != nil {
+		t.Fatalf("LogOutPage: %v", err)
+	}
+	if want := "Build: " + revision; !strings.Contains(string(out), want) {
+		t.Errorf("output missing %q", want)
+	}
+}

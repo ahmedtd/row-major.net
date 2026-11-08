@@ -3,7 +3,6 @@ package uitemplates
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 )
 
 type LogOutParams struct {
@@ -26,7 +25,7 @@ var logOutText = `
 {{end}}
 `
 
-var logOutTemplate = template.Must(template.Must(template.New("base").Parse(baseText)).Parse(logOutText))
+var logOutTemplate = newPageTemplate(logOutText)
 
 func LogOutPage(params *LogOutParams) ([]byte, error) {
 	b := bytes.Buffer{}

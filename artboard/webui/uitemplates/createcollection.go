@@ -3,7 +3,6 @@ package uitemplates
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 )
 
 type CreateCollectionParams struct {
@@ -67,7 +66,7 @@ var createCollectionText = `
 {{end}}
 `
 
-var createCollectionTemplate = template.Must(template.Must(template.New("base").Parse(baseText)).Parse(createCollectionText))
+var createCollectionTemplate = newPageTemplate(createCollectionText)
 
 func CreateCollectionPage(params *CreateCollectionParams) ([]byte, error) {
 	b := bytes.Buffer{}

@@ -1,5 +1,49 @@
 package uitemplates
 
+import (
+	"html/template"
+	"runtime/debug"
+)
+
+// templateFuncs are the functions available to every page template.
+var templateFuncs = template.FuncMap{
+	"buildRevision": func() string { return revision },
+}
+
+var revision = buildRevision()
+
+// newPageTemplate parses the base template followed by the page-specific
+// template text.
+func newPageTemplate(pageText string) *template.Template {
+	return template.Must(template.Must(template.New("base").Funcs(templateFuncs).Parse(baseText)).Parse(pageText))
+}
+
+// buildRevision returns the VCS revision that the binary was built from, as
+// stamped by the Go toolchain, with a "-dirty" suffix if the working tree had
+// local modifications.
+func buildRevision() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+
+	revision := "unknown"
+	modified := false
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			revision = setting.Value
+		case "vcs.modified":
+			modified = setting.Value == "true"
+		}
+	}
+
+	if modified {
+		revision += "-dirty"
+	}
+	return revision
+}
+
 var baseText = `
 <!DOCTYPE html>
 <html lang="en">
@@ -33,6 +77,7 @@ var baseText = `
         <address>
           Contact: admin@rumor-mill.dev
         </address>
+        <p class="text-body-secondary small">Build: {{buildRevision}}</p>
       </footer>
     </div>
 
