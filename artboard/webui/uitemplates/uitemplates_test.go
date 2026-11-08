@@ -62,6 +62,10 @@ func TestViewObjectPage(t *testing.T) {
 		ContentType:           "image/png",
 		IsImage:               true,
 		NextLink:              "/view-object?collection=abc&name=dog.png",
+		Tags:                  []string{"tabby", "<script>"},
+		AddTagLink:            "/add-object-tag",
+		CollectionID:          "abc",
+		UserError:             "tag too long",
 	})
 	if err != nil {
 		t.Fatalf("ViewObjectPage: %v", err)
@@ -71,9 +75,28 @@ func TestViewObjectPage(t *testing.T) {
 		`<img src="/collection-object?collection=abc&amp;name=cats%2Ftabby&#43;%3C1%3E.png"`,
 		`href="/view-object?collection=abc&amp;name=dog.png" rel="next"`,
 		`disabled" aria-disabled="true">&larr; Previous`,
+		"<td>tabby</td>",
+		"<td>&lt;script&gt;</td>",
+		`action="/add-object-tag"`,
+		`name="collection" value="abc"`,
+		`name="name" value="cats/tabby &lt;1&gt;.png"`,
+		"Error: tag too long",
 	} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("output missing %q", want)
 		}
+	}
+}
+
+func TestViewObjectPageNoTags(t *testing.T) {
+	out, err := ViewObjectPage(&ViewObjectParams{Name: "cat.png"})
+	if err != nil {
+		t.Fatalf("ViewObjectPage: %v", err)
+	}
+	if !strings.Contains(string(out), "No tags.") {
+		t.Errorf("output missing empty-tags message")
+	}
+	if strings.Contains(string(out), "alert-danger") {
+		t.Errorf("output unexpectedly contains an error alert")
 	}
 }

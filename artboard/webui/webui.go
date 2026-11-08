@@ -50,6 +50,7 @@ func (u *WebUI) Register(m *http.ServeMux, host string) {
 	m.HandleFunc("POST "+host+"/create-collection", u.createCollectionPostHandler)
 	m.HandleFunc("GET "+host+"/show-collection", u.showCollectionHandler)
 	m.HandleFunc("GET "+host+"/view-object", u.viewObjectHandler)
+	m.HandleFunc("POST "+host+"/add-object-tag", u.addObjectTagHandler)
 	m.HandleFunc("GET "+host+"/collection-object", u.objectContentHandler)
 
 	// Catch-all so that requests for this host never fall through to other

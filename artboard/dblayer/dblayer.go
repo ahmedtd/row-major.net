@@ -3,7 +3,9 @@ package dblayer
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -231,4 +233,65 @@ func (db *DB) GetCollectionForUser(ctx context.Context, user *dbtypes.User, id s
 	}
 
 	return collection, nil
+}
+
+// objectMetadataRef returns the document reference for an object's metadata.
+//
+// The document ID is derived from the collection ID and object path, so that
+// lookups and upserts don't need a query, and concurrent first writes for the
+// same object land on the same document.  It is hashed because object names
+// can contain "/" and can be longer than Firestore allows for document IDs.
+func (db *DB) objectMetadataRef(collectionID, path string) *firestore.DocumentRef {
+	h := sha256.New()
+	h.Write([]byte(collectionID))
+	h.Write([]byte{0})
+	h.Write([]byte(path))
+	return db.firestoreClient.Collection("ObjectMetadata").Doc(hex.EncodeToString(h.Sum(nil)))
+}
+
+// GetObjectMetadata returns the metadata for an object in a collection.  If
+// no metadata has been recorded for the object, it returns an empty
+// ObjectMetadata rather than an error.
+//
+// The caller is responsible for checking that the user may access the
+// collection.
+func (db *DB) GetObjectMetadata(ctx context.Context, collectionID, path string) (*dbtypes.ObjectMetadata, error) {
+	ref := db.objectMetadataRef(collectionID, path)
+	snap, err := ref.Get(ctx)
+	if status.Code(err) == codes.NotFound {
+		return &dbtypes.ObjectMetadata{
+			ID:         ref.ID,
+			Collection: collectionID,
+			Path:       path,
+		}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("while retrieving metadata for object %q in collection %s: %w", path, collectionID, err)
+	}
+
+	md := &dbtypes.ObjectMetadata{}
+	if err := snap.DataTo(md); err != nil {
+		return nil, fmt.Errorf("while unmarshaling metadata for object %q in collection %s: %w", path, collectionID, err)
+	}
+	return md, nil
+}
+
+// AddObjectTag associates tag with an object in a collection, creating the
+// object's metadata entry if necessary.  Adding a tag that the object already
+// has is a no-op.
+//
+// The caller is responsible for checking that the user may access the
+// collection, and for validating the tag.
+func (db *DB) AddObjectTag(ctx context.Context, collectionID, path, tag string) error {
+	ref := db.objectMetadataRef(collectionID, path)
+	_, err := ref.Set(ctx, map[string]any{
+		"id":         ref.ID,
+		"collection": collectionID,
+		"path":       path,
+		"tags":       firestore.ArrayUnion(tag),
+	}, firestore.MergeAll)
+	if err != nil {
+		return fmt.Errorf("while adding tag to object %q in collection %s: %w", path, collectionID, err)
+	}
+	return nil
 }

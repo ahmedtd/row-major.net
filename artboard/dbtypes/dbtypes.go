@@ -32,10 +32,20 @@ type Collection struct {
 	StorageURL string `firestore:"storageURL"`
 }
 
-// Images are hierarchically filed under a collection
-type Image struct {
-	ID          string   `firestore:"id"`
-	Name        string   `firestore:"name"`
-	StoragePath string   `firestore:"storagePath"`
-	Tags        []string `firestore:"tags"`
+// ObjectMetadata holds application data (such as tags) about a single Cloud
+// Storage object within a collection.  It is stored in the "ObjectMetadata"
+// Firestore collection.
+//
+// Entries are created lazily, the first time there is something to record
+// about an object, so most objects in a collection have no entry.
+type ObjectMetadata struct {
+	ID string `firestore:"id"`
+
+	// Collection is the ID of the Collection the object belongs to.
+	Collection string `firestore:"collection"`
+
+	// Path is the object's name relative to the collection's storage prefix.
+	Path string `firestore:"path"`
+
+	Tags []string `firestore:"tags"`
 }
