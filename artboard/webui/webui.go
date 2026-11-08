@@ -15,6 +15,7 @@ import (
 	"row-major/artboard/dblayer"
 	"row-major/artboard/dbtypes"
 	"row-major/artboard/gcsurl"
+	"row-major/artboard/metadatasync"
 	"row-major/artboard/webui/uitemplates"
 
 	"cloud.google.com/go/storage"
@@ -31,12 +32,17 @@ type WebUI struct {
 	// storageClient accesses collection buckets using the server's ambient
 	// (Workload Identity) credentials.
 	storageClient *storage.Client
+
+	// syncer creates missing object metadata entries when a user asks for a
+	// resync.
+	syncer *metadatasync.Syncer
 }
 
 func New(db *dblayer.DB, storageClient *storage.Client) *WebUI {
 	return &WebUI{
 		db:            db,
 		storageClient: storageClient,
+		syncer:        metadatasync.New(db, storageClient),
 	}
 }
 
@@ -54,6 +60,7 @@ func (u *WebUI) Register(m *http.ServeMux, host string) {
 	m.HandleFunc("GET "+host+"/view-object", u.viewObjectHandler)
 	m.HandleFunc("POST "+host+"/add-object-tag", u.addObjectTagHandler)
 	m.HandleFunc("GET "+host+"/collection-object", u.objectContentHandler)
+	m.HandleFunc("POST "+host+"/resync-metadata", u.resyncMetadataHandler)
 
 	// Catch-all so that requests for this host never fall through to other
 	// sites registered on the same mux.
@@ -146,6 +153,7 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if user != nil {
 		params.LoggedIn = true
+		params.ResyncRunning = u.syncer.Running()
 
 		collections, err := u.db.ListCollectionsForUser(ctx, user)
 		if err != nil {
@@ -174,6 +182,29 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
+}
+
+// resyncMetadataHandler starts a background pass over all collections that
+// creates any missing object metadata entries, then sends the user back to the
+// home page.  It doesn't wait for the pass to finish.
+//
+// Any logged-in user may trigger a resync.
+func (u *WebUI) resyncMetadataHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	user := u.checkSession(ctx, w, r, "/")
+	if user == nil {
+		// checkSession already wrote an error or redirect.
+		return
+	}
+
+	if u.syncer.Start() {
+		slog.InfoContext(ctx, "User started object metadata resync", slog.String("user", user.ID))
+	} else {
+		slog.InfoContext(ctx, "Object metadata resync already in progress", slog.String("user", user.ID))
+	}
+
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func logInLink(userError, redirectTarget string) string {

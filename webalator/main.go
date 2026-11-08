@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	artboarddblayer "row-major/artboard/dblayer"
-	artboardmetadatasync "row-major/artboard/metadatasync"
 	artboardwebui "row-major/artboard/webui"
 	"row-major/medtracker/dblayer"
 	"row-major/medtracker/webui"
@@ -31,8 +30,6 @@ var (
 	medtrackerDataProject = flag.String("medtracker-data-project", "", "GCP project that contains the medtracker application state.")
 	artboardDataProject   = flag.String("artboard-data-project", "", "GCP project that contains the artboard application state.  If empty, artboard is not served.")
 	artboardDatabase      = flag.String("artboard-database", firestore.DefaultDatabaseID, "Firestore database (within --artboard-data-project) that contains the artboard application state.")
-
-	artboardMetadataSyncInterval = flag.Duration("artboard-metadata-sync-interval", 1*time.Hour, "How often to scan artboard collections and create missing object metadata entries.  If zero, the sync is disabled.")
 )
 
 func main() {
@@ -58,7 +55,6 @@ func main() {
 		slog.String("medtracker-data-project", *medtrackerDataProject),
 		slog.String("artboard-data-project", *artboardDataProject),
 		slog.String("artboard-database", *artboardDatabase),
-		slog.Duration("artboard-metadata-sync-interval", *artboardMetadataSyncInterval),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -104,13 +100,7 @@ func main() {
 			slog.ErrorContext(ctx, "Error creating artboard Cloud Storage client", slog.Any("err", err))
 			os.Exit(1)
 		}
-		artboardDB := artboarddblayer.New(artboardFirestore)
-		artboardUI = artboardwebui.New(artboardDB, artboardStorage)
-
-		if *artboardMetadataSyncInterval > 0 {
-			syncer := artboardmetadatasync.New(artboardDB, artboardStorage)
-			go syncer.Run(ctx, *artboardMetadataSyncInterval)
-		}
+		artboardUI = artboardwebui.New(artboarddblayer.New(artboardFirestore), artboardStorage)
 	}
 
 	debugServeMux := http.NewServeMux()
@@ -136,10 +126,14 @@ func main() {
 		artboardUI.Register(serveMux, "rumor-mill.dev")
 	}
 
+	// Reject cross-origin state-changing requests (CSRF protection) using
+	// Sec-Fetch-Site / Origin headers.
+	crossOriginProtection := http.NewCrossOriginProtection()
+
 	server := &http.Server{
 		Addr: *listen,
 
-		Handler: GCPCloudLoggingHTTPMiddleware(serveMux),
+		Handler: GCPCloudLoggingHTTPMiddleware(crossOriginProtection.Handler(serveMux)),
 
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,

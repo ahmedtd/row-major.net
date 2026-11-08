@@ -1,5 +1,6 @@
-// Package metadatasync periodically walks every collection's Cloud Storage
-// location and makes sure each object has an ObjectMetadata entry.
+// Package metadatasync walks every collection's Cloud Storage location and
+// makes sure each object has an ObjectMetadata entry.  A sync is expensive
+// (one Firestore read per object), so it only runs when explicitly triggered.
 package metadatasync
 
 import (
@@ -7,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"row-major/artboard/dblayer"
@@ -27,6 +29,9 @@ type Syncer struct {
 	// storageClient accesses collection buckets using the server's ambient
 	// (Workload Identity) credentials.
 	storageClient *storage.Client
+
+	// running is set while a sync started by Start is in progress.
+	running atomic.Bool
 }
 
 func New(db *dblayer.DB, storageClient *storage.Client) *Syncer {
@@ -36,25 +41,31 @@ func New(db *dblayer.DB, storageClient *storage.Client) *Syncer {
 	}
 }
 
-// Run syncs all collections immediately, and then again every interval, until
-// ctx is cancelled.  Errors are logged rather than returned, so that one bad
-// collection or a transient failure doesn't stop the loop.
-func (s *Syncer) Run(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		s.SyncAll(ctx)
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
+// Start begins syncing all collections on a background goroutine and returns
+// immediately.  If a sync is already in progress, it does nothing and returns
+// false.
+//
+// The sync is not tied to any caller's context (such as an HTTP request), so
+// it keeps going after the caller returns.
+func (s *Syncer) Start() bool {
+	if !s.running.CompareAndSwap(false, true) {
+		return false
 	}
+	go func() {
+		defer s.running.Store(false)
+		s.SyncAll(context.Background())
+	}()
+	return true
 }
 
-// SyncAll makes one pass over every collection.
+// Running reports whether a sync started by Start is in progress.
+func (s *Syncer) Running() bool {
+	return s.running.Load()
+}
+
+// SyncAll makes one pass over every collection, blocking until it is done.
+// Errors are logged rather than returned, so that one bad collection doesn't
+// stop the others from being synced.
 func (s *Syncer) SyncAll(ctx context.Context) {
 	start := time.Now()
 	slog.InfoContext(ctx, "Starting artboard object metadata sync")

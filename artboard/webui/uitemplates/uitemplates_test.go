@@ -17,10 +17,23 @@ func TestHomeTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	for _, want := range []string{"Sketches &lt;b&gt;", "gs://bucket/sketches/", `href="/show-collection?id=abc"`} {
+	for _, want := range []string{"Sketches &lt;b&gt;", "gs://bucket/sketches/", `href="/show-collection?id=abc"`, `action="/resync-metadata"`, "Resync Object Metadata"} {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("output missing %q", want)
 		}
+	}
+}
+
+func TestHomeTemplateResyncRunning(t *testing.T) {
+	b := bytes.Buffer{}
+	if err := HomeTemplate.Execute(&b, &HomeParams{LoggedIn: true, ResyncRunning: true}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(b.String(), "Resync in progress") {
+		t.Errorf("output missing in-progress indicator")
+	}
+	if strings.Contains(b.String(), "Resync Object Metadata") {
+		t.Errorf("output shows resync button while a resync is running")
 	}
 }
 

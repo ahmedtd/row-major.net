@@ -5,6 +5,9 @@ import "html/template"
 type HomeParams struct {
 	LoggedIn    bool
 	Collections []HomeCollection
+
+	// ResyncRunning is set while an object metadata resync is in progress.
+	ResyncRunning bool
 }
 
 type HomeCollection struct {
@@ -48,6 +51,25 @@ var homeText = `{{define "title"}}Home{{end}}
     <p>
       <a href="/create-collection" class="btn btn-primary">Create Collection</a>
     </p>
+
+    <h2 class="mt-4">Maintenance</h2>
+
+    <form method="post" action="/resync-metadata">
+      <p>
+        Scan every collection's bucket and create metadata entries for objects
+        that don't have one yet.  This runs in the background and reads every
+        object, so it can take a while on large collections.
+      </p>
+      {{if .ResyncRunning}}
+        <p>
+          <button type="submit" class="btn btn-secondary" disabled>Resync in progress&hellip;</button>
+        </p>
+      {{else}}
+        <p>
+          <button type="submit" class="btn btn-secondary">Resync Object Metadata</button>
+        </p>
+      {{end}}
+    </form>
 
     <p>
       <a href="/log-out">Log Out</a>
