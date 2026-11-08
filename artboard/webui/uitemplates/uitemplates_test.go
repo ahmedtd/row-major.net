@@ -81,7 +81,7 @@ func TestShowCollectionPageSearch(t *testing.T) {
 		`action="/show-collection"`,
 		`name="id" value="abc"`,
 		`name="q" value="cat &lt;b&gt;"`,
-		"No objects have a tag containing &ldquo;cat &lt;b&gt;&rdquo;.",
+		"No objects match &ldquo;cat &lt;b&gt;&rdquo;.",
 		"Clear",
 	} {
 		if !strings.Contains(string(out), want) {

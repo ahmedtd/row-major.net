@@ -519,8 +519,8 @@ func showCollectionLink(id, pageToken string) string {
 	return link.String()
 }
 
-// showCollectionSearchLink links to the objects in a collection that have a
-// tag containing query.  If after is non-empty, only objects whose names sort
+// showCollectionSearchLink links to the objects in a collection that match the
+// full-text search query.  If after is non-empty, only objects whose names sort
 // after it are shown.
 func showCollectionSearchLink(id, query, after string) string {
 	q := url.Values{}
@@ -646,12 +646,12 @@ func (u *WebUI) listCollectionObjects(ctx context.Context, collection *dbtypes.C
 }
 
 // searchCollectionObjects returns one page of the objects in a collection that
-// have a tag containing query, starting after the object named after.  It also
+// match the full-text search query, starting after the object named after.  It also
 // returns the name to pass as after to get the next page, or "" if there are
 // no more.
 func (u *WebUI) searchCollectionObjects(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, query, after string) ([]uitemplates.ShowCollectionObject, string, error) {
 	// Fetch one extra result so we know whether there is a next page.
-	mds, err := u.db.SearchObjectsByTag(ctx, collection.ID, query, after, objectsPageSize+1)
+	mds, err := u.db.SearchObjects(ctx, collection.ID, query, after, objectsPageSize+1)
 	if err != nil {
 		return nil, "", err
 	}
@@ -674,7 +674,7 @@ func (u *WebUI) searchCollectionObjects(ctx context.Context, collection *dbtypes
 		g.Go(func() error {
 			a, err := bucket.Object(loc.Prefix + md.Path).Attrs(gctx)
 			if errors.Is(err, storage.ErrObjectNotExist) {
-				// The object was deleted after it was tagged.
+				// The object was deleted after its metadata was recorded.
 				return nil
 			}
 			if err != nil {

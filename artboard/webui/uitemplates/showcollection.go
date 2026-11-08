@@ -11,12 +11,12 @@ type ShowCollectionParams struct {
 	StorageURL  string
 	SelfLink    string
 
-	// CollectionID and SearchLink are used by the tag search form.
+	// CollectionID and SearchLink are used by the search form.
 	CollectionID string
 	SearchLink   string
 
-	// SearchQuery is the active tag search, if any.  When set, Objects only
-	// contains objects with a matching tag.
+	// SearchQuery is the active full-text search, if any.  When set, Objects
+	// only contains objects matching the search.
 	SearchQuery string
 
 	Objects []ShowCollectionObject
@@ -52,8 +52,8 @@ var showCollectionText = `
 <form method="GET" action="{{.SearchLink}}" class="row g-2 align-items-center mb-3" role="search">
   <input type="hidden" name="id" value="{{.CollectionID}}">
   <div class="col-auto">
-    <label for="q" class="visually-hidden">Search tags</label>
-    <input id="q" type="search" name="q" value="{{.SearchQuery}}" class="form-control" placeholder="Search tags">
+    <label for="q" class="visually-hidden">Search</label>
+    <input id="q" type="search" name="q" value="{{.SearchQuery}}" class="form-control" placeholder="Search">
   </div>
   <div class="col-auto">
     <button type="submit" class="btn btn-primary">Search</button>
@@ -93,7 +93,7 @@ var showCollectionText = `
     </table>
   {{else}}
     {{if .SearchQuery}}
-      <p>No objects have a tag containing &ldquo;{{.SearchQuery}}&rdquo;.</p>
+      <p>No objects match &ldquo;{{.SearchQuery}}&rdquo;.</p>
     {{else}}
       <p>No objects found.</p>
     {{end}}

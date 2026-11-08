@@ -296,32 +296,38 @@ func (db *DB) AddObjectTag(ctx context.Context, collectionID, path, tag string) 
 	return nil
 }
 
-// SearchObjectsByTag returns the metadata of objects in a collection that have
-// at least one tag containing query as a substring, ordered by path.
+// SearchObjects returns the metadata of objects in a collection that match a
+// full-text search query, ordered by path.  The query uses Firestore's search
+// syntax (for example, "red OR blue"), and is matched against the text index
+// on the ObjectMetadata collection.
 //
 // Only objects whose path sorts strictly after `after` are returned, so that
 // callers can page through results by passing the last path of the previous
 // page.  Pass "" to start from the beginning.  At most limit results are
 // returned.
 //
-// The query is used as a LIKE pattern, so "%" and "_" in it act as wildcards.
-//
 // The caller is responsible for checking that the user may access the
 // collection.
-func (db *DB) SearchObjectsByTag(ctx context.Context, collectionID, query, after string, limit int) ([]*dbtypes.ObjectMetadata, error) {
+func (db *DB) SearchObjects(ctx context.Context, collectionID, query, after string, limit int) ([]*dbtypes.ObjectMetadata, error) {
 	conditions := []firestore.BooleanExpression{
 		firestore.Equal("collection", collectionID),
-		firestore.GreaterThan(
-			firestore.ArrayLength(firestore.ArrayFilter("tags", "tag", firestore.Like(firestore.Variable("tag"), "%"+query+"%"))),
-			0,
-		),
 	}
 	if after != "" {
 		conditions = append(conditions, firestore.GreaterThan("path", after))
 	}
 
+	// The search stage must come first in the pipeline, so the collection
+	// filter is applied after it.
+	//
+	// TODO: If the search stage caps how many documents it retrieves before
+	// the Where stage runs, objects in a small collection could be crowded
+	// out by matches from other collections.  Consider moving the collection
+	// filter into the search query itself (And(DocumentMatches(query),
+	// Equal("collection", collectionID))), if Search supports that, or
+	// raising the cap with WithSearchRetrievalDepth.
 	iter := db.firestoreClient.Pipeline().
 		Collection("ObjectMetadata").
+		Search(firestore.WithSearchQuery(firestore.DocumentMatches(query))).
 		Where(firestore.And(conditions[0], conditions[1:]...)).
 		Sort(firestore.Orders(firestore.Ascending(firestore.FieldOf("path")))).
 		Limit(limit).
