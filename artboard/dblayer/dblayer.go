@@ -315,6 +315,11 @@ func (db *DB) SearchObjects(ctx context.Context, collectionID, query, after stri
 	if after != "" {
 		conditions = append(conditions, firestore.GreaterThan("path", after))
 	}
+	// Firestore rejects an And with only one argument.
+	filter := conditions[0]
+	if len(conditions) > 1 {
+		filter = firestore.And(conditions[0], conditions[1:]...)
+	}
 
 	// The search stage must come first in the pipeline, so the collection
 	// filter is applied after it.
@@ -328,7 +333,7 @@ func (db *DB) SearchObjects(ctx context.Context, collectionID, query, after stri
 	iter := db.firestoreClient.Pipeline().
 		Collection("ObjectMetadata").
 		Search(firestore.WithSearchQuery(firestore.DocumentMatches(query))).
-		Where(firestore.And(conditions[0], conditions[1:]...)).
+		Where(filter).
 		Sort(firestore.Orders(firestore.Ascending(firestore.FieldOf("path")))).
 		Limit(limit).
 		Execute(ctx).
