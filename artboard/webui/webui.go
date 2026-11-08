@@ -3,7 +3,6 @@ package webui
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -50,6 +49,8 @@ func (u *WebUI) Register(m *http.ServeMux, host string) {
 	m.HandleFunc("GET "+host+"/create-collection", u.createCollectionGetHandler)
 	m.HandleFunc("POST "+host+"/create-collection", u.createCollectionPostHandler)
 	m.HandleFunc("GET "+host+"/show-collection", u.showCollectionHandler)
+	m.HandleFunc("GET "+host+"/view-object", u.viewObjectHandler)
+	m.HandleFunc("GET "+host+"/collection-object", u.objectContentHandler)
 
 	// Catch-all so that requests for this host never fall through to other
 	// sites registered on the same mux.
@@ -502,15 +503,9 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collection, err := u.db.GetCollectionForUser(ctx, user, collectionID)
-	if errors.Is(err, dblayer.ErrPermissionDenied) {
-		slog.InfoContext(ctx, "User is not allowed to view collection", slog.String("collection", collectionID))
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		slog.ErrorContext(ctx, "Error while getting collection", slog.Any("err", err))
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
+	collection, loc := u.loadCollection(w, r, user, collectionID)
+	if collection == nil {
+		// loadCollection already wrote an error.
 		return
 	}
 
@@ -518,13 +513,6 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 		DisplayName: collection.DisplayName,
 		StorageURL:  collection.StorageURL,
 		SelfLink:    showCollectionLink(collection.ID, ""),
-	}
-
-	loc, err := gcsurl.Parse(collection.StorageURL)
-	if err != nil {
-		slog.ErrorContext(ctx, "Stored collection has invalid storage URL", slog.String("collection", collection.ID), slog.Any("err", err))
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
 	}
 
 	it := u.storageClient.Bucket(loc.Bucket).Objects(ctx, &storage.Query{Prefix: loc.Prefix})
@@ -542,6 +530,7 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			params.Objects = append(params.Objects, uitemplates.ShowCollectionObject{
 				Name:        name,
+				ViewLink:    viewObjectLink(collection.ID, name),
 				ContentType: obj.ContentType,
 				Size:        humanBytes(obj.Size),
 				Updated:     obj.Updated.UTC().Format(time.DateTime),

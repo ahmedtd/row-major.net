@@ -51,3 +51,29 @@ func TestShowCollectionPage(t *testing.T) {
 		}
 	}
 }
+
+func TestViewObjectPage(t *testing.T) {
+	out, err := ViewObjectPage(&ViewObjectParams{
+		CollectionDisplayName: "Sketches",
+		CollectionLink:        "/show-collection?id=abc",
+		Name:                  "cats/tabby <1>.png",
+		SelfLink:              "/view-object?collection=abc&name=cats%2Ftabby+%3C1%3E.png",
+		ContentLink:           "/collection-object?collection=abc&name=cats%2Ftabby+%3C1%3E.png",
+		ContentType:           "image/png",
+		IsImage:               true,
+		NextLink:              "/view-object?collection=abc&name=dog.png",
+	})
+	if err != nil {
+		t.Fatalf("ViewObjectPage: %v", err)
+	}
+	for _, want := range []string{
+		"cats/tabby &lt;1&gt;.png",
+		`<img src="/collection-object?collection=abc&amp;name=cats%2Ftabby&#43;%3C1%3E.png"`,
+		`href="/view-object?collection=abc&amp;name=dog.png" rel="next"`,
+		`disabled" aria-disabled="true">&larr; Previous`,
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+}

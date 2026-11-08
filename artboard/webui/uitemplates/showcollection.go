@@ -22,6 +22,7 @@ type ShowCollectionParams struct {
 
 type ShowCollectionObject struct {
 	Name        string
+	ViewLink    string
 	ContentType string
 	Size        string
 	Updated     string
@@ -58,7 +59,7 @@ var showCollectionText = `
       <tbody class="table-group-divider">
       {{range .Objects}}
         <tr>
-          <td>{{.Name}}</td>
+          <td><a href="{{.ViewLink}}">{{.Name}}</a></td>
           <td>{{.ContentType}}</td>
           <td>{{.Size}}</td>
           <td>{{.Updated}}</td>
