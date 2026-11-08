@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"row-major/artboard/dbtypes"
@@ -14,6 +15,8 @@ import (
 	"cloud.google.com/go/firestore"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type DB struct {
@@ -166,4 +169,66 @@ func (db *DB) UserFromSessionCookie(ctx context.Context, cookie string) (*dbtype
 	}
 
 	return user, nil
+}
+
+// CreateCollection stores a new collection, assigning its ID.
+func (db *DB) CreateCollection(ctx context.Context, collection *dbtypes.Collection) error {
+	ref := db.firestoreClient.Collection("Collections").NewDoc()
+	collection.ID = ref.ID
+	if _, err := ref.Create(ctx, collection); err != nil {
+		return fmt.Errorf("while creating collection: %w", err)
+	}
+	return nil
+}
+
+// ListCollectionsForUser returns all collections that the user manages.
+func (db *DB) ListCollectionsForUser(ctx context.Context, user *dbtypes.User) ([]*dbtypes.Collection, error) {
+	iter := db.firestoreClient.Collection("Collections").Where("managingUsers", "array-contains", user.ID).Documents(ctx)
+	defer iter.Stop()
+
+	var collections []*dbtypes.Collection
+	for {
+		snap, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("while iterating collections: %w", err)
+		}
+
+		collection := &dbtypes.Collection{}
+		if err := snap.DataTo(collection); err != nil {
+			return nil, fmt.Errorf("while unmarshaling collection %s: %w", snap.Ref.ID, err)
+		}
+		collections = append(collections, collection)
+	}
+
+	return collections, nil
+}
+
+// GetCollectionForUser retrieves a collection, returning ErrPermissionDenied if
+// it does not exist or the user does not manage it.
+func (db *DB) GetCollectionForUser(ctx context.Context, user *dbtypes.User, id string) (*dbtypes.Collection, error) {
+	if id == "" {
+		return nil, ErrPermissionDenied
+	}
+
+	snap, err := db.firestoreClient.Collection("Collections").Doc(id).Get(ctx)
+	if status.Code(err) == codes.NotFound {
+		return nil, ErrPermissionDenied
+	}
+	if err != nil {
+		return nil, fmt.Errorf("while retrieving collection %s: %w", id, err)
+	}
+
+	collection := &dbtypes.Collection{}
+	if err := snap.DataTo(collection); err != nil {
+		return nil, fmt.Errorf("while unmarshaling collection %s: %w", id, err)
+	}
+
+	if !slices.Contains(collection.ManagingUsers, user.ID) {
+		return nil, ErrPermissionDenied
+	}
+
+	return collection, nil
 }

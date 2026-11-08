@@ -20,10 +20,16 @@ type Session struct {
 	Expires time.Time              `firestore:"expires"`
 }
 
+// Collection is a set of media backed by a Google Cloud Storage location.
 type Collection struct {
 	ID            string   `firestore:"id"`
 	DisplayName   string   `firestore:"displayName"`
 	ManagingUsers []string `firestore:"managingUsers"`
+
+	// StorageURL is the canonical gs://bucket/prefix/ location holding the
+	// collection's media.  The server accesses it using its own (Workload
+	// Identity) credentials.
+	StorageURL string `firestore:"storageURL"`
 }
 
 // Images are hierarchically filed under a collection

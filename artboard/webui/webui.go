@@ -3,24 +3,39 @@ package webui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
+	"time"
 
 	"row-major/artboard/dblayer"
 	"row-major/artboard/dbtypes"
+	"row-major/artboard/gcsurl"
 	"row-major/artboard/webui/uitemplates"
+
+	"cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
 )
+
+// objectsPageSize is the number of objects shown per page of a collection.
+const objectsPageSize = 100
 
 type WebUI struct {
 	db *dblayer.DB
+
+	// storageClient accesses collection buckets using the server's ambient
+	// (Workload Identity) credentials.
+	storageClient *storage.Client
 }
 
-func New(db *dblayer.DB) *WebUI {
+func New(db *dblayer.DB, storageClient *storage.Client) *WebUI {
 	return &WebUI{
-		db: db,
+		db:            db,
+		storageClient: storageClient,
 	}
 }
 
@@ -32,6 +47,9 @@ func (u *WebUI) Register(m *http.ServeMux, host string) {
 	m.HandleFunc("POST "+host+"/log-in", u.logInPostHandler)
 	m.HandleFunc("GET "+host+"/log-out", u.logOutGetHandler)
 	m.HandleFunc("POST "+host+"/log-out", u.logOutPostHandler)
+	m.HandleFunc("GET "+host+"/create-collection", u.createCollectionGetHandler)
+	m.HandleFunc("POST "+host+"/create-collection", u.createCollectionPostHandler)
+	m.HandleFunc("GET "+host+"/show-collection", u.showCollectionHandler)
 
 	// Catch-all so that requests for this host never fall through to other
 	// sites registered on the same mux.
@@ -124,6 +142,20 @@ func (u *WebUI) homeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if user != nil {
 		params.LoggedIn = true
+
+		collections, err := u.db.ListCollectionsForUser(ctx, user)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error while listing collections", slog.Any("err", err))
+			http.Error(w, "Internal Error", http.StatusInternalServerError)
+			return
+		}
+		for _, c := range collections {
+			params.Collections = append(params.Collections, uitemplates.HomeCollection{
+				DisplayName: c.DisplayName,
+				StorageURL:  c.StorageURL,
+				ShowLink:    showCollectionLink(c.ID, ""),
+			})
+		}
 	}
 
 	content := bytes.Buffer{}
@@ -321,4 +353,229 @@ func (u *WebUI) logOutPostHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func createCollectionLink(userError, displayName, storageURL string) string {
+	q := url.Values{}
+	if userError != "" {
+		q.Add("user-error", userError)
+	}
+	if displayName != "" {
+		q.Add("name", displayName)
+	}
+	if storageURL != "" {
+		q.Add("storage-url", storageURL)
+	}
+	link := &url.URL{
+		Path:     "/create-collection",
+		RawQuery: q.Encode(),
+	}
+	return link.String()
+}
+
+func (u *WebUI) createCollectionGetHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	user := u.checkSession(ctx, w, r, createCollectionLink("", r.Form.Get("name"), r.Form.Get("storage-url")))
+	if user == nil {
+		// checkSession already wrote an error or redirect.
+		return
+	}
+	// No permissions check necessary; any user may create a collection.
+
+	params := &uitemplates.CreateCollectionParams{
+		UserError:   r.Form.Get("user-error"),
+		DisplayName: r.Form.Get("name"),
+		StorageURL:  r.Form.Get("storage-url"),
+	}
+	content, err := uitemplates.CreateCollectionPage(params)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := w.Write(content); err != nil {
+		// It's too late to write an error to the HTTP response.
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
+		return
+	}
+}
+
+func (u *WebUI) createCollectionPostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	displayName := strings.TrimSpace(r.PostForm.Get("name"))
+	rawStorageURL := strings.TrimSpace(r.PostForm.Get("storage-url"))
+
+	user := u.checkSession(ctx, w, r, createCollectionLink("", displayName, rawStorageURL))
+	if user == nil {
+		// checkSession already wrote an error or redirect.
+		return
+	}
+	// No permissions check necessary; any user may create a collection.
+
+	if displayName == "" {
+		http.Redirect(w, r, createCollectionLink("Name must not be empty", displayName, rawStorageURL), http.StatusFound)
+		return
+	}
+
+	storageURL, err := gcsurl.Parse(rawStorageURL)
+	if err != nil {
+		http.Redirect(w, r, createCollectionLink("Invalid Cloud Storage URL: "+err.Error(), displayName, rawStorageURL), http.StatusFound)
+		return
+	}
+
+	// Make sure we can actually read the location before saving it, so that
+	// the user gets immediate feedback about missing permissions or typos.
+	if err := u.checkBucketReadable(ctx, storageURL); err != nil {
+		slog.InfoContext(ctx, "Cloud Storage location is not readable", slog.String("storageURL", storageURL.String()), slog.Any("err", err))
+		userError := fmt.Sprintf("Could not list objects in %s.  Check that the bucket exists and that this site has been granted read access to it.", storageURL)
+		http.Redirect(w, r, createCollectionLink(userError, displayName, rawStorageURL), http.StatusFound)
+		return
+	}
+
+	collection := &dbtypes.Collection{
+		DisplayName:   displayName,
+		ManagingUsers: []string{user.ID},
+		StorageURL:    storageURL.String(),
+	}
+	if err := u.db.CreateCollection(ctx, collection); err != nil {
+		slog.ErrorContext(ctx, "Error while creating collection", slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, showCollectionLink(collection.ID, ""), http.StatusFound)
+}
+
+// checkBucketReadable verifies that the server can list objects at loc.
+func (u *WebUI) checkBucketReadable(ctx context.Context, loc *gcsurl.URL) error {
+	it := u.storageClient.Bucket(loc.Bucket).Objects(ctx, &storage.Query{Prefix: loc.Prefix})
+	_, err := it.Next()
+	if err != nil && err != iterator.Done {
+		return err
+	}
+	return nil
+}
+
+func showCollectionLink(id, pageToken string) string {
+	q := url.Values{}
+	q.Add("id", id)
+	if pageToken != "" {
+		q.Add("page-token", pageToken)
+	}
+	link := &url.URL{
+		Path:     "/show-collection",
+		RawQuery: q.Encode(),
+	}
+	return link.String()
+}
+
+func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	collectionID := r.Form.Get("id")
+	pageToken := r.Form.Get("page-token")
+
+	user := u.checkSession(ctx, w, r, showCollectionLink(collectionID, pageToken))
+	if user == nil {
+		// checkSession already wrote an error or redirect.
+		return
+	}
+
+	collection, err := u.db.GetCollectionForUser(ctx, user, collectionID)
+	if errors.Is(err, dblayer.ErrPermissionDenied) {
+		slog.InfoContext(ctx, "User is not allowed to view collection", slog.String("collection", collectionID))
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while getting collection", slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	params := &uitemplates.ShowCollectionParams{
+		DisplayName: collection.DisplayName,
+		StorageURL:  collection.StorageURL,
+		SelfLink:    showCollectionLink(collection.ID, ""),
+	}
+
+	loc, err := gcsurl.Parse(collection.StorageURL)
+	if err != nil {
+		slog.ErrorContext(ctx, "Stored collection has invalid storage URL", slog.String("collection", collection.ID), slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	it := u.storageClient.Bucket(loc.Bucket).Objects(ctx, &storage.Query{Prefix: loc.Prefix})
+	var objs []*storage.ObjectAttrs
+	nextPageToken, err := iterator.NewPager(it, objectsPageSize, pageToken).NextPage(&objs)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while listing collection objects", slog.String("collection", collection.ID), slog.Any("err", err))
+		params.UserError = "Could not list objects in the collection's bucket.  Check that the bucket exists and that this site has read access to it."
+	} else {
+		for _, obj := range objs {
+			name := strings.TrimPrefix(obj.Name, loc.Prefix)
+			if name == "" || strings.HasSuffix(name, "/") {
+				// Skip folder placeholder objects.
+				continue
+			}
+			params.Objects = append(params.Objects, uitemplates.ShowCollectionObject{
+				Name:        name,
+				ContentType: obj.ContentType,
+				Size:        humanBytes(obj.Size),
+				Updated:     obj.Updated.UTC().Format(time.DateTime),
+			})
+		}
+		if nextPageToken != "" {
+			params.NextPageLink = showCollectionLink(collection.ID, nextPageToken)
+		}
+	}
+
+	content, err := uitemplates.ShowCollectionPage(params)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while executing template", slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := w.Write(content); err != nil {
+		// It's too late to write an error to the HTTP response.
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
+		return
+	}
+}
+
+// humanBytes formats a byte count using binary (KiB, MiB, ...) units.
+func humanBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for m := n / unit; m >= unit; m /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }

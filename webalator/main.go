@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/storage"
 )
 
 var (
@@ -90,7 +91,14 @@ func main() {
 			slog.ErrorContext(ctx, "Error creating artboard FireStore client", slog.Any("err", err))
 			os.Exit(1)
 		}
-		artboardUI = artboardwebui.New(artboarddblayer.New(artboardFirestore))
+		// Uses ambient credentials (Workload Identity when running in GKE)
+		// to read collection buckets.
+		artboardStorage, err := storage.NewClient(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error creating artboard Cloud Storage client", slog.Any("err", err))
+			os.Exit(1)
+		}
+		artboardUI = artboardwebui.New(artboarddblayer.New(artboardFirestore), artboardStorage)
 	}
 
 	debugServeMux := http.NewServeMux()

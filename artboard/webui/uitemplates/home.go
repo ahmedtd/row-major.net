@@ -3,7 +3,14 @@ package uitemplates
 import "html/template"
 
 type HomeParams struct {
-	LoggedIn bool
+	LoggedIn    bool
+	Collections []HomeCollection
+}
+
+type HomeCollection struct {
+	DisplayName string
+	StorageURL  string
+	ShowLink    string
 }
 
 var homeText = `{{define "title"}}Home{{end}}
@@ -15,12 +22,36 @@ var homeText = `{{define "title"}}Home{{end}}
   <h1>Art Mood Board</h1>
 
   {{if .LoggedIn}}
+    <h2 class="mt-4">Your Collections</h2>
+
+    {{if .Collections}}
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Location</th>
+          </tr>
+        </thead>
+        <tbody class="table-group-divider">
+        {{range .Collections}}
+          <tr>
+            <td><a href="{{.ShowLink}}">{{.DisplayName}}</a></td>
+            <td><code>{{.StorageURL}}</code></td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      <p>You don't have any collections yet.</p>
+    {{end}}
+
     <p>
-	  Welcome. Actions available:
-	  <ul>
-		<li><a href="/log-out">Log Out</a></li>
-	  </ul>
-	</p>
+      <a href="/create-collection" class="btn btn-primary">Create Collection</a>
+    </p>
+
+    <p>
+      <a href="/log-out">Log Out</a>
+    </p>
   {{else}}
     <p>
       To get started, <a href="/log-in">Log In</a>.
