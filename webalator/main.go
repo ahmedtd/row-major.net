@@ -29,6 +29,7 @@ var (
 
 	medtrackerDataProject = flag.String("medtracker-data-project", "", "GCP project that contains the medtracker application state.")
 	artboardDataProject   = flag.String("artboard-data-project", "", "GCP project that contains the artboard application state.  If empty, artboard is not served.")
+	artboardDatabase      = flag.String("artboard-database", firestore.DefaultDatabaseID, "Firestore database (within --artboard-data-project) that contains the artboard application state.")
 )
 
 func main() {
@@ -53,6 +54,7 @@ func main() {
 		slog.String("debug-listen", *debugListen),
 		slog.String("medtracker-data-project", *medtrackerDataProject),
 		slog.String("artboard-data-project", *artboardDataProject),
+		slog.String("artboard-database", *artboardDatabase),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -86,7 +88,7 @@ func main() {
 
 	var artboardUI *artboardwebui.WebUI
 	if *artboardDataProject != "" {
-		artboardFirestore, err := firestore.NewClient(ctx, *artboardDataProject)
+		artboardFirestore, err := firestore.NewClientWithDatabase(ctx, *artboardDataProject, *artboardDatabase)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error creating artboard FireStore client", slog.Any("err", err))
 			os.Exit(1)

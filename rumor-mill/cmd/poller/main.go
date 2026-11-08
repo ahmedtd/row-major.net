@@ -20,11 +20,13 @@ import (
 
 	"cloud.google.com/go/firestore"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	cloudmetrics "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
 	cloudtrace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"github.com/sendgrid/sendgrid-go"
+	"go.opentelemetry.io/otel"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
 
 var (
@@ -79,19 +81,26 @@ func main() {
 			traceOpts = append(traceOpts, cloudtrace.WithProjectID(*monitoringProject))
 		}
 
-		_, traceShutdown, err := cloudtrace.InstallNewPipeline(traceOpts, sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)))
+		traceExporter, err := cloudtrace.New(traceOpts...)
 		if err != nil {
-			slog.ErrorContext(ctx, "Failed to install Cloud Trace OpenTelemetry trace pipeline", slog.Any("err", err))
+			slog.ErrorContext(ctx, "Failed to create Cloud Trace OpenTelemetry exporter", slog.Any("err", err))
 			os.Exit(255)
 		}
-		defer traceShutdown()
+		tracerProvider := sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(traceExporter),
+			sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*monitoringTraceRatio)),
+		)
+		otel.SetTracerProvider(tracerProvider)
+		defer tracerProvider.Shutdown(ctx)
 
-		pusher, err := cloudmetrics.InstallNewPipeline(metricsOpts)
+		metricExporter, err := cloudmetrics.New(metricsOpts...)
 		if err != nil {
-			slog.ErrorContext(ctx, "Failed to install Cloud Metrics OpenTelemetry meter pipeline", slog.Any("err", err))
+			slog.ErrorContext(ctx, "Failed to create Cloud Monitoring OpenTelemetry exporter", slog.Any("err", err))
 			os.Exit(255)
 		}
-		defer pusher.Stop(ctx)
+		meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)))
+		otel.SetMeterProvider(meterProvider)
+		defer meterProvider.Shutdown(ctx)
 	}
 
 	httpClient := &http.Client{}

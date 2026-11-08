@@ -3,6 +3,7 @@ package webui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,6 +18,7 @@ import (
 	"row-major/artboard/webui/uitemplates"
 
 	"cloud.google.com/go/storage"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -486,6 +488,23 @@ func showCollectionLink(id, pageToken string) string {
 	return link.String()
 }
 
+// showCollectionSearchLink links to the objects in a collection that have a
+// tag containing query.  If after is non-empty, only objects whose names sort
+// after it are shown.
+func showCollectionSearchLink(id, query, after string) string {
+	q := url.Values{}
+	q.Add("id", id)
+	q.Add("q", query)
+	if after != "" {
+		q.Add("after", after)
+	}
+	link := &url.URL{
+		Path:     "/show-collection",
+		RawQuery: q.Encode(),
+	}
+	return link.String()
+}
+
 func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -497,8 +516,14 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 
 	collectionID := r.Form.Get("id")
 	pageToken := r.Form.Get("page-token")
+	searchQuery := strings.TrimSpace(r.Form.Get("q"))
+	after := r.Form.Get("after")
 
-	user := u.checkSession(ctx, w, r, showCollectionLink(collectionID, pageToken))
+	redirectAfterLogin := showCollectionLink(collectionID, pageToken)
+	if searchQuery != "" {
+		redirectAfterLogin = showCollectionSearchLink(collectionID, searchQuery, after)
+	}
+	user := u.checkSession(ctx, w, r, redirectAfterLogin)
 	if user == nil {
 		// checkSession already wrote an error or redirect.
 		return
@@ -511,34 +536,35 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := &uitemplates.ShowCollectionParams{
-		DisplayName: collection.DisplayName,
-		StorageURL:  collection.StorageURL,
-		SelfLink:    showCollectionLink(collection.ID, ""),
+		DisplayName:  collection.DisplayName,
+		StorageURL:   collection.StorageURL,
+		SelfLink:     showCollectionLink(collection.ID, ""),
+		CollectionID: collection.ID,
+		SearchLink:   "/show-collection",
+		SearchQuery:  searchQuery,
 	}
 
-	it := u.storageClient.Bucket(loc.Bucket).Objects(ctx, &storage.Query{Prefix: loc.Prefix})
-	var objs []*storage.ObjectAttrs
-	nextPageToken, err := iterator.NewPager(it, objectsPageSize, pageToken).NextPage(&objs)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error while listing collection objects", slog.String("collection", collection.ID), slog.Any("err", err))
-		params.UserError = "Could not list objects in the collection's bucket.  Check that the bucket exists and that this site has read access to it."
-	} else {
-		for _, obj := range objs {
-			name := strings.TrimPrefix(obj.Name, loc.Prefix)
-			if name == "" || strings.HasSuffix(name, "/") {
-				// Skip folder placeholder objects.
-				continue
+	if searchQuery != "" {
+		objects, nextAfter, err := u.searchCollectionObjects(ctx, collection, loc, searchQuery, after)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error while searching collection objects", slog.String("collection", collection.ID), slog.String("query", searchQuery), slog.Any("err", err))
+			params.UserError = "Could not search the collection."
+		} else {
+			params.Objects = objects
+			if nextAfter != "" {
+				params.NextPageLink = showCollectionSearchLink(collection.ID, searchQuery, nextAfter)
 			}
-			params.Objects = append(params.Objects, uitemplates.ShowCollectionObject{
-				Name:        name,
-				ViewLink:    viewObjectLink(collection.ID, name),
-				ContentType: obj.ContentType,
-				Size:        humanBytes(obj.Size),
-				Updated:     obj.Updated.UTC().Format(time.DateTime),
-			})
 		}
-		if nextPageToken != "" {
-			params.NextPageLink = showCollectionLink(collection.ID, nextPageToken)
+	} else {
+		objects, nextPageToken, err := u.listCollectionObjects(ctx, collection, loc, pageToken)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error while listing collection objects", slog.String("collection", collection.ID), slog.Any("err", err))
+			params.UserError = "Could not list objects in the collection's bucket.  Check that the bucket exists and that this site has read access to it."
+		} else {
+			params.Objects = objects
+			if nextPageToken != "" {
+				params.NextPageLink = showCollectionLink(collection.ID, nextPageToken)
+			}
 		}
 	}
 
@@ -554,6 +580,91 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
+}
+
+func showCollectionObject(collectionID, name string, obj *storage.ObjectAttrs) uitemplates.ShowCollectionObject {
+	return uitemplates.ShowCollectionObject{
+		Name:        name,
+		ViewLink:    viewObjectLink(collectionID, name),
+		ContentType: obj.ContentType,
+		Size:        humanBytes(obj.Size),
+		Updated:     obj.Updated.UTC().Format(time.DateTime),
+	}
+}
+
+// listCollectionObjects lists one page of the objects in a collection's bucket,
+// returning the token for the next page, or "" if there are no more.
+func (u *WebUI) listCollectionObjects(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, pageToken string) ([]uitemplates.ShowCollectionObject, string, error) {
+	it := u.storageClient.Bucket(loc.Bucket).Objects(ctx, &storage.Query{Prefix: loc.Prefix})
+	var objs []*storage.ObjectAttrs
+	nextPageToken, err := iterator.NewPager(it, objectsPageSize, pageToken).NextPage(&objs)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var objects []uitemplates.ShowCollectionObject
+	for _, obj := range objs {
+		name := strings.TrimPrefix(obj.Name, loc.Prefix)
+		if !validObjectName(name) {
+			// Skip folder placeholder objects.
+			continue
+		}
+		objects = append(objects, showCollectionObject(collection.ID, name, obj))
+	}
+	return objects, nextPageToken, nil
+}
+
+// searchCollectionObjects returns one page of the objects in a collection that
+// have a tag containing query, starting after the object named after.  It also
+// returns the name to pass as after to get the next page, or "" if there are
+// no more.
+func (u *WebUI) searchCollectionObjects(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, query, after string) ([]uitemplates.ShowCollectionObject, string, error) {
+	// Fetch one extra result so we know whether there is a next page.
+	mds, err := u.db.SearchObjectsByTag(ctx, collection.ID, query, after, objectsPageSize+1)
+	if err != nil {
+		return nil, "", err
+	}
+	nextAfter := ""
+	if len(mds) > objectsPageSize {
+		mds = mds[:objectsPageSize]
+		nextAfter = mds[len(mds)-1].Path
+	}
+
+	// Look up the current attributes of each matching object, so the results
+	// look like a normal listing.
+	bucket := u.storageClient.Bucket(loc.Bucket)
+	attrs := make([]*storage.ObjectAttrs, len(mds))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(16)
+	for i, md := range mds {
+		if !validObjectName(md.Path) {
+			continue
+		}
+		g.Go(func() error {
+			a, err := bucket.Object(loc.Prefix + md.Path).Attrs(gctx)
+			if errors.Is(err, storage.ErrObjectNotExist) {
+				// The object was deleted after it was tagged.
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("while getting attributes of object %q: %w", md.Path, err)
+			}
+			attrs[i] = a
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, "", err
+	}
+
+	var objects []uitemplates.ShowCollectionObject
+	for i, md := range mds {
+		if attrs[i] == nil {
+			continue
+		}
+		objects = append(objects, showCollectionObject(collection.ID, md.Path, attrs[i]))
+	}
+	return objects, nextAfter, nil
 }
 
 // humanBytes formats a byte count using binary (KiB, MiB, ...) units.

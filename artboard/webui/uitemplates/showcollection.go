@@ -11,6 +11,14 @@ type ShowCollectionParams struct {
 	StorageURL  string
 	SelfLink    string
 
+	// CollectionID and SearchLink are used by the tag search form.
+	CollectionID string
+	SearchLink   string
+
+	// SearchQuery is the active tag search, if any.  When set, Objects only
+	// contains objects with a matching tag.
+	SearchQuery string
+
 	Objects []ShowCollectionObject
 
 	// NextPageLink is empty when there are no more objects.
@@ -41,6 +49,22 @@ var showCollectionText = `
 <h1>{{.DisplayName}}</h1>
 <p><code>{{.StorageURL}}</code></p>
 
+<form method="GET" action="{{.SearchLink}}" class="row g-2 align-items-center mb-3" role="search">
+  <input type="hidden" name="id" value="{{.CollectionID}}">
+  <div class="col-auto">
+    <label for="q" class="visually-hidden">Search tags</label>
+    <input id="q" type="search" name="q" value="{{.SearchQuery}}" class="form-control" placeholder="Search tags">
+  </div>
+  <div class="col-auto">
+    <button type="submit" class="btn btn-primary">Search</button>
+  </div>
+  {{if .SearchQuery}}
+  <div class="col-auto">
+    <a href="{{.SelfLink}}" class="btn btn-outline-secondary">Clear</a>
+  </div>
+  {{end}}
+</form>
+
 {{if .UserError}}
   <div class="alert alert-danger" role="alert">
     Error: {{.UserError}}
@@ -68,7 +92,11 @@ var showCollectionText = `
       </tbody>
     </table>
   {{else}}
-    <p>No objects found.</p>
+    {{if .SearchQuery}}
+      <p>No objects have a tag containing &ldquo;{{.SearchQuery}}&rdquo;.</p>
+    {{else}}
+      <p>No objects found.</p>
+    {{end}}
   {{end}}
 
   {{if .NextPageLink}}

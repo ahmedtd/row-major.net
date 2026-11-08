@@ -102,3 +102,12 @@ func TestViewObjectLinkWithTagError(t *testing.T) {
 		t.Errorf("viewObjectLinkWithTagError = %q, want %q", got, want)
 	}
 }
+
+func TestShowCollectionSearchLink(t *testing.T) {
+	if got, want := showCollectionSearchLink("abc", "red & blue", ""), "/show-collection?id=abc&q=red+%26+blue"; got != want {
+		t.Errorf("showCollectionSearchLink = %q, want %q", got, want)
+	}
+	if got, want := showCollectionSearchLink("abc", "red", "a/b.png"), "/show-collection?after=a%2Fb.png&id=abc&q=red"; got != want {
+		t.Errorf("showCollectionSearchLink = %q, want %q", got, want)
+	}
+}

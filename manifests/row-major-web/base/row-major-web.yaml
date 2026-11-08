@@ -79,6 +79,7 @@ spec:
             - --debug-listen=0.0.0.0:8081
             - --medtracker-data-project=medtracker-314520-data-prod
             - --artboard-data-project=artboard-314520-data-prod
+            - --artboard-database=artboard
           resources:
             requests:
               cpu: 250m

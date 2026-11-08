@@ -295,3 +295,56 @@ func (db *DB) AddObjectTag(ctx context.Context, collectionID, path, tag string) 
 	}
 	return nil
 }
+
+// SearchObjectsByTag returns the metadata of objects in a collection that have
+// at least one tag containing query as a substring, ordered by path.
+//
+// Only objects whose path sorts strictly after `after` are returned, so that
+// callers can page through results by passing the last path of the previous
+// page.  Pass "" to start from the beginning.  At most limit results are
+// returned.
+//
+// The query is used as a LIKE pattern, so "%" and "_" in it act as wildcards.
+//
+// The caller is responsible for checking that the user may access the
+// collection.
+func (db *DB) SearchObjectsByTag(ctx context.Context, collectionID, query, after string, limit int) ([]*dbtypes.ObjectMetadata, error) {
+	conditions := []firestore.BooleanExpression{
+		firestore.Equal("collection", collectionID),
+		firestore.GreaterThan(
+			firestore.ArrayLength(firestore.ArrayFilter("tags", "tag", firestore.Like(firestore.Variable("tag"), "%"+query+"%"))),
+			0,
+		),
+	}
+	if after != "" {
+		conditions = append(conditions, firestore.GreaterThan("path", after))
+	}
+
+	iter := db.firestoreClient.Pipeline().
+		Collection("ObjectMetadata").
+		Where(firestore.And(conditions[0], conditions[1:]...)).
+		Sort(firestore.Orders(firestore.Ascending(firestore.FieldOf("path")))).
+		Limit(limit).
+		Execute(ctx).
+		Results()
+	defer iter.Stop()
+
+	var results []*dbtypes.ObjectMetadata
+	for {
+		res, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("while searching objects in collection %s: %w", collectionID, err)
+		}
+
+		md := &dbtypes.ObjectMetadata{}
+		if err := res.DataTo(md); err != nil {
+			return nil, fmt.Errorf("while unmarshaling object metadata in collection %s: %w", collectionID, err)
+		}
+		results = append(results, md)
+	}
+
+	return results, nil
+}

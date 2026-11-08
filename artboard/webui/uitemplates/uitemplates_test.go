@@ -52,6 +52,40 @@ func TestShowCollectionPage(t *testing.T) {
 	}
 }
 
+func TestShowCollectionPageSearch(t *testing.T) {
+	params := &ShowCollectionParams{
+		DisplayName:  "Sketches",
+		SelfLink:     "/show-collection?id=abc",
+		CollectionID: "abc",
+		SearchLink:   "/show-collection",
+		SearchQuery:  "cat <b>",
+	}
+	out, err := ShowCollectionPage(params)
+	if err != nil {
+		t.Fatalf("ShowCollectionPage: %v", err)
+	}
+	for _, want := range []string{
+		`action="/show-collection"`,
+		`name="id" value="abc"`,
+		`name="q" value="cat &lt;b&gt;"`,
+		"No objects have a tag containing &ldquo;cat &lt;b&gt;&rdquo;.",
+		"Clear",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+
+	params.SearchQuery = ""
+	out, err = ShowCollectionPage(params)
+	if err != nil {
+		t.Fatalf("ShowCollectionPage: %v", err)
+	}
+	if strings.Contains(string(out), "Clear") {
+		t.Errorf("output has Clear button without an active search")
+	}
+}
+
 func TestViewObjectPage(t *testing.T) {
 	out, err := ViewObjectPage(&ViewObjectParams{
 		CollectionDisplayName: "Sketches",
