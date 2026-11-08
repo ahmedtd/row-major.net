@@ -49,5 +49,9 @@ type ObjectMetadata struct {
 	// Path is the object's name relative to the collection's storage prefix.
 	Path string `firestore:"path"`
 
+	// Caption is a free-form description of the object.  It may span multiple
+	// lines, separated by "\n".  It is empty if the object has no caption.
+	Caption string `firestore:"caption"`
+
 	Tags []string `firestore:"tags"`
 }

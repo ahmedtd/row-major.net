@@ -35,6 +35,12 @@ type ViewObjectParams struct {
 	// UserError is shown above the add-tag form, and TagInput pre-fills it.
 	UserError string
 	TagInput  string
+
+	// SetCaptionLink is the target of the caption form, which is pre-filled
+	// with CaptionInput.  CaptionError is shown above it.
+	SetCaptionLink string
+	CaptionError   string
+	CaptionInput   string
 }
 
 var viewObjectText = `
@@ -84,6 +90,24 @@ var viewObjectText = `
   <dt class="col-sm-2">Size</dt><dd class="col-sm-10">{{.Size}}</dd>
   <dt class="col-sm-2">Updated</dt><dd class="col-sm-10">{{.Updated}}</dd>
 </dl>
+
+<h2 id="caption" class="h4">Caption</h2>
+
+{{if .CaptionError}}
+  <div class="alert alert-danger" role="alert">
+    Error: {{.CaptionError}}
+  </div>
+{{end}}
+
+<form method="POST" action="{{.SetCaptionLink}}" class="mb-4">
+  <input type="hidden" name="collection" value="{{.CollectionID}}">
+  <input type="hidden" name="name" value="{{.Name}}">
+  <div class="mb-2">
+    <label for="caption-input" class="visually-hidden">Caption</label>
+    <textarea id="caption-input" name="caption" rows="3" class="form-control" placeholder="No caption">{{.CaptionInput}}</textarea>
+  </div>
+  <button type="submit" class="btn btn-primary">Save Caption</button>
+</form>
 
 <h2 id="tags" class="h4">Tags</h2>
 

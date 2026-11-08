@@ -103,6 +103,39 @@ func TestViewObjectLinkWithTagError(t *testing.T) {
 	}
 }
 
+func TestNormalizeCaption(t *testing.T) {
+	for _, tc := range []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"", "", false},
+		{"  ", "", false},
+		{"  A tabby cat  ", "A tabby cat", false},
+		{"line\nbreak", "line\nbreak", false},
+		{"line\r\nbreak\r\n", "line\nbreak", false},
+		{"tab\tseparated", "tab\tseparated", false},
+		{"bell\a", "", true},
+		{"lone\rcarriage", "", true},
+		{"\xff", "", true},
+		{strings.Repeat("é", maxCaptionLength), strings.Repeat("é", maxCaptionLength), false},
+		{strings.Repeat("é", maxCaptionLength+1), "", true},
+	} {
+		got, err := normalizeCaption(tc.in)
+		if got != tc.want || (err != nil) != tc.wantErr {
+			t.Errorf("normalizeCaption(%q) = %q, %v; want %q, err=%v", tc.in, got, err, tc.want, tc.wantErr)
+		}
+	}
+}
+
+func TestViewObjectLinkWithCaptionError(t *testing.T) {
+	got := viewObjectLinkWithCaptionError("abc", "a/b.png", "Caption must be valid UTF-8", "")
+	want := "/view-object?caption=&caption-error=Caption+must+be+valid+UTF-8&collection=abc&name=a%2Fb.png#caption"
+	if got != want {
+		t.Errorf("viewObjectLinkWithCaptionError = %q, want %q", got, want)
+	}
+}
+
 func TestShowCollectionSearchLink(t *testing.T) {
 	if got, want := showCollectionSearchLink("abc", "red & blue", ""), "/show-collection?id=abc&q=red+%26+blue"; got != want {
 		t.Errorf("showCollectionSearchLink = %q, want %q", got, want)

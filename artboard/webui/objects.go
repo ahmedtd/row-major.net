@@ -56,6 +56,54 @@ func addObjectTagLink() string {
 	return "/add-object-tag"
 }
 
+// viewObjectLinkWithCaptionError links to the object viewer, scrolled to the
+// caption section, showing userError and pre-filling the caption form with
+// caption (which may be empty).
+func viewObjectLinkWithCaptionError(collectionID, name, userError, caption string) string {
+	q := url.Values{}
+	q.Add("collection", collectionID)
+	q.Add("name", name)
+	if userError != "" {
+		q.Add("caption-error", userError)
+	}
+	q.Add("caption", caption)
+	link := &url.URL{
+		Path:     "/view-object",
+		RawQuery: q.Encode(),
+		Fragment: "caption",
+	}
+	return link.String()
+}
+
+func setObjectCaptionLink() string {
+	return "/set-object-caption"
+}
+
+// maxCaptionLength is the maximum length of a caption, in characters.
+const maxCaptionLength = 1000
+
+// normalizeCaption cleans up a user-entered caption, returning a user-facing
+// error if it is not acceptable.  An empty caption is allowed, and clears the
+// object's caption.  Line breaks (which browsers submit from a textarea as
+// "\r\n") are normalized to "\n"; tabs are allowed, but other control
+// characters are not.
+func normalizeCaption(caption string) (string, error) {
+	caption = strings.ReplaceAll(caption, "\r\n", "\n")
+	caption = strings.TrimSpace(caption)
+	if !utf8.ValidString(caption) {
+		return "", errors.New("Caption must be valid UTF-8")
+	}
+	if strings.ContainsFunc(caption, func(r rune) bool {
+		return unicode.IsControl(r) && r != '\n' && r != '\t'
+	}) {
+		return "", errors.New("Caption must not contain control characters")
+	}
+	if utf8.RuneCountInString(caption) > maxCaptionLength {
+		return "", fmt.Errorf("Caption must be at most %d characters", maxCaptionLength)
+	}
+	return caption, nil
+}
+
 // maxTagLength is the maximum length of a tag, in characters.
 const maxTagLength = 100
 
@@ -207,6 +255,14 @@ func (u *WebUI) viewObjectHandler(w http.ResponseWriter, r *http.Request) {
 		CollectionID:          collection.ID,
 		UserError:             r.Form.Get("user-error"),
 		TagInput:              r.Form.Get("tag"),
+		SetCaptionLink:        setObjectCaptionLink(),
+		CaptionError:          r.Form.Get("caption-error"),
+		CaptionInput:          metadata.Caption,
+	}
+	// After a failed (or interrupted) caption update, show what the user
+	// typed rather than the stored caption, so they can fix it up.
+	if r.Form.Has("caption") {
+		params.CaptionInput = r.Form.Get("caption")
 	}
 	if prevName != "" {
 		params.PrevLink = viewObjectLink(collection.ID, strings.TrimPrefix(prevName, loc.Prefix))
@@ -289,6 +345,69 @@ func (u *WebUI) addObjectTagHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	link := viewObjectLink(collection.ID, name) + "#tags"
+	http.Redirect(w, r, link, http.StatusSeeOther)
+}
+
+// setObjectCaptionHandler sets the caption of an object in a collection, then
+// redirects back to the object viewer.
+func (u *WebUI) setObjectCaptionHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	collectionID := r.PostForm.Get("collection")
+	name := r.PostForm.Get("name")
+	rawCaption := r.PostForm.Get("caption")
+
+	// If the user needs to log in, the update is lost, but they land back on
+	// the object with the caption pre-filled.
+	user := u.checkSession(ctx, w, r, viewObjectLinkWithCaptionError(collectionID, name, "", rawCaption))
+	if user == nil {
+		// checkSession already wrote an error or redirect.
+		return
+	}
+
+	collection, loc := u.loadCollection(w, r, user, collectionID)
+	if collection == nil {
+		// loadCollection already wrote an error.
+		return
+	}
+
+	if !validObjectName(name) {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	caption, err := normalizeCaption(rawCaption)
+	if err != nil {
+		http.Redirect(w, r, viewObjectLinkWithCaptionError(collection.ID, name, err.Error(), rawCaption), http.StatusSeeOther)
+		return
+	}
+
+	// Only record metadata for objects that actually exist.
+	fullName := loc.Prefix + name
+	_, err = u.storageClient.Bucket(loc.Bucket).Object(fullName).Attrs(ctx)
+	if errors.Is(err, storage.ErrObjectNotExist) {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while looking up object", slog.String("collection", collection.ID), slog.String("object", fullName), slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := u.db.SetObjectCaption(ctx, collection.ID, name, caption); err != nil {
+		slog.ErrorContext(ctx, "Error while setting object caption", slog.String("collection", collection.ID), slog.String("object", fullName), slog.Any("err", err))
+		http.Error(w, "Internal Error", http.StatusInternalServerError)
+		return
+	}
+
+	link := viewObjectLink(collection.ID, name) + "#caption"
 	http.Redirect(w, r, link, http.StatusSeeOther)
 }
 

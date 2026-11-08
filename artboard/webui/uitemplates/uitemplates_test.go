@@ -113,6 +113,9 @@ func TestViewObjectPage(t *testing.T) {
 		AddTagLink:            "/add-object-tag",
 		CollectionID:          "abc",
 		UserError:             "tag too long",
+		SetCaptionLink:        "/set-object-caption",
+		CaptionInput:          "A \"tabby\"\n<cat>",
+		CaptionError:          "caption too long",
 	})
 	if err != nil {
 		t.Fatalf("ViewObjectPage: %v", err)
@@ -128,6 +131,9 @@ func TestViewObjectPage(t *testing.T) {
 		`name="collection" value="abc"`,
 		`name="name" value="cats/tabby &lt;1&gt;.png"`,
 		"Error: tag too long",
+		`action="/set-object-caption"`,
+		`placeholder="No caption">A &#34;tabby&#34;` + "\n" + `&lt;cat&gt;</textarea>`,
+		"Error: caption too long",
 	} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("output missing %q", want)

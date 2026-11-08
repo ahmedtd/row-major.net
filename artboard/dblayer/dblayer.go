@@ -296,6 +296,25 @@ func (db *DB) AddObjectTag(ctx context.Context, collectionID, path, tag string) 
 	return nil
 }
 
+// SetObjectCaption sets the caption of an object in a collection, creating the
+// object's metadata entry if necessary.  An empty caption clears it.
+//
+// The caller is responsible for checking that the user may access the
+// collection, and for validating the caption.
+func (db *DB) SetObjectCaption(ctx context.Context, collectionID, path, caption string) error {
+	ref := db.objectMetadataRef(collectionID, path)
+	_, err := ref.Set(ctx, map[string]any{
+		"id":         ref.ID,
+		"collection": collectionID,
+		"path":       path,
+		"caption":    caption,
+	}, firestore.MergeAll)
+	if err != nil {
+		return fmt.Errorf("while setting caption of object %q in collection %s: %w", path, collectionID, err)
+	}
+	return nil
+}
+
 // SearchObjects returns the metadata of objects in a collection that match a
 // full-text search query, ordered by path.  The query uses Firestore's search
 // syntax (for example, "red OR blue"), and is matched against the text index
