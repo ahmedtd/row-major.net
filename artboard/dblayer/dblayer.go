@@ -348,3 +348,78 @@ func (db *DB) SearchObjectsByTag(ctx context.Context, collectionID, query, after
 
 	return results, nil
 }
+
+// ListAllCollections returns every collection, regardless of which users
+// manage it.  It is intended for background processing, not for serving user
+// requests.
+func (db *DB) ListAllCollections(ctx context.Context) ([]*dbtypes.Collection, error) {
+	iter := db.firestoreClient.Collection("Collections").Documents(ctx)
+	defer iter.Stop()
+
+	var collections []*dbtypes.Collection
+	for {
+		snap, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("while iterating collections: %w", err)
+		}
+
+		collection := &dbtypes.Collection{}
+		if err := snap.DataTo(collection); err != nil {
+			return nil, fmt.Errorf("while unmarshaling collection %s: %w", snap.Ref.ID, err)
+		}
+		collections = append(collections, collection)
+	}
+
+	return collections, nil
+}
+
+// EnsureObjectMetadata makes sure that each of the given objects in a
+// collection has a metadata entry, creating an empty one (no tags) for any
+// that don't.  Existing entries are left untouched.  It returns the number of
+// entries created.
+func (db *DB) EnsureObjectMetadata(ctx context.Context, collectionID string, paths []string) (int, error) {
+	if len(paths) == 0 {
+		return 0, nil
+	}
+
+	refs := make([]*firestore.DocumentRef, len(paths))
+	for i, path := range paths {
+		refs[i] = db.objectMetadataRef(collectionID, path)
+	}
+
+	snaps, err := db.firestoreClient.GetAll(ctx, refs)
+	if err != nil {
+		return 0, fmt.Errorf("while retrieving metadata for objects in collection %s: %w", collectionID, err)
+	}
+
+	created := 0
+	for i, snap := range snaps {
+		if snap.Exists() {
+			continue
+		}
+
+		md := &dbtypes.ObjectMetadata{
+			ID:         refs[i].ID,
+			Collection: collectionID,
+			Path:       paths[i],
+			// Store an empty array rather than null, so that array
+			// operations in queries behave uniformly.
+			Tags: []string{},
+		}
+		// Create (rather than Set) so that we never clobber an entry
+		// written concurrently, for example by AddObjectTag.
+		_, err := refs[i].Create(ctx, md)
+		if status.Code(err) == codes.AlreadyExists {
+			continue
+		}
+		if err != nil {
+			return created, fmt.Errorf("while creating metadata for object %q in collection %s: %w", paths[i], collectionID, err)
+		}
+		created++
+	}
+
+	return created, nil
+}

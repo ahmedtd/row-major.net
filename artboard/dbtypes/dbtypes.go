@@ -36,8 +36,10 @@ type Collection struct {
 // Storage object within a collection.  It is stored in the "ObjectMetadata"
 // Firestore collection.
 //
-// Entries are created lazily, the first time there is something to record
-// about an object, so most objects in a collection have no entry.
+// Entries are created by a periodic background sync that walks each
+// collection's storage location (see package metadatasync), and also on demand
+// the first time there is something to record about an object.  Objects that
+// were added to a collection recently may not have an entry yet.
 type ObjectMetadata struct {
 	ID string `firestore:"id"`
 
