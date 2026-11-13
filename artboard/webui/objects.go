@@ -80,7 +80,7 @@ func setObjectCaptionLink() string {
 }
 
 // maxCaptionLength is the maximum length of a caption, in characters.
-const maxCaptionLength = 1000
+const maxCaptionLength = 50000
 
 // normalizeCaption cleans up a user-entered caption, returning a user-facing
 // error if it is not acceptable.  An empty caption is allowed, and clears the
