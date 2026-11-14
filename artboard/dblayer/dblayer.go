@@ -15,7 +15,9 @@ import (
 	"row-major/artboard/dbtypes"
 
 	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -284,12 +286,24 @@ func (db *DB) GetObjectMetadata(ctx context.Context, collectionID, path string) 
 // collection, and for validating the tag.
 func (db *DB) AddObjectTag(ctx context.Context, collectionID, path, tag string) error {
 	ref := db.objectMetadataRef(collectionID, path)
-	_, err := ref.Set(ctx, map[string]any{
+	// We don't know the caption here without a read, but the trigrams of the
+	// path are always a subset of the correct set, so union them in.  This
+	// makes an entry created by this call searchable by path.
+	pathTrigrams := searchTrigrams(path, "")
+	trigrams := make([]any, len(pathTrigrams))
+	for i, t := range pathTrigrams {
+		trigrams[i] = t
+	}
+	fields := map[string]any{
 		"id":         ref.ID,
 		"collection": collectionID,
 		"path":       path,
 		"tags":       firestore.ArrayUnion(tag),
-	}, firestore.MergeAll)
+	}
+	if len(trigrams) > 0 {
+		fields["trigrams"] = firestore.ArrayUnion(trigrams...)
+	}
+	_, err := ref.Set(ctx, fields, firestore.MergeAll)
 	if err != nil {
 		return fmt.Errorf("while adding tag to object %q in collection %s: %w", path, collectionID, err)
 	}
@@ -308,6 +322,9 @@ func (db *DB) SetObjectCaption(ctx context.Context, collectionID, path, caption 
 		"collection": collectionID,
 		"path":       path,
 		"caption":    caption,
+		// Path and caption are both known here, so the trigrams can be
+		// written in full, atomically with the caption.
+		"trigrams": searchTrigrams(path, caption),
 	}, firestore.MergeAll)
 	if err != nil {
 		return fmt.Errorf("while setting caption of object %q in collection %s: %w", path, collectionID, err)
@@ -316,52 +333,58 @@ func (db *DB) SetObjectCaption(ctx context.Context, collectionID, path, caption 
 }
 
 // SearchObjects returns the metadata of objects in a collection that match a
-// full-text search query, ordered by path.  The query uses Firestore's search
-// syntax (for example, "red OR blue"), and is matched against the text index
-// on the ObjectMetadata collection.
+// substring search query, ordered by path.
+//
+// The query is split on whitespace into terms, and an object matches if every
+// term appears (ignoring case) as a substring of its path or its caption.
+//
+// Candidates are found using the trigrams field.  Firestore allows only one
+// array-contains filter per query, so rather than running a query per trigram
+// and intersecting the (unbounded) results, we count how many objects contain
+// each of the query's trigrams, then stream the objects containing the rarest
+// one in path order, checking each candidate in memory.  This keeps paging by
+// path cheap: we stop reading as soon as we have limit matches.  If no term is
+// long enough to have a trigram, every object in the collection is a
+// candidate.
 //
 // Only objects whose path sorts strictly after `after` are returned, so that
 // callers can page through results by passing the last path of the previous
 // page.  Pass "" to start from the beginning.  At most limit results are
 // returned.
 //
+// This relies on a composite index on ObjectMetadata of (collection ASC,
+// trigrams CONTAINS, path ASC), and one of (collection ASC, path ASC).
+//
 // The caller is responsible for checking that the user may access the
 // collection.
 func (db *DB) SearchObjects(ctx context.Context, collectionID, query, after string, limit int) ([]*dbtypes.ObjectMetadata, error) {
-	conditions := []firestore.BooleanExpression{
-		firestore.Equal("collection", collectionID),
+	terms := parseSearchQuery(query)
+
+	base := db.firestoreClient.Collection("ObjectMetadata").Where("collection", "==", collectionID)
+
+	q := base
+	if trigrams := queryTrigrams(terms); len(trigrams) > 0 {
+		rarest, n, err := db.rarestTrigram(ctx, base, trigrams)
+		if err != nil {
+			return nil, fmt.Errorf("while searching objects in collection %s: %w", collectionID, err)
+		}
+		if n == 0 {
+			// Some trigram of the query appears nowhere, so nothing can match.
+			return nil, nil
+		}
+		q = q.Where("trigrams", "array-contains", rarest)
 	}
+	q = q.OrderBy("path", firestore.Asc)
 	if after != "" {
-		conditions = append(conditions, firestore.GreaterThan("path", after))
-	}
-	// Firestore rejects an And with only one argument.
-	filter := conditions[0]
-	if len(conditions) > 1 {
-		filter = firestore.And(conditions[0], conditions[1:]...)
+		q = q.StartAfter(after)
 	}
 
-	// The search stage must come first in the pipeline, so the collection
-	// filter is applied after it.
-	//
-	// TODO: If the search stage caps how many documents it retrieves before
-	// the Where stage runs, objects in a small collection could be crowded
-	// out by matches from other collections.  Consider moving the collection
-	// filter into the search query itself (And(DocumentMatches(query),
-	// Equal("collection", collectionID))), if Search supports that, or
-	// raising the cap with WithSearchRetrievalDepth.
-	iter := db.firestoreClient.Pipeline().
-		Collection("ObjectMetadata").
-		Search(firestore.WithSearchQuery(firestore.DocumentMatches(query))).
-		Where(filter).
-		Sort(firestore.Orders(firestore.Ascending(firestore.FieldOf("path")))).
-		Limit(limit).
-		Execute(ctx).
-		Results()
+	iter := q.Documents(ctx)
 	defer iter.Stop()
 
 	var results []*dbtypes.ObjectMetadata
-	for {
-		res, err := iter.Next()
+	for len(results) < limit {
+		snap, err := iter.Next()
 		if err == iterator.Done {
 			break
 		}
@@ -370,13 +393,65 @@ func (db *DB) SearchObjects(ctx context.Context, collectionID, query, after stri
 		}
 
 		md := &dbtypes.ObjectMetadata{}
-		if err := res.DataTo(md); err != nil {
+		if err := snap.DataTo(md); err != nil {
 			return nil, fmt.Errorf("while unmarshaling object metadata in collection %s: %w", collectionID, err)
+		}
+		if !matchesAllTerms(md.Path, md.Caption, terms) {
+			continue
 		}
 		results = append(results, md)
 	}
 
 	return results, nil
+}
+
+// rarestTrigram returns the trigram that the fewest documents matched by q
+// contain, along with that count.  Counting is cheap in Firestore (billed per
+// batch of index entries, not per document), so this is much less expensive
+// than reading the documents for every trigram.
+func (db *DB) rarestTrigram(ctx context.Context, q firestore.Query, trigrams []string) (string, int64, error) {
+	counts := make([]int64, len(trigrams))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(16)
+	for i, t := range trigrams {
+		g.Go(func() error {
+			tq := q.Where("trigrams", "array-contains", t)
+			res, err := tq.NewAggregationQuery().WithCount("count").Get(gctx)
+			if err != nil {
+				return fmt.Errorf("while counting objects containing trigram %q: %w", t, err)
+			}
+			n, err := aggregateCount(res, "count")
+			if err != nil {
+				return fmt.Errorf("while counting objects containing trigram %q: %w", t, err)
+			}
+			counts[i] = n
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return "", 0, err
+	}
+
+	best := 0
+	for i := range counts {
+		if counts[i] < counts[best] {
+			best = i
+		}
+	}
+	return trigrams[best], counts[best], nil
+}
+
+// aggregateCount extracts a count from an aggregation result.
+func aggregateCount(res firestore.AggregationResult, alias string) (int64, error) {
+	v, ok := res[alias]
+	if !ok {
+		return 0, fmt.Errorf("aggregation result has no %q field", alias)
+	}
+	pv, ok := v.(*firestorepb.Value)
+	if !ok {
+		return 0, fmt.Errorf("aggregation result field %q has unexpected type %T", alias, v)
+	}
+	return pv.GetIntegerValue(), nil
 }
 
 // ListAllCollections returns every collection, regardless of which users
@@ -407,12 +482,14 @@ func (db *DB) ListAllCollections(ctx context.Context) ([]*dbtypes.Collection, er
 }
 
 // EnsureObjectMetadata makes sure that each of the given objects in a
-// collection has a metadata entry, creating an empty one (no tags) for any
-// that don't.  Existing entries are left untouched.  It returns the number of
-// entries created.
-func (db *DB) EnsureObjectMetadata(ctx context.Context, collectionID string, paths []string) (int, error) {
+// collection has an up-to-date metadata entry.  It creates an empty entry (no
+// tags or caption) for any object that doesn't have one, and recomputes the
+// trigrams of any existing entry whose stored trigrams are missing or stale.
+// Other fields of existing entries are left untouched.  It returns the number
+// of entries created and the number updated.
+func (db *DB) EnsureObjectMetadata(ctx context.Context, collectionID string, paths []string) (created, updated int, err error) {
 	if len(paths) == 0 {
-		return 0, nil
+		return 0, 0, nil
 	}
 
 	refs := make([]*firestore.DocumentRef, len(paths))
@@ -422,12 +499,16 @@ func (db *DB) EnsureObjectMetadata(ctx context.Context, collectionID string, pat
 
 	snaps, err := db.firestoreClient.GetAll(ctx, refs)
 	if err != nil {
-		return 0, fmt.Errorf("while retrieving metadata for objects in collection %s: %w", collectionID, err)
+		return 0, 0, fmt.Errorf("while retrieving metadata for objects in collection %s: %w", collectionID, err)
 	}
 
-	created := 0
 	for i, snap := range snaps {
 		if snap.Exists() {
+			n, err := db.refreshTrigrams(ctx, snap)
+			updated += n
+			if err != nil {
+				return created, updated, fmt.Errorf("while updating trigrams for object %q in collection %s: %w", paths[i], collectionID, err)
+			}
 			continue
 		}
 
@@ -437,7 +518,8 @@ func (db *DB) EnsureObjectMetadata(ctx context.Context, collectionID string, pat
 			Path:       paths[i],
 			// Store an empty array rather than null, so that array
 			// operations in queries behave uniformly.
-			Tags: []string{},
+			Tags:     []string{},
+			Trigrams: searchTrigrams(paths[i], ""),
 		}
 		// Create (rather than Set) so that we never clobber an entry
 		// written concurrently, for example by AddObjectTag.
@@ -446,10 +528,40 @@ func (db *DB) EnsureObjectMetadata(ctx context.Context, collectionID string, pat
 			continue
 		}
 		if err != nil {
-			return created, fmt.Errorf("while creating metadata for object %q in collection %s: %w", paths[i], collectionID, err)
+			return created, updated, fmt.Errorf("while creating metadata for object %q in collection %s: %w", paths[i], collectionID, err)
 		}
 		created++
 	}
 
-	return created, nil
+	return created, updated, nil
+}
+
+// refreshTrigrams recomputes the trigrams of an existing metadata entry and
+// writes them if they differ from what is stored.  It returns 1 if it wrote
+// the entry, and 0 otherwise.
+//
+// The write is conditioned on the entry not having changed since snap was
+// read, so it can't clobber a concurrent caption change.  If it has changed,
+// the concurrent writer is responsible for the trigrams, and this is a no-op.
+func (db *DB) refreshTrigrams(ctx context.Context, snap *firestore.DocumentSnapshot) (int, error) {
+	md := &dbtypes.ObjectMetadata{}
+	if err := snap.DataTo(md); err != nil {
+		return 0, fmt.Errorf("while unmarshaling metadata: %w", err)
+	}
+
+	want := searchTrigrams(md.Path, md.Caption)
+	if md.Trigrams != nil && slices.Equal(md.Trigrams, want) {
+		return 0, nil
+	}
+
+	_, err := snap.Ref.Update(ctx, []firestore.Update{
+		{Path: "trigrams", Value: want},
+	}, firestore.LastUpdateTime(snap.UpdateTime))
+	if status.Code(err) == codes.FailedPrecondition {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return 1, nil
 }

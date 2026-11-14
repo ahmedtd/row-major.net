@@ -54,4 +54,11 @@ type ObjectMetadata struct {
 	Caption string `firestore:"caption"`
 
 	Tags []string `firestore:"tags"`
+
+	// Trigrams is the sorted set of trigrams (three-rune substrings) of the
+	// lower-cased Path and Caption, used to find candidates for substring
+	// search with array-contains queries.  It is maintained by the dblayer
+	// package whenever Path or Caption is written, and backfilled by the
+	// metadata sync for entries written before it existed.
+	Trigrams []string `firestore:"trigrams"`
 }
