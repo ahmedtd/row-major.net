@@ -32,7 +32,7 @@ type Collection struct {
 	StorageURL string `firestore:"storageURL"`
 }
 
-// ObjectMetadata holds application data (such as tags) about a single Cloud
+// ObjectMetadata holds application data (such as captions) about a single Cloud
 // Storage object within a collection.  It is stored in the "ObjectMetadata"
 // Firestore collection.
 //
@@ -52,8 +52,6 @@ type ObjectMetadata struct {
 	// Caption is a free-form description of the object.  It may span multiple
 	// lines, separated by "\n".  It is empty if the object has no caption.
 	Caption string `firestore:"caption"`
-
-	Tags []string `firestore:"tags"`
 
 	// Trigrams is the sorted set of trigrams (three-rune substrings) of the
 	// lower-cased Path and Caption, used to find candidates for substring

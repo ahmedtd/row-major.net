@@ -24,19 +24,10 @@ type ViewObjectParams struct {
 	PrevLink string
 	NextLink string
 
-	Tags []string
-
-	// AddTagLink is the target of the add-tag form.  CollectionID is passed
-	// along with Name as hidden form fields.
-	AddTagLink   string
-	CollectionID string
-
-	// UserError is shown above the add-tag form, and TagInput pre-fills it.
-	UserError string
-	TagInput  string
-
 	// SetCaptionLink is the target of the caption form, which is pre-filled
-	// with CaptionInput.  CaptionError is shown above it.
+	// with CaptionInput.  CaptionError is shown above it.  CollectionID is
+	// passed along with Name as hidden form fields.
+	CollectionID   string
 	SetCaptionLink string
 	CaptionError   string
 	CaptionInput   string
@@ -106,41 +97,6 @@ var viewObjectText = `
     <textarea id="caption-input" name="caption" rows="3" class="form-control" placeholder="No caption">{{.CaptionInput}}</textarea>
   </div>
   <button type="submit" class="btn btn-primary">Save Caption</button>
-</form>
-
-<h2 id="tags" class="h4">Tags</h2>
-
-{{if .Tags}}
-<table class="table table-sm">
-  <thead>
-    <tr><th scope="col">Tag</th></tr>
-  </thead>
-  <tbody>
-    {{range .Tags}}
-    <tr><td>{{.}}</td></tr>
-    {{end}}
-  </tbody>
-</table>
-{{else}}
-<p class="text-body-secondary">No tags.</p>
-{{end}}
-
-{{if .UserError}}
-  <div class="alert alert-danger" role="alert">
-    Error: {{.UserError}}
-  </div>
-{{end}}
-
-<form method="POST" action="{{.AddTagLink}}" class="row g-2 align-items-center">
-  <input type="hidden" name="collection" value="{{.CollectionID}}">
-  <input type="hidden" name="name" value="{{.Name}}">
-  <div class="col-auto">
-    <label for="tag" class="visually-hidden">Tag</label>
-    <input id="tag" type="text" name="tag" value="{{.TagInput}}" class="form-control" placeholder="New tag" required>
-  </div>
-  <div class="col-auto">
-    <button type="submit" class="btn btn-primary">Add Tag</button>
-  </div>
 </form>
 
 {{end}}

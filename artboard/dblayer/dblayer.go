@@ -278,38 +278,6 @@ func (db *DB) GetObjectMetadata(ctx context.Context, collectionID, path string) 
 	return md, nil
 }
 
-// AddObjectTag associates tag with an object in a collection, creating the
-// object's metadata entry if necessary.  Adding a tag that the object already
-// has is a no-op.
-//
-// The caller is responsible for checking that the user may access the
-// collection, and for validating the tag.
-func (db *DB) AddObjectTag(ctx context.Context, collectionID, path, tag string) error {
-	ref := db.objectMetadataRef(collectionID, path)
-	// We don't know the caption here without a read, but the trigrams of the
-	// path are always a subset of the correct set, so union them in.  This
-	// makes an entry created by this call searchable by path.
-	pathTrigrams := searchTrigrams(path, "")
-	trigrams := make([]any, len(pathTrigrams))
-	for i, t := range pathTrigrams {
-		trigrams[i] = t
-	}
-	fields := map[string]any{
-		"id":         ref.ID,
-		"collection": collectionID,
-		"path":       path,
-		"tags":       firestore.ArrayUnion(tag),
-	}
-	if len(trigrams) > 0 {
-		fields["trigrams"] = firestore.ArrayUnion(trigrams...)
-	}
-	_, err := ref.Set(ctx, fields, firestore.MergeAll)
-	if err != nil {
-		return fmt.Errorf("while adding tag to object %q in collection %s: %w", path, collectionID, err)
-	}
-	return nil
-}
-
 // SetObjectCaption sets the caption of an object in a collection, creating the
 // object's metadata entry if necessary.  An empty caption clears it.
 //
@@ -483,7 +451,7 @@ func (db *DB) ListAllCollections(ctx context.Context) ([]*dbtypes.Collection, er
 
 // EnsureObjectMetadata makes sure that each of the given objects in a
 // collection has an up-to-date metadata entry.  It creates an empty entry (no
-// tags or caption) for any object that doesn't have one, and recomputes the
+// caption) for any object that doesn't have one, and recomputes the
 // trigrams of any existing entry whose stored trigrams are missing or stale.
 // Other fields of existing entries are left untouched.  It returns the number
 // of entries created and the number updated.
@@ -516,13 +484,10 @@ func (db *DB) EnsureObjectMetadata(ctx context.Context, collectionID string, pat
 			ID:         refs[i].ID,
 			Collection: collectionID,
 			Path:       paths[i],
-			// Store an empty array rather than null, so that array
-			// operations in queries behave uniformly.
-			Tags:     []string{},
-			Trigrams: searchTrigrams(paths[i], ""),
+			Trigrams:   searchTrigrams(paths[i], ""),
 		}
 		// Create (rather than Set) so that we never clobber an entry
-		// written concurrently, for example by AddObjectTag.
+		// written concurrently, for example by SetObjectCaption.
 		_, err := refs[i].Create(ctx, md)
 		if status.Code(err) == codes.AlreadyExists {
 			continue

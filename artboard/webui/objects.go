@@ -27,33 +27,14 @@ import (
 )
 
 func viewObjectLink(collectionID, name string) string {
-	return viewObjectLinkWithTagError(collectionID, name, "", "")
-}
-
-// viewObjectLinkWithTagError links to the object viewer, scrolled to the tags
-// section, showing userError and pre-filling the add-tag form with tag.
-func viewObjectLinkWithTagError(collectionID, name, userError, tag string) string {
 	q := url.Values{}
 	q.Add("collection", collectionID)
 	q.Add("name", name)
-	if userError != "" {
-		q.Add("user-error", userError)
-	}
-	if tag != "" {
-		q.Add("tag", tag)
-	}
 	link := &url.URL{
 		Path:     "/view-object",
 		RawQuery: q.Encode(),
 	}
-	if userError != "" {
-		link.Fragment = "tags"
-	}
 	return link.String()
-}
-
-func addObjectTagLink() string {
-	return "/add-object-tag"
 }
 
 // viewObjectLinkWithCaptionError links to the object viewer, scrolled to the
@@ -102,28 +83,6 @@ func normalizeCaption(caption string) (string, error) {
 		return "", fmt.Errorf("Caption must be at most %d characters", maxCaptionLength)
 	}
 	return caption, nil
-}
-
-// maxTagLength is the maximum length of a tag, in characters.
-const maxTagLength = 100
-
-// normalizeTag cleans up a user-entered tag, returning a user-facing error if
-// it is not acceptable.
-func normalizeTag(tag string) (string, error) {
-	tag = strings.TrimSpace(tag)
-	if tag == "" {
-		return "", errors.New("Tag must not be empty")
-	}
-	if !utf8.ValidString(tag) {
-		return "", errors.New("Tag must be valid UTF-8")
-	}
-	if strings.ContainsFunc(tag, unicode.IsControl) {
-		return "", errors.New("Tag must not contain control characters")
-	}
-	if utf8.RuneCountInString(tag) > maxTagLength {
-		return "", fmt.Errorf("Tag must be at most %d characters", maxTagLength)
-	}
-	return tag, nil
 }
 
 func objectContentLink(collectionID, name string) string {
@@ -250,11 +209,7 @@ func (u *WebUI) viewObjectHandler(w http.ResponseWriter, r *http.Request) {
 		Updated:               attrs.Updated.UTC().Format(time.DateTime),
 		IsImage:               strings.HasPrefix(attrs.ContentType, "image/"),
 		IsVideo:               strings.HasPrefix(attrs.ContentType, "video/"),
-		Tags:                  metadata.Tags,
-		AddTagLink:            addObjectTagLink(),
 		CollectionID:          collection.ID,
-		UserError:             r.Form.Get("user-error"),
-		TagInput:              r.Form.Get("tag"),
 		SetCaptionLink:        setObjectCaptionLink(),
 		CaptionError:          r.Form.Get("caption-error"),
 		CaptionInput:          metadata.Caption,
@@ -283,69 +238,6 @@ func (u *WebUI) viewObjectHandler(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
 		return
 	}
-}
-
-// addObjectTagHandler applies a tag to an object in a collection, then
-// redirects back to the object viewer.
-func (u *WebUI) addObjectTagHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	if err := r.ParseForm(); err != nil {
-		slog.ErrorContext(ctx, "Error while parsing form", slog.Any("err", err))
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-
-	collectionID := r.PostForm.Get("collection")
-	name := r.PostForm.Get("name")
-	rawTag := r.PostForm.Get("tag")
-
-	// If the user needs to log in, the tag is lost, but they land back on the
-	// object with the tag pre-filled.
-	user := u.checkSession(ctx, w, r, viewObjectLinkWithTagError(collectionID, name, "", rawTag))
-	if user == nil {
-		// checkSession already wrote an error or redirect.
-		return
-	}
-
-	collection, loc := u.loadCollection(w, r, user, collectionID)
-	if collection == nil {
-		// loadCollection already wrote an error.
-		return
-	}
-
-	if !validObjectName(name) {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	tag, err := normalizeTag(rawTag)
-	if err != nil {
-		http.Redirect(w, r, viewObjectLinkWithTagError(collection.ID, name, err.Error(), rawTag), http.StatusSeeOther)
-		return
-	}
-
-	// Only record metadata for objects that actually exist.
-	fullName := loc.Prefix + name
-	_, err = u.storageClient.Bucket(loc.Bucket).Object(fullName).Attrs(ctx)
-	if errors.Is(err, storage.ErrObjectNotExist) {
-		http.Error(w, "Not Found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		slog.ErrorContext(ctx, "Error while looking up object", slog.String("collection", collection.ID), slog.String("object", fullName), slog.Any("err", err))
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
-	if err := u.db.AddObjectTag(ctx, collection.ID, name, tag); err != nil {
-		slog.ErrorContext(ctx, "Error while adding object tag", slog.String("collection", collection.ID), slog.String("object", fullName), slog.Any("err", err))
-		http.Error(w, "Internal Error", http.StatusInternalServerError)
-		return
-	}
-
-	link := viewObjectLink(collection.ID, name) + "#tags"
-	http.Redirect(w, r, link, http.StatusSeeOther)
 }
 
 // setObjectCaptionHandler sets the caption of an object in a collection, then

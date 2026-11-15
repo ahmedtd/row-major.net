@@ -69,37 +69,9 @@ func TestEtagListMatches(t *testing.T) {
 	}
 }
 
-func TestNormalizeTag(t *testing.T) {
-	testCases := []struct {
-		in      string
-		want    string
-		wantErr bool
-	}{
-		{"landscape", "landscape", false},
-		{"  two words \t", "two words", false},
-		{"", "", true},
-		{"   ", "", true},
-		{"a\x00b", "", true},
-		{"bad\xffutf8", "", true},
-		{strings.Repeat("é", maxTagLength), strings.Repeat("é", maxTagLength), false},
-		{strings.Repeat("é", maxTagLength+1), "", true},
-	}
-	for _, tc := range testCases {
-		got, err := normalizeTag(tc.in)
-		if (err != nil) != tc.wantErr || got != tc.want {
-			t.Errorf("normalizeTag(%q) = %q, %v; want %q, err=%v", tc.in, got, err, tc.want, tc.wantErr)
-		}
-	}
-}
-
-func TestViewObjectLinkWithTagError(t *testing.T) {
+func TestViewObjectLink(t *testing.T) {
 	if got, want := viewObjectLink("abc", "a/b.png"), "/view-object?collection=abc&name=a%2Fb.png"; got != want {
 		t.Errorf("viewObjectLink = %q, want %q", got, want)
-	}
-	got := viewObjectLinkWithTagError("abc", "a/b.png", "Tag must not be empty", " ")
-	want := "/view-object?collection=abc&name=a%2Fb.png&tag=+&user-error=Tag+must+not+be+empty#tags"
-	if got != want {
-		t.Errorf("viewObjectLinkWithTagError = %q, want %q", got, want)
 	}
 }
 
