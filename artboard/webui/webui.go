@@ -61,6 +61,8 @@ func (u *WebUI) Register(m *http.ServeMux, host string) {
 	m.HandleFunc("POST "+host+"/set-object-caption", u.setObjectCaptionHandler)
 	m.HandleFunc("GET "+host+"/collection-object", u.objectContentHandler)
 	m.HandleFunc("POST "+host+"/resync-metadata", u.resyncMetadataHandler)
+	m.HandleFunc("GET "+host+"/upload-object", u.uploadObjectGetHandler)
+	m.HandleFunc("POST "+host+"/upload-object", u.uploadObjectPostHandler)
 
 	// Catch-all so that requests for this host never fall through to other
 	// sites registered on the same mux.
@@ -570,6 +572,7 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 		DisplayName:  collection.DisplayName,
 		StorageURL:   collection.StorageURL,
 		SelfLink:     showCollectionLink(collection.ID, ""),
+		UploadLink:   uploadObjectLink(collection.ID, "", "", ""),
 		CollectionID: collection.ID,
 		SearchLink:   "/show-collection",
 		SearchQuery:  searchQuery,

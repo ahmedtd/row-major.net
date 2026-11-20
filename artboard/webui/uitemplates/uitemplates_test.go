@@ -153,3 +153,38 @@ func TestBuildRevisionFooter(t *testing.T) {
 		t.Errorf("output missing %q", want)
 	}
 }
+
+func TestUploadObjectPage(t *testing.T) {
+	out, err := UploadObjectPage(&UploadObjectParams{
+		CollectionDisplayName: "Sketches",
+		CollectionLink:        "/show-collection?id=abc",
+		SelfLink:              "/upload-object?collection=abc",
+		UploadLink:            "/upload-object?collection=abc",
+		Folder:                "cats/<tabby>",
+		UploadedName:          "cats/00000001.png",
+		UploadedViewLink:      "/view-object?collection=abc&name=cats%2F00000001.png",
+		UploadedContentLink:   "/collection-object?collection=abc&name=cats%2F00000001.png",
+		UploadedIsImage:       true,
+	})
+	if err != nil {
+		t.Fatalf("UploadObjectPage: %v", err)
+	}
+	s := string(out)
+	for _, want := range []string{
+		`action="/upload-object?collection=abc" enctype="multipart/form-data"`,
+		`name="folder"`,
+		`value="cats/&lt;tabby&gt;"`,
+		`<img src="/collection-object?collection=abc&amp;name=cats%2F00000001.png"`,
+		`addEventListener("paste"`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+	if strings.Index(s, `name="folder"`) > strings.Index(s, `name="file"`) {
+		t.Errorf("folder field must precede file field")
+	}
+	if strings.Contains(s, "alert-danger") {
+		t.Errorf("output unexpectedly contains an error alert")
+	}
+}

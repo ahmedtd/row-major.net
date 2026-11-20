@@ -237,6 +237,33 @@ func (db *DB) GetCollectionForUser(ctx context.Context, user *dbtypes.User, id s
 	return collection, nil
 }
 
+// AllocateObjectNumber atomically increments the collection's upload counter
+// and returns the new value.  Numbers start at 1 and are never handed out
+// twice, though one may go unused if the upload that claimed it fails.
+//
+// The caller is responsible for checking that the user may access the
+// collection.
+func (db *DB) AllocateObjectNumber(ctx context.Context, collectionID string) (int64, error) {
+	ref := db.firestoreClient.Collection("Collections").Doc(collectionID)
+	var n int64
+	err := db.firestoreClient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if err != nil {
+			return err
+		}
+		collection := &dbtypes.Collection{}
+		if err := snap.DataTo(collection); err != nil {
+			return fmt.Errorf("while unmarshaling collection: %w", err)
+		}
+		n = collection.UploadCounter + 1
+		return tx.Update(ref, []firestore.Update{{Path: "uploadCounter", Value: n}})
+	})
+	if err != nil {
+		return 0, fmt.Errorf("while allocating object number in collection %s: %w", collectionID, err)
+	}
+	return n, nil
+}
+
 // objectMetadataRef returns the document reference for an object's metadata.
 //
 // The document ID is derived from the collection ID and object path, so that

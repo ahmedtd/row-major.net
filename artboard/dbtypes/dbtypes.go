@@ -30,6 +30,11 @@ type Collection struct {
 	// collection's media.  The server accesses it using its own (Workload
 	// Identity) credentials.
 	StorageURL string `firestore:"storageURL"`
+
+	// UploadCounter is the number of object numbers handed out so far for
+	// naming uploaded objects.  The next upload gets UploadCounter+1.  It is
+	// only modified by dblayer.AllocateObjectNumber.
+	UploadCounter int64 `firestore:"uploadCounter"`
 }
 
 // ObjectMetadata holds application data (such as captions) about a single Cloud

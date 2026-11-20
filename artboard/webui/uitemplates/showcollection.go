@@ -9,6 +9,7 @@ type ShowCollectionParams struct {
 	DisplayName string
 	StorageURL  string
 	SelfLink    string
+	UploadLink  string
 
 	// CollectionID and SearchLink are used by the search form.
 	CollectionID string
@@ -45,7 +46,10 @@ var showCollectionText = `
 
 {{define "content"}}
 
-<h1>{{.DisplayName}}</h1>
+<div class="d-flex justify-content-between align-items-start">
+  <h1>{{.DisplayName}}</h1>
+  {{if .UploadLink}}<a href="{{.UploadLink}}" class="btn btn-primary">Upload</a>{{end}}
+</div>
 <p><code>{{.StorageURL}}</code></p>
 
 <form method="GET" action="{{.SearchLink}}" class="row g-2 align-items-center mb-3" role="search">
