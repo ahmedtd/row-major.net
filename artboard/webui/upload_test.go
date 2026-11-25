@@ -162,3 +162,15 @@ func TestArchiveEntryContentType(t *testing.T) {
 		}
 	}
 }
+
+func TestTimedCopy(t *testing.T) {
+	src := strings.Repeat("artboard", 500000)
+	var dst strings.Builder
+	stats, err := timedCopy(&dst, strings.NewReader(src))
+	if err != nil {
+		t.Fatalf("timedCopy: %v", err)
+	}
+	if dst.String() != src || stats.bytes != int64(len(src)) {
+		t.Errorf("copied %d bytes (stats say %d), want %d", dst.Len(), stats.bytes, len(src))
+	}
+}

@@ -310,7 +310,12 @@ func (u *WebUI) uploadObjectPostHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+	// The server's read and write timeouts cover the whole request, which
+	// isn't long enough to receive a large upload.  Now that the user is
+	// known, give them as long as the body keeps arriving.
+	deadlines := &deadlineExtendingReader{r: r.Body, rc: http.NewResponseController(w)}
+	deadlines.extend()
+	r.Body = http.MaxBytesReader(w, deadlines, maxRequestBytes)
 	mr, err := r.MultipartReader()
 	if err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -356,6 +361,9 @@ func (u *WebUI) uploadObjectPostHandler(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			status := u.storeUpload(ctx, collection, loc, folder, part)
+			// Finishing the upload after the body arrived may have taken a
+			// while; leave time to write the response.
+			deadlines.extend()
 			if status.UserError != "" {
 				// Keep what the user typed, so they can correct it.
 				http.Redirect(w, r, uploadObjectLink(collection.ID, rawFolder, status), http.StatusSeeOther)
@@ -367,6 +375,44 @@ func (u *WebUI) uploadObjectPostHandler(w http.ResponseWriter, r *http.Request) 
 			http.Redirect(w, r, uploadObjectLink(collection.ID, folder, status), http.StatusSeeOther)
 			return
 		}
+	}
+}
+
+// uploadIdleTimeout is how long an upload may go without receiving data (or,
+// once the body is received, without the response being written).
+const uploadIdleTimeout = 30 * time.Second
+
+// deadlineExtendingReader reads a request body, pushing the connection's read
+// and write deadlines uploadIdleTimeout into the future as data arrives.
+type deadlineExtendingReader struct {
+	r            io.ReadCloser
+	rc           *http.ResponseController
+	lastExtended time.Time
+}
+
+func (d *deadlineExtendingReader) Read(p []byte) (int, error) {
+	// Extending on every read would be wasteful; once a second is plenty.
+	if time.Since(d.lastExtended) > time.Second {
+		d.extend()
+	}
+	return d.r.Read(p)
+}
+
+func (d *deadlineExtendingReader) Close() error {
+	return d.r.Close()
+}
+
+// extend pushes the deadlines out.  The write deadline moves too, since it
+// also counts from the start of the request, and the response is only
+// written after the body is consumed.
+func (d *deadlineExtendingReader) extend() {
+	d.lastExtended = time.Now()
+	deadline := d.lastExtended.Add(uploadIdleTimeout)
+	if err := d.rc.SetReadDeadline(deadline); err != nil {
+		slog.Error("Error while extending upload read deadline", slog.Any("err", err))
+	}
+	if err := d.rc.SetWriteDeadline(deadline); err != nil {
+		slog.Error("Error while extending upload write deadline", slog.Any("err", err))
 	}
 }
 
@@ -389,7 +435,9 @@ func (u *WebUI) storeUpload(ctx context.Context, collection *dbtypes.Collection,
 	}
 
 	if isZipUpload(part.Header.Get("Content-Type"), part.FileName(), head) {
-		archive, err := u.spoolArchive(part)
+		// content, not part: the peek above already consumed the start of
+		// the part into content's buffer.
+		archive, err := u.spoolArchive(ctx, content)
 		if err != nil {
 			logErr(err)
 			return uploadStatus{UserError: uploadUserError(err)}
@@ -561,9 +609,73 @@ func (a *spooledArchive) fileCount() int {
 	return n
 }
 
+// copyStats records where the time went in a timedCopy.
+type copyStats struct {
+	bytes     int64
+	readTime  time.Duration
+	writeTime time.Duration
+	total     time.Duration
+}
+
+func (c copyStats) String() string {
+	return fmt.Sprintf("copied %d bytes in %v: %v reading, %v writing", c.bytes, c.total.Round(time.Millisecond), c.readTime.Round(time.Millisecond), c.writeTime.Round(time.Millisecond))
+}
+
+func (c copyStats) logAttrs(err error) []any {
+	attrs := []any{
+		slog.Int64("bytes", c.bytes),
+		slog.Duration("total", c.total),
+		slog.Duration("read", c.readTime),
+		slog.Duration("write", c.writeTime),
+	}
+	if c.readTime > 0 {
+		attrs = append(attrs, slog.Float64("read-mib-per-sec", float64(c.bytes)/(1<<20)/c.readTime.Seconds()))
+	}
+	if c.writeTime > 0 {
+		attrs = append(attrs, slog.Float64("write-mib-per-sec", float64(c.bytes)/(1<<20)/c.writeTime.Seconds()))
+	}
+	if err != nil {
+		attrs = append(attrs, slog.Any("err", err))
+	}
+	return attrs
+}
+
+// timedCopy is io.Copy, but measures time spent reading from src separately
+// from time spent writing to dst.
+func timedCopy(dst io.Writer, src io.Reader) (copyStats, error) {
+	var stats copyStats
+	start := time.Now()
+
+	buf := make([]byte, 1<<20)
+	for {
+		t := time.Now()
+		n, readErr := src.Read(buf)
+		stats.readTime += time.Since(t)
+
+		if n > 0 {
+			t = time.Now()
+			_, err := dst.Write(buf[:n])
+			stats.writeTime += time.Since(t)
+			if err != nil {
+				stats.total = time.Since(start)
+				return stats, err
+			}
+			stats.bytes += int64(n)
+		}
+		if readErr == io.EOF {
+			stats.total = time.Since(start)
+			return stats, nil
+		}
+		if readErr != nil {
+			stats.total = time.Since(start)
+			return stats, readErr
+		}
+	}
+}
+
 // spoolArchive saves a zip archive to the scratch directory, and checks that
 // it is valid and within limits.  The caller must close the result.
-func (u *WebUI) spoolArchive(content io.Reader) (_ *spooledArchive, retErr error) {
+func (u *WebUI) spoolArchive(ctx context.Context, content io.Reader) (_ *spooledArchive, retErr error) {
 	f, err := os.CreateTemp(u.scratchDir, scratchPattern)
 	if err != nil {
 		return nil, fmt.Errorf("while creating scratch file: %w", err)
@@ -575,9 +687,11 @@ func (u *WebUI) spoolArchive(content io.Reader) (_ *spooledArchive, retErr error
 		}
 	}()
 
-	size, err := io.Copy(f, io.LimitReader(content, maxArchiveBytes+1))
+	stats, err := timedCopy(f, io.LimitReader(content, maxArchiveBytes+1))
+	slog.InfoContext(ctx, "Spooled archive", stats.logAttrs(err)...)
+	size := stats.bytes
 	if err != nil {
-		return nil, fmt.Errorf("while spooling archive (total bytes copied %d): %w", size, err)
+		return nil, fmt.Errorf("while spooling archive (%s): %w", stats, err)
 	}
 	if size > maxArchiveBytes {
 		return nil, errTooLarge
