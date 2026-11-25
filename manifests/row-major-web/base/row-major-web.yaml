@@ -80,14 +80,23 @@ spec:
             - --medtracker-data-project=medtracker-314520-data-prod
             - --artboard-data-project=artboard-314520-data-prod
             - --artboard-database=artboard-2
+            - --artboard-scratch-dir=/run/artboard-scratch
+          volumeMounts:
+            - name: artboard-scratch
+              mountPath: /run/artboard-scratch
           resources:
             requests:
               cpu: 250m
-              ephemeral-storage: 10Mi
+              ephemeral-storage: 20Gi
               memory: 512Mi
             limits:
-              ephemeral-storage: 10Mi
+              ephemeral-storage: 20Gi
               memory: 512Mi
+      volumes:
+        # Holds uploaded zip archives while artboard extracts them.
+        - name: artboard-scratch
+          emptyDir:
+            sizeLimit: 20Gi
 
 ---
 

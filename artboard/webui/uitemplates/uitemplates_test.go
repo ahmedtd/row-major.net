@@ -195,19 +195,15 @@ func TestUploadObjectPageArchive(t *testing.T) {
 		CollectionLink:        "/show-collection?id=abc",
 		SelfLink:              "/upload-object?collection=abc",
 		UploadLink:            "/upload-object?collection=abc",
-		UploadedName:          "00000009.mp4",
-		UploadedViewLink:      "/view-object?collection=abc&name=00000009.mp4",
-		UploadedContentLink:   "/collection-object?collection=abc&name=00000009.mp4",
-		UploadedCount:         4,
-		SkippedCount:          1,
+		ArchiveFiles:          4,
 	})
 	if err != nil {
 		t.Fatalf("UploadObjectPage: %v", err)
 	}
 	s := string(out)
 	for _, want := range []string{
-		"Uploaded 4 files from the archive",
-		"Skipped 1 file that was not an image or video.",
+		"Received an archive of 4 files.",
+		`<a href="/show-collection?id=abc" class="alert-link">Check the collection</a>`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("output missing %q", want)

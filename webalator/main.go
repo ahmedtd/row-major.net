@@ -29,6 +29,7 @@ var (
 
 	medtrackerDataProject = flag.String("medtracker-data-project", "", "GCP project that contains the medtracker application state.")
 	artboardDataProject   = flag.String("artboard-data-project", "", "GCP project that contains the artboard application state.  If empty, artboard is not served.")
+	artboardScratchDir    = flag.String("artboard-scratch-dir", "", "Directory where artboard spools uploaded zip archives while extracting them.  Needs room for several archives (up to 2 GiB each).  If empty, the system temporary directory is used.")
 	artboardDatabase      = flag.String("artboard-database", firestore.DefaultDatabaseID, "Firestore database (within --artboard-data-project) that contains the artboard application state.")
 )
 
@@ -55,6 +56,7 @@ func main() {
 		slog.String("medtracker-data-project", *medtrackerDataProject),
 		slog.String("artboard-data-project", *artboardDataProject),
 		slog.String("artboard-database", *artboardDatabase),
+		slog.String("artboard-scratch-dir", *artboardScratchDir),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -100,7 +102,7 @@ func main() {
 			slog.ErrorContext(ctx, "Error creating artboard Cloud Storage client", slog.Any("err", err))
 			os.Exit(1)
 		}
-		artboardUI = artboardwebui.New(artboarddblayer.New(artboardFirestore), artboardStorage)
+		artboardUI = artboardwebui.New(artboarddblayer.New(artboardFirestore), artboardStorage, *artboardScratchDir)
 	}
 
 	debugServeMux := http.NewServeMux()

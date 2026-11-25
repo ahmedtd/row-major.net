@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"context"
@@ -12,10 +13,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -28,8 +31,26 @@ import (
 )
 
 const (
-	// maxUploadBytes bounds the size of an upload request body.
+	// maxUploadBytes bounds the size of a single uploaded file.
 	maxUploadBytes = 256 << 20
+
+	// maxArchiveBytes bounds the size of an uploaded zip archive, which is
+	// spooled to the scratch directory.
+	maxArchiveBytes = 2 << 30
+
+	// maxRequestBytes bounds the size of an upload request body.  It leaves
+	// room for the form fields around the file.
+	maxRequestBytes = maxArchiveBytes + 1<<20
+
+	// maxObjectNameLength is Cloud Storage's limit on object names, in bytes.
+	maxObjectNameLength = 1024
+
+	// maxArchiveProcessingTime bounds how long background extraction of an
+	// archive may take.
+	maxArchiveProcessingTime = 2 * time.Hour
+
+	// scratchPattern names the files archives are spooled to.
+	scratchPattern = "artboard-upload-*.zip"
 
 	// maxFolderLength bounds the length (in bytes) of the folder prefix that
 	// uploads are placed under.  Cloud Storage object names can be at most
@@ -42,31 +63,35 @@ const (
 
 	// maxArchiveExtractedBytes bounds the total decompressed size of a zip
 	// upload's contents, as a defense against zip bombs.
-	maxArchiveExtractedBytes = 4 << 30
+	maxArchiveExtractedBytes = 8 << 30
 
-	// maxArchiveEntries bounds the number of entries read from a zip upload.
-	maxArchiveEntries = 10000
+	// maxArchiveEntries bounds the number of entries in a zip upload.
+	maxArchiveEntries = 50000
 )
 
 var (
 	errNoFile           = errors.New("No file was uploaded")
 	errEmptyFile        = errors.New("The uploaded file is empty")
 	errNameAttemptsUsed = errors.New("Could not find an unused object name")
-	errNoArchiveMedia   = errors.New("The archive contains no image or video files")
 	errTooManyEntries   = fmt.Errorf("The archive has more than %d entries", maxArchiveEntries)
+	errTooLarge         = fmt.Errorf("The upload is too large; files can be at most %s, and zip archives %s", humanBytes(maxUploadBytes), humanBytes(maxArchiveBytes))
+
+	errArchiveExpandsTooMuch = fmt.Errorf("The archive's contents are larger than %s", humanBytes(maxArchiveExtractedBytes))
+
+	// errObjectExists means an object could not be written because one
+	// already has its name.
+	errObjectExists = errors.New("object already exists")
 )
 
 // uploadStatus describes the outcome of an upload, for display on the upload
 // form.
 type uploadStatus struct {
-	// Uploaded is the name of the (last) object uploaded, if any.
+	// Uploaded is the name of the object uploaded, if any.
 	Uploaded string
 
-	// Count is the number of objects uploaded from an archive, and Skipped
-	// the number of archive entries that were not uploaded.  Both are zero
-	// for a single-file upload.
-	Count   int
-	Skipped int
+	// ArchiveFiles is the number of files in an uploaded zip archive, which
+	// is being extracted in the background.
+	ArchiveFiles int
 
 	// UserError is an error from a failed upload.
 	UserError string
@@ -83,11 +108,8 @@ func uploadObjectLink(collectionID, folder string, status uploadStatus) string {
 	if status.Uploaded != "" {
 		q.Add("uploaded", status.Uploaded)
 	}
-	if status.Count != 0 {
-		q.Add("uploaded-count", strconv.Itoa(status.Count))
-	}
-	if status.Skipped != 0 {
-		q.Add("skipped-count", strconv.Itoa(status.Skipped))
+	if status.ArchiveFiles != 0 {
+		q.Add("archive-files", strconv.Itoa(status.ArchiveFiles))
 	}
 	if status.UserError != "" {
 		q.Add("user-error", status.UserError)
@@ -246,11 +268,8 @@ func (u *WebUI) uploadObjectGetHandler(w http.ResponseWriter, r *http.Request) {
 		// type, so the extension is a reliable guide.
 		params.UploadedIsImage = strings.HasPrefix(mime.TypeByExtension(path.Ext(uploaded)), "image/")
 	}
-	if n, err := strconv.Atoi(r.Form.Get("uploaded-count")); err == nil && n > 0 {
-		params.UploadedCount = n
-	}
-	if n, err := strconv.Atoi(r.Form.Get("skipped-count")); err == nil && n > 0 {
-		params.SkippedCount = n
+	if n, err := strconv.Atoi(r.Form.Get("archive-files")); err == nil && n > 0 {
+		params.ArchiveFiles = n
 	}
 
 	content, err := uitemplates.UploadObjectPage(params)
@@ -291,7 +310,7 @@ func (u *WebUI) uploadObjectPostHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 	mr, err := r.MultipartReader()
 	if err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -338,13 +357,11 @@ func (u *WebUI) uploadObjectPostHandler(w http.ResponseWriter, r *http.Request) 
 			}
 			status := u.storeUpload(ctx, collection, loc, folder, part)
 			if status.UserError != "" {
-				// Keep what the user typed, so they can correct it.  Any
-				// objects already stored from an archive are still
-				// reported.
+				// Keep what the user typed, so they can correct it.
 				http.Redirect(w, r, uploadObjectLink(collection.ID, rawFolder, status), http.StatusSeeOther)
 				return
 			}
-			slog.InfoContext(ctx, "Stored upload", slog.String("collection", collection.ID), slog.String("object", status.Uploaded), slog.Int("archive-count", status.Count), slog.String("user", user.ID))
+			slog.InfoContext(ctx, "Stored upload", slog.String("collection", collection.ID), slog.String("object", status.Uploaded), slog.Int("archive-files", status.ArchiveFiles), slog.String("user", user.ID))
 			// Show the normalized folder, so the user sees where the next
 			// upload will go.
 			http.Redirect(w, r, uploadObjectLink(collection.ID, folder, status), http.StatusSeeOther)
@@ -354,14 +371,14 @@ func (u *WebUI) uploadObjectPostHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 // storeUpload stores an uploaded file in the collection.  A zip archive is
-// extracted, and each image or video in it is stored as a separate object.
+// spooled to the scratch directory, then extracted in the background, with
+// each image or video in it stored as a separate object.
 func (u *WebUI) storeUpload(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, folder string, part *multipart.Part) uploadStatus {
 	logErr := func(err error) {
 		slog.ErrorContext(ctx, "Error while storing upload", slog.String("collection", collection.ID), slog.String("folder", folder), slog.Any("err", err))
 	}
 
-	// The buffer is large because the zip reader reads through it too.
-	content := bufio.NewReaderSize(part, 64<<10)
+	content := bufio.NewReaderSize(part, 512)
 	head, err := content.Peek(512)
 	if err != nil && err != io.EOF {
 		logErr(err)
@@ -372,25 +389,55 @@ func (u *WebUI) storeUpload(ctx context.Context, collection *dbtypes.Collection,
 	}
 
 	if isZipUpload(part.Header.Get("Content-Type"), part.FileName(), head) {
-		status, err := u.storeArchive(ctx, collection, loc, folder, content)
+		archive, err := u.spoolArchive(content)
 		if err != nil {
 			logErr(err)
-			status.UserError = uploadUserError(err)
-			if status.Count > 0 {
-				status.UserError += fmt.Sprintf("  (%d files from the archive were uploaded before the failure.)", status.Count)
-			}
+			return uploadStatus{UserError: uploadUserError(err)}
 		}
-		return status
+		files := archive.fileCount()
+
+		// Extracting a large archive can take longer than the load
+		// balancer will wait for a response, so it happens in the
+		// background, detached from the request.
+		//
+		// TODO: Track these as jobs, so users can see progress and
+		// failures, and so shutdown can wait for them.
+		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), maxArchiveProcessingTime)
+		go func() {
+			defer cancel()
+			defer archive.close()
+			u.extractArchive(bgCtx, collection, loc, folder, archive)
+		}()
+		return uploadStatus{ArchiveFiles: files}
 	}
 
 	contentType := uploadContentType(part.Header.Get("Content-Type"), part.FileName(), head)
 	ext := uploadExtension(contentType, part.FileName())
-	name, err := u.storeObject(ctx, collection, loc, folder, contentType, ext, content)
+	// The request body may be as large as an archive, so single files need
+	// their own limit.
+	capped := &cappedReader{r: content, remaining: maxUploadBytes}
+	name, err := u.storeNumberedObject(ctx, collection, loc, folder, contentType, ext, capped)
 	if err != nil {
 		logErr(err)
 		return uploadStatus{UserError: uploadUserError(err)}
 	}
 	return uploadStatus{Uploaded: name}
+}
+
+// cappedReader reads from r, failing with errTooLarge if it yields more than
+// remaining bytes.
+type cappedReader struct {
+	r         io.Reader
+	remaining int64
+}
+
+func (c *cappedReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.remaining -= int64(n)
+	if c.remaining < 0 {
+		return n, errTooLarge
+	}
+	return n, err
 }
 
 // zipContentTypes are the types browsers declare for zip archives.
@@ -460,60 +507,203 @@ func archiveEntryContentType(name string, head []byte) string {
 	return contentType
 }
 
-// storeArchive extracts a zip archive, storing each image or video in it as a
-// separate object, in archive order.  It returns the status so far even on
-// error, since earlier objects remain stored.
-func (u *WebUI) storeArchive(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, folder string, content io.Reader) (uploadStatus, error) {
-	status := uploadStatus{}
-	zs := newZipStream(content, maxArchiveExtractedBytes)
-	for entries := 0; ; entries++ {
-		entry, err := zs.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return status, err
-		}
-		if entries >= maxArchiveEntries {
-			return status, errTooManyEntries
-		}
-
-		if !entry.supported() {
-			if !strings.HasSuffix(entry.Name, "/") {
-				status.Skipped++
-			}
-			continue
-		}
-
-		entryContent := bufio.NewReaderSize(entry, 512)
-		head, err := entryContent.Peek(512)
-		if err != nil && err != io.EOF {
-			return status, err
-		}
-		contentType := archiveEntryContentType(entry.Name, head)
-		if contentType == "" || len(head) == 0 {
-			if !strings.HasSuffix(entry.Name, "/") {
-				status.Skipped++
-			}
-			continue
-		}
-
-		name, err := u.storeObject(ctx, collection, loc, folder, contentType, uploadExtension(contentType, entry.Name), entryContent)
-		if err != nil {
-			return status, fmt.Errorf("while storing archive entry %q: %w", entry.Name, err)
-		}
-		status.Uploaded = name
-		status.Count++
+// archiveObjectName returns the object name (relative to the collection
+// prefix) for an archive entry: its path within the archive, under folder.
+// It returns false if the entry's path is not usable as an object name.
+func archiveObjectName(folder, entryName string) (string, bool) {
+	if !utf8.ValidString(entryName) || strings.ContainsFunc(entryName, unicode.IsControl) {
+		return "", false
 	}
-	if status.Count == 0 {
-		return status, errNoArchiveMedia
+	// Some Windows archivers use backslashes despite the spec.
+	entryName = strings.ReplaceAll(entryName, `\`, "/")
+
+	var segments []string
+	if folder != "" {
+		segments = append(segments, folder)
 	}
-	return status, nil
+	for _, seg := range strings.Split(entryName, "/") {
+		switch seg {
+		case "", ".":
+			continue
+		case "..":
+			return "", false
+		}
+		segments = append(segments, seg)
+	}
+	if len(segments) == 0 || (folder != "" && len(segments) == 1) {
+		return "", false
+	}
+	return strings.Join(segments, "/"), true
 }
 
-// storeObject writes content into the collection under the next object
-// number, and returns its name relative to the collection prefix.
-func (u *WebUI) storeObject(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, folder, contentType, ext string, content io.Reader) (string, error) {
+// spooledArchive is an uploaded zip archive saved in the scratch directory.
+type spooledArchive struct {
+	f  *os.File
+	zr *zip.Reader
+}
+
+// close deletes the archive's scratch file.
+func (a *spooledArchive) close() {
+	a.f.Close()
+	if err := os.Remove(a.f.Name()); err != nil {
+		slog.Error("Error while removing scratch file", slog.String("file", a.f.Name()), slog.Any("err", err))
+	}
+}
+
+// fileCount returns the number of (non-directory) entries in the archive.
+func (a *spooledArchive) fileCount() int {
+	n := 0
+	for _, zf := range a.zr.File {
+		if !zf.FileInfo().IsDir() {
+			n++
+		}
+	}
+	return n
+}
+
+// spoolArchive saves a zip archive to the scratch directory, and checks that
+// it is valid and within limits.  The caller must close the result.
+func (u *WebUI) spoolArchive(content io.Reader) (_ *spooledArchive, retErr error) {
+	f, err := os.CreateTemp(u.scratchDir, scratchPattern)
+	if err != nil {
+		return nil, fmt.Errorf("while creating scratch file: %w", err)
+	}
+	a := &spooledArchive{f: f}
+	defer func() {
+		if retErr != nil {
+			a.close()
+		}
+	}()
+
+	size, err := io.Copy(f, io.LimitReader(content, maxArchiveBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("while spooling archive: %w", err)
+	}
+	if size > maxArchiveBytes {
+		return nil, errTooLarge
+	}
+
+	a.zr, err = zip.NewReader(f, size)
+	if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
+		// Names are checked individually during extraction.
+		return nil, fmt.Errorf("while opening archive: %w", err)
+	}
+
+	// archive/zip makes sure entries don't decompress to more than their
+	// declared sizes, so the declared sizes can be trusted.
+	if len(a.zr.File) > maxArchiveEntries {
+		return nil, errTooManyEntries
+	}
+	var total uint64
+	for _, zf := range a.zr.File {
+		total += zf.UncompressedSize64
+	}
+	if total > maxArchiveExtractedBytes {
+		return nil, errArchiveExpandsTooMuch
+	}
+	return a, nil
+}
+
+// extractArchive stores each image or video in an archive as an object named
+// after its path in the archive.  Objects that already exist are left alone,
+// so a failed upload can be retried.  It runs in the background, so the
+// outcome is only logged.
+func (u *WebUI) extractArchive(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, folder string, a *spooledArchive) {
+	var stored, existing, skipped int
+	logAttrs := func() []any {
+		return []any{
+			slog.String("collection", collection.ID),
+			slog.String("folder", folder),
+			slog.Int("stored", stored),
+			slog.Int("existing", existing),
+			slog.Int("skipped", skipped),
+		}
+	}
+
+	for _, zf := range a.zr.File {
+		if zf.FileInfo().IsDir() {
+			continue
+		}
+		name, ok := archiveObjectName(folder, zf.Name)
+		if !ok || len(loc.Prefix)+len(name) > maxObjectNameLength || zf.Flags&0x1 != 0 {
+			// Unusable name, or encrypted.
+			skipped++
+			continue
+		}
+
+		outcome, err := u.storeArchiveEntry(ctx, collection, loc, name, zf)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error while extracting uploaded archive", append(logAttrs(), slog.String("entry", zf.Name), slog.Any("err", err))...)
+			return
+		}
+		switch outcome {
+		case entrySkipped:
+			skipped++
+		case entryExisted:
+			existing++
+		case entryStored:
+			stored++
+		}
+	}
+	slog.InfoContext(ctx, "Extracted uploaded archive", logAttrs()...)
+}
+
+type entryOutcome int
+
+const (
+	entrySkipped entryOutcome = iota
+	entryExisted
+	entryStored
+)
+
+// storeArchiveEntry stores one archive entry as the named object, if it is an
+// image or video.
+func (u *WebUI) storeArchiveEntry(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, name string, zf *zip.File) (entryOutcome, error) {
+	rc, err := zf.Open()
+	if errors.Is(err, zip.ErrAlgorithm) {
+		// An unsupported compression method.
+		return entrySkipped, nil
+	}
+	if err != nil {
+		return entrySkipped, err
+	}
+	defer rc.Close()
+
+	content := bufio.NewReaderSize(rc, 512)
+	head, err := content.Peek(512)
+	if err != nil && err != io.EOF {
+		return entrySkipped, err
+	}
+	contentType := archiveEntryContentType(zf.Name, head)
+	if contentType == "" || len(head) == 0 {
+		return entrySkipped, nil
+	}
+
+	// Check first, to avoid uploading the content only to have the write's
+	// precondition fail.
+	_, err = u.storageClient.Bucket(loc.Bucket).Object(loc.Prefix + name).Attrs(ctx)
+	if err == nil {
+		u.ensureMetadata(ctx, collection, name)
+		return entryExisted, nil
+	}
+	if !errors.Is(err, storage.ErrObjectNotExist) {
+		return entrySkipped, fmt.Errorf("while checking for existing object %q: %w", name, err)
+	}
+
+	err = u.writeObject(ctx, collection, loc, name, contentType, content)
+	if errors.Is(err, errObjectExists) {
+		u.ensureMetadata(ctx, collection, name)
+		return entryExisted, nil
+	}
+	if err != nil {
+		return entrySkipped, err
+	}
+	return entryStored, nil
+}
+
+// storeNumberedObject writes content into the collection under the next
+// object number, and returns its name relative to the collection prefix.
+func (u *WebUI) storeNumberedObject(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, folder, contentType, ext string, content io.Reader) (string, error) {
 	bucket := u.storageClient.Bucket(loc.Bucket)
 
 	// The counter normally yields an unused name, but objects can also be
@@ -539,40 +729,61 @@ func (u *WebUI) storeObject(ctx context.Context, collection *dbtypes.Collection,
 		return "", errNameAttemptsUsed
 	}
 
+	if err := u.writeObject(ctx, collection, loc, name, contentType, content); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// writeObject creates the named object (relative to the collection prefix)
+// with the given content, and records its metadata.  It fails with
+// errObjectExists if the object already exists.
+func (u *WebUI) writeObject(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, name, contentType string, content io.Reader) error {
 	// Cancelling the context is the only way to abandon a write without
 	// creating the object.
 	writeCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// The precondition guards against something else creating the object
-	// between the check above and now.
-	wr := bucket.Object(loc.Prefix + name).If(storage.Conditions{DoesNotExist: true}).NewWriter(writeCtx)
+	// since the caller checked.
+	wr := u.storageClient.Bucket(loc.Bucket).Object(loc.Prefix + name).If(storage.Conditions{DoesNotExist: true}).NewWriter(writeCtx)
 	wr.ContentType = contentType
 	if _, err := io.Copy(wr, content); err != nil {
 		cancel()
 		wr.Close()
-		return "", fmt.Errorf("while writing object %q: %w", name, err)
+		return fmt.Errorf("while writing object %q: %w", name, err)
 	}
 	if err := wr.Close(); err != nil {
-		return "", fmt.Errorf("while writing object %q: %w", name, err)
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == http.StatusPreconditionFailed {
+			return errObjectExists
+		}
+		return fmt.Errorf("while writing object %q: %w", name, err)
 	}
 
-	// Record metadata now, so the object is searchable without waiting for a
-	// resync.  The object is already stored, so don't fail the upload over it.
+	u.ensureMetadata(ctx, collection, name)
+	return nil
+}
+
+// ensureMetadata records metadata for a stored object, so it is searchable
+// without waiting for a resync.  The object is already stored, so failure is
+// only logged.
+func (u *WebUI) ensureMetadata(ctx context.Context, collection *dbtypes.Collection, name string) {
 	if _, _, err := u.db.EnsureObjectMetadata(ctx, collection.ID, []string{name}); err != nil {
 		slog.ErrorContext(ctx, "Error while creating metadata for uploaded object", slog.String("collection", collection.ID), slog.String("object", name), slog.Any("err", err))
 	}
-
-	return name, nil
 }
 
 // uploadUserError turns an upload failure into a message for the user.
 func uploadUserError(err error) string {
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {
-		return fmt.Sprintf("File is too large; the limit is %s", humanBytes(maxUploadBytes))
+		return errTooLarge.Error()
 	}
-	for _, userErr := range []error{errNoFile, errEmptyFile, errNameAttemptsUsed, errNoArchiveMedia, errTooManyEntries, errZipFormat, errZipTooLarge, errZipChecksum, errZipUnsupported} {
+	if errors.Is(err, zip.ErrFormat) || errors.Is(err, zip.ErrChecksum) {
+		return "The archive is not a valid zip file, or is corrupt"
+	}
+	for _, userErr := range []error{errNoFile, errEmptyFile, errTooLarge, errNameAttemptsUsed, errTooManyEntries, errArchiveExpandsTooMuch} {
 		if errors.Is(err, userErr) {
 			return userErr.Error()
 		}

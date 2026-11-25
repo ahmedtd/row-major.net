@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -36,13 +38,42 @@ type WebUI struct {
 	// syncer creates missing object metadata entries when a user asks for a
 	// resync.
 	syncer *metadatasync.Syncer
+
+	// scratchDir holds uploaded zip archives while they are extracted.  If
+	// empty, the system temporary directory is used.
+	scratchDir string
 }
 
-func New(db *dblayer.DB, storageClient *storage.Client) *WebUI {
+// New creates the UI.  scratchDir is where uploaded archives are spooled; it
+// needs room for several archives at once.  If empty, the system temporary
+// directory is used.
+func New(db *dblayer.DB, storageClient *storage.Client, scratchDir string) *WebUI {
+	removeStaleScratchFiles(scratchDir)
 	return &WebUI{
 		db:            db,
 		storageClient: storageClient,
 		syncer:        metadatasync.New(db, storageClient),
+		scratchDir:    scratchDir,
+	}
+}
+
+// removeStaleScratchFiles deletes archives left in the scratch directory by
+// a previous run that exited mid-upload.  (A scratch volume can outlive a
+// container restart.)
+func removeStaleScratchFiles(scratchDir string) {
+	dir := scratchDir
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, scratchPattern))
+	if err != nil {
+		slog.Error("Error while listing stale scratch files", slog.String("dir", dir), slog.Any("err", err))
+		return
+	}
+	for _, m := range matches {
+		if err := os.Remove(m); err != nil {
+			slog.Error("Error while removing stale scratch file", slog.String("file", m), slog.Any("err", err))
+		}
 	}
 }
 

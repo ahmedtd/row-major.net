@@ -26,12 +26,9 @@ type UploadObjectParams struct {
 	UploadedContentLink string
 	UploadedIsImage     bool
 
-	// UploadedCount is the number of objects uploaded from a zip archive
-	// (with UploadedName the last of them), and SkippedCount the number of
-	// archive entries that were not images or videos.  Both are zero for a
-	// single-file upload.
-	UploadedCount int
-	SkippedCount  int
+	// ArchiveFiles is the number of files in a just-uploaded zip archive,
+	// which is being extracted in the background.
+	ArchiveFiles int
 }
 
 var uploadObjectText = `
@@ -58,17 +55,14 @@ var uploadObjectText = `
     {{if .UploadedIsImage}}
       <a href="{{.UploadedViewLink}}"><img src="{{.UploadedContentLink}}" alt="{{.UploadedName}}" style="max-height: 6rem; max-width: 10rem"></a>
     {{end}}
-    <div>
-      {{if .UploadedCount}}
-        Uploaded {{.UploadedCount}} file{{if ne .UploadedCount 1}}s{{end}} from the archive, ending with
-        <a href="{{.UploadedViewLink}}" class="alert-link text-break">{{.UploadedName}}</a>.
-        {{if .SkippedCount}}
-          Skipped {{.SkippedCount}} file{{if ne .SkippedCount 1}}s{{end}} that {{if eq .SkippedCount 1}}was not an image or video{{else}}were not images or videos{{end}}.
-        {{end}}
-      {{else}}
-        Uploaded <a href="{{.UploadedViewLink}}" class="alert-link text-break">{{.UploadedName}}</a>
-      {{end}}
-    </div>
+    <div>Uploaded <a href="{{.UploadedViewLink}}" class="alert-link text-break">{{.UploadedName}}</a></div>
+  </div>
+{{end}}
+
+{{if .ArchiveFiles}}
+  <div class="alert alert-success" role="status">
+    Received an archive of {{.ArchiveFiles}} file{{if ne .ArchiveFiles 1}}s{{end}}.  Its images and videos are being added to the collection in the background, which may take a while for a large archive.
+    <a href="{{.CollectionLink}}" class="alert-link">Check the collection</a> to see them as they arrive.
   </div>
 {{end}}
 
@@ -91,7 +85,7 @@ var uploadObjectText = `
 
   <div id="drop-zone" class="mb-3 p-5 border border-2 rounded text-center text-body-secondary" style="border-style: dashed !important">
     <p class="mb-2">Paste an image anywhere on this page (Ctrl+V) to upload it immediately, or drop a file here.</p>
-    <p class="mb-2 small">A .zip archive is extracted, and each image or video in it is uploaded separately.</p>
+    <p class="mb-2 small">A .zip archive (up to 2 GiB) is extracted, and each image or video in it is uploaded under its path within the archive, inside the folder.  Files that already exist are left unchanged, so a failed archive upload can be retried.</p>
     <label for="file" class="visually-hidden">File</label>
     <input id="file" type="file" name="file" class="form-control mx-auto" style="max-width: 30rem">
   </div>

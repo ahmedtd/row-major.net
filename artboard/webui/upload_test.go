@@ -1,6 +1,8 @@
 package webui
 
 import (
+	"errors"
+	"io"
 	"strings"
 	"testing"
 )
@@ -82,7 +84,81 @@ func TestUploadObjectLink(t *testing.T) {
 	if got, want := uploadObjectLink("abc", "", uploadStatus{}), "/upload-object?collection=abc"; got != want {
 		t.Errorf("uploadObjectLink = %q, want %q", got, want)
 	}
-	if got, want := uploadObjectLink("abc", "a/b", uploadStatus{Uploaded: "a/b/00000001.png", Count: 3, Skipped: 2, UserError: "oops"}), "/upload-object?collection=abc&folder=a%2Fb&skipped-count=2&uploaded=a%2Fb%2F00000001.png&uploaded-count=3&user-error=oops"; got != want {
+	if got, want := uploadObjectLink("abc", "a/b", uploadStatus{Uploaded: "a/b/00000001.png", ArchiveFiles: 3, UserError: "oops"}), "/upload-object?archive-files=3&collection=abc&folder=a%2Fb&uploaded=a%2Fb%2F00000001.png&user-error=oops"; got != want {
 		t.Errorf("uploadObjectLink = %q, want %q", got, want)
+	}
+}
+
+func TestArchiveObjectName(t *testing.T) {
+	for _, tc := range []struct {
+		folder, entry string
+		want          string
+		wantOK        bool
+	}{
+		{"", "cat.jpg", "cat.jpg", true},
+		{"", "photos/2024/cat.jpg", "photos/2024/cat.jpg", true},
+		{"uploads", "photos/cat.jpg", "uploads/photos/cat.jpg", true},
+		{"uploads", "/photos//./cat.jpg", "uploads/photos/cat.jpg", true},
+		{"", `photos\cat.jpg`, "photos/cat.jpg", true},
+		{"", "photos/../../cat.jpg", "", false},
+		{"", "bad\tname.jpg", "", false},
+		{"", "\xffname.jpg", "", false},
+		{"uploads", "/", "", false},
+	} {
+		got, ok := archiveObjectName(tc.folder, tc.entry)
+		if got != tc.want || ok != tc.wantOK {
+			t.Errorf("archiveObjectName(%q, %q) = %q, %v; want %q, %v", tc.folder, tc.entry, got, ok, tc.want, tc.wantOK)
+		}
+	}
+}
+
+func TestCappedReader(t *testing.T) {
+	if _, err := io.ReadAll(&cappedReader{r: strings.NewReader("12345"), remaining: 5}); err != nil {
+		t.Errorf("reading exactly the cap: %v", err)
+	}
+	if _, err := io.ReadAll(&cappedReader{r: strings.NewReader("123456"), remaining: 5}); !errors.Is(err, errTooLarge) {
+		t.Errorf("reading past the cap: err = %v, want errTooLarge", err)
+	}
+}
+
+func TestIsZipUpload(t *testing.T) {
+	zipHead := []byte("PK\x03\x04\x14\x00")
+	for _, tc := range []struct {
+		declared, filename string
+		head               []byte
+		want               bool
+	}{
+		{"application/zip", "photos.zip", zipHead, true},
+		{"application/x-zip-compressed", "photos", zipHead, true},
+		{"application/octet-stream", "PHOTOS.ZIP", zipHead, true},
+		{"", "empty.zip", []byte("PK\x05\x06"), true},
+		{"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "doc.docx", zipHead, false},
+		{"application/zip", "fake.zip", []byte("not a zip"), false},
+	} {
+		if got := isZipUpload(tc.declared, tc.filename, tc.head); got != tc.want {
+			t.Errorf("isZipUpload(%q, %q) = %v, want %v", tc.declared, tc.filename, got, tc.want)
+		}
+	}
+}
+
+func TestArchiveEntryContentType(t *testing.T) {
+	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+	for _, tc := range []struct {
+		name string
+		head []byte
+		want string
+	}{
+		{"photos/cat.JPG", png, "image/jpeg"},
+		{"clip.mov", []byte("\x00\x00\x00\x14ftypqt  "), "video/quicktime"},
+		{"noext", png, "image/png"},
+		{"notes.txt", []byte("hello"), ""},
+		{"photos/", nil, ""},
+		{"__MACOSX/photos/._cat.jpg", png, ""},
+		{"photos/._cat.jpg", png, ""},
+		{".hidden/cat.png", png, ""},
+	} {
+		if got := archiveEntryContentType(tc.name, tc.head); got != tc.want {
+			t.Errorf("archiveEntryContentType(%q) = %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
