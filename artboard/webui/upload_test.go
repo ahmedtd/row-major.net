@@ -79,10 +79,10 @@ func TestUploadExtension(t *testing.T) {
 }
 
 func TestUploadObjectLink(t *testing.T) {
-	if got, want := uploadObjectLink("abc", "", "", ""), "/upload-object?collection=abc"; got != want {
+	if got, want := uploadObjectLink("abc", "", uploadStatus{}), "/upload-object?collection=abc"; got != want {
 		t.Errorf("uploadObjectLink = %q, want %q", got, want)
 	}
-	if got, want := uploadObjectLink("abc", "a/b", "a/b/00000001.png", "oops"), "/upload-object?collection=abc&folder=a%2Fb&uploaded=a%2Fb%2F00000001.png&user-error=oops"; got != want {
+	if got, want := uploadObjectLink("abc", "a/b", uploadStatus{Uploaded: "a/b/00000001.png", Count: 3, Skipped: 2, UserError: "oops"}), "/upload-object?collection=abc&folder=a%2Fb&skipped-count=2&uploaded=a%2Fb%2F00000001.png&uploaded-count=3&user-error=oops"; got != want {
 		t.Errorf("uploadObjectLink = %q, want %q", got, want)
 	}
 }

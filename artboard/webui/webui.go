@@ -572,7 +572,7 @@ func (u *WebUI) showCollectionHandler(w http.ResponseWriter, r *http.Request) {
 		DisplayName:  collection.DisplayName,
 		StorageURL:   collection.StorageURL,
 		SelfLink:     showCollectionLink(collection.ID, ""),
-		UploadLink:   uploadObjectLink(collection.ID, "", "", ""),
+		UploadLink:   uploadObjectLink(collection.ID, "", uploadStatus{}),
 		CollectionID: collection.ID,
 		SearchLink:   "/show-collection",
 		SearchQuery:  searchQuery,

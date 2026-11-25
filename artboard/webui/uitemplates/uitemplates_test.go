@@ -188,3 +188,29 @@ func TestUploadObjectPage(t *testing.T) {
 		t.Errorf("output unexpectedly contains an error alert")
 	}
 }
+
+func TestUploadObjectPageArchive(t *testing.T) {
+	out, err := UploadObjectPage(&UploadObjectParams{
+		CollectionDisplayName: "Sketches",
+		CollectionLink:        "/show-collection?id=abc",
+		SelfLink:              "/upload-object?collection=abc",
+		UploadLink:            "/upload-object?collection=abc",
+		UploadedName:          "00000009.mp4",
+		UploadedViewLink:      "/view-object?collection=abc&name=00000009.mp4",
+		UploadedContentLink:   "/collection-object?collection=abc&name=00000009.mp4",
+		UploadedCount:         4,
+		SkippedCount:          1,
+	})
+	if err != nil {
+		t.Fatalf("UploadObjectPage: %v", err)
+	}
+	s := string(out)
+	for _, want := range []string{
+		"Uploaded 4 files from the archive",
+		"Skipped 1 file that was not an image or video.",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+}
