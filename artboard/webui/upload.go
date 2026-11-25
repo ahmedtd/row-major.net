@@ -577,7 +577,7 @@ func (u *WebUI) spoolArchive(content io.Reader) (_ *spooledArchive, retErr error
 
 	size, err := io.Copy(f, io.LimitReader(content, maxArchiveBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("while spooling archive: %w", err)
+		return nil, fmt.Errorf("while spooling archive (total bytes copied %d): %w", size, err)
 	}
 	if size > maxArchiveBytes {
 		return nil, errTooLarge
