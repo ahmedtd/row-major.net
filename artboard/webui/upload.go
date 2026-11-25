@@ -389,7 +389,7 @@ func (u *WebUI) storeUpload(ctx context.Context, collection *dbtypes.Collection,
 	}
 
 	if isZipUpload(part.Header.Get("Content-Type"), part.FileName(), head) {
-		archive, err := u.spoolArchive(content)
+		archive, err := u.spoolArchive(part)
 		if err != nil {
 			logErr(err)
 			return uploadStatus{UserError: uploadUserError(err)}
