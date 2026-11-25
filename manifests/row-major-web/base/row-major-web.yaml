@@ -87,16 +87,16 @@ spec:
           resources:
             requests:
               cpu: 250m
-              ephemeral-storage: 20Gi
+              ephemeral-storage: 10Gi
               memory: 512Mi
             limits:
-              ephemeral-storage: 20Gi
+              ephemeral-storage: 10Gi
               memory: 512Mi
       volumes:
         # Holds uploaded zip archives while artboard extracts them.
         - name: artboard-scratch
           emptyDir:
-            sizeLimit: 20Gi
+            sizeLimit: 10Gi
 
 ---
 
