@@ -165,6 +165,9 @@ func TestUploadObjectPage(t *testing.T) {
 		UploadedViewLink:      "/view-object?collection=abc&name=cats%2F00000001.png",
 		UploadedContentLink:   "/collection-object?collection=abc&name=cats%2F00000001.png",
 		UploadedIsImage:       true,
+		CollectionID:          "abc",
+		FolderUploadLink:      "/upload-folder-file?collection=abc",
+		MaxFileBytes:          1024,
 	})
 	if err != nil {
 		t.Fatalf("UploadObjectPage: %v", err)
@@ -172,6 +175,10 @@ func TestUploadObjectPage(t *testing.T) {
 	s := string(out)
 	for _, want := range []string{
 		`action="/upload-object?collection=abc" enctype="multipart/form-data"`,
+		`data-endpoint="/upload-folder-file?collection=abc"`,
+		`data-collection="abc"`,
+		`data-max-bytes="1024"`,
+		`<script src="/static/uploadfolder.js?v=` + revision + `"></script>`,
 		`name="folder"`,
 		`value="cats/&lt;tabby&gt;"`,
 		`<img src="/collection-object?collection=abc&amp;name=cats%2F00000001.png"`,

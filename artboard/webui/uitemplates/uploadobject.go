@@ -26,6 +26,13 @@ type UploadObjectParams struct {
 	UploadedContentLink string
 	UploadedIsImage     bool
 
+	// CollectionID and FolderUploadLink configure the folder uploader, which
+	// sends each file in a folder to FolderUploadLink.  MaxFileBytes is the
+	// largest file it may send.
+	CollectionID     string
+	FolderUploadLink string
+	MaxFileBytes     int64
+
 	// ArchiveFiles is the number of files in a just-uploaded zip archive,
 	// which is being extracted in the background.
 	ArchiveFiles int
@@ -95,6 +102,14 @@ var uploadObjectText = `
   <noscript><button type="submit" class="btn btn-primary">Upload</button></noscript>
 </form>
 
+<h2 class="h4 mt-4">Upload a folder</h2>
+<div id="folder-uploader"
+     data-endpoint="{{.FolderUploadLink}}"
+     data-collection="{{.CollectionID}}"
+     data-max-bytes="{{.MaxFileBytes}}">
+  <noscript><p class="text-body-secondary">Uploading a folder requires JavaScript.</p></noscript>
+</div>
+
 {{end}}
 
 {{define "scripts"}}
@@ -149,6 +164,9 @@ var uploadObjectText = `
   });
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
+<script src="/static/uploadfolder.js?v={{buildRevision}}"></script>
 {{end}}
 `
 

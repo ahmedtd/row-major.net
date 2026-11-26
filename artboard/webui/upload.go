@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"row-major/artboard/dblayer"
 	"row-major/artboard/dbtypes"
 	"row-major/artboard/gcsurl"
 	"row-major/artboard/webui/uitemplates"
@@ -259,6 +261,9 @@ func (u *WebUI) uploadObjectGetHandler(w http.ResponseWriter, r *http.Request) {
 		UploadLink:            uploadObjectPostLink(collection.ID),
 		Folder:                folder,
 		UserError:             r.Form.Get("user-error"),
+		CollectionID:          collection.ID,
+		FolderUploadLink:      uploadFolderFileLink(collection.ID),
+		MaxFileBytes:          maxUploadBytes,
 	}
 	if uploaded := r.Form.Get("uploaded"); validObjectName(uploaded) {
 		params.UploadedName = uploaded
@@ -782,13 +787,20 @@ func (u *WebUI) storeArchiveEntry(ctx context.Context, collection *dbtypes.Colle
 		return entrySkipped, err
 	}
 	defer rc.Close()
+	return u.storeNamedEntry(ctx, collection, loc, name, zf.Name, rc)
+}
 
-	content := bufio.NewReaderSize(rc, 512)
+// storeNamedEntry stores content as the named object, if it is an image or
+// video (judged by sourcePath, its path in the archive or folder it came from).
+// An object that already exists is left alone, so that a failed upload can be
+// retried.
+func (u *WebUI) storeNamedEntry(ctx context.Context, collection *dbtypes.Collection, loc *gcsurl.URL, name, sourcePath string, r io.Reader) (entryOutcome, error) {
+	content := bufio.NewReaderSize(r, 512)
 	head, err := content.Peek(512)
 	if err != nil && err != io.EOF {
 		return entrySkipped, err
 	}
-	contentType := archiveEntryContentType(zf.Name, head)
+	contentType := archiveEntryContentType(sourcePath, head)
 	if contentType == "" || len(head) == 0 {
 		return entrySkipped, nil
 	}
@@ -813,6 +825,131 @@ func (u *WebUI) storeArchiveEntry(ctx context.Context, collection *dbtypes.Colle
 		return entrySkipped, err
 	}
 	return entryStored, nil
+}
+
+// folderFileResponse is the JSON response to a folder file upload.
+type folderFileResponse struct {
+	// Outcome is "stored", "existed", or "skipped" (not an image or video).
+	Outcome string `json:"outcome,omitempty"`
+
+	// Name is the object's name within the collection.
+	Name string `json:"name,omitempty"`
+
+	// Error is a user-facing error message, if the upload failed.
+	Error string `json:"error,omitempty"`
+}
+
+func writeFolderFileResponse(ctx context.Context, w http.ResponseWriter, code int, resp folderFileResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		slog.ErrorContext(ctx, "Error while writing output", slog.Any("err", err))
+	}
+}
+
+// uploadFolderFileLink is the endpoint that the folder uploader sends each
+// file to.  The parameters other than the collection are added by the
+// client.
+func uploadFolderFileLink(collectionID string) string {
+	q := url.Values{}
+	q.Add("collection", collectionID)
+	link := &url.URL{
+		Path:     "/upload-folder-file",
+		RawQuery: q.Encode(),
+	}
+	return link.String()
+}
+
+// uploadFolderFileHandler stores one file from a folder that the user picked
+// in the browser.  The request body is the raw file content, and the query
+// parameters give the collection, the destination folder, and the file's
+// path within the picked folder.  The object is named after that path, under
+// the destination folder.  Like archive entries, files that aren't images or
+// videos are skipped, and existing objects are left alone, so the client can
+// simply retry a folder.
+//
+// It responds with JSON (folderFileResponse), since it is called by script
+// rather than by a form.
+func (u *WebUI) uploadFolderFileHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	q := r.URL.Query()
+	collectionID := q.Get("collection")
+	sourcePath := q.Get("path")
+
+	fail := func(code int, userError string) {
+		writeFolderFileResponse(ctx, w, code, folderFileResponse{Error: userError})
+	}
+
+	// Unlike checkSession, don't redirect to log in: the client can't follow
+	// that usefully.
+	_, user, err := u.getLoggedInUser(ctx, r)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while getting logged-in user", slog.Any("err", err))
+		fail(http.StatusInternalServerError, "The upload failed.  Please try again.")
+		return
+	}
+	if user == nil {
+		fail(http.StatusUnauthorized, "You are not logged in.  Reload the page to log in, then retry.")
+		return
+	}
+
+	collection, err := u.db.GetCollectionForUser(ctx, user, collectionID)
+	if errors.Is(err, dblayer.ErrPermissionDenied) {
+		fail(http.StatusNotFound, "Collection not found")
+		return
+	}
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while getting collection", slog.Any("err", err))
+		fail(http.StatusInternalServerError, "The upload failed.  Please try again.")
+		return
+	}
+	loc, err := gcsurl.Parse(collection.StorageURL)
+	if err != nil {
+		slog.ErrorContext(ctx, "Stored collection has invalid storage URL", slog.String("collection", collection.ID), slog.Any("err", err))
+		fail(http.StatusInternalServerError, "The upload failed.  Please try again.")
+		return
+	}
+
+	folder, err := normalizeFolder(q.Get("folder"))
+	if err != nil {
+		fail(http.StatusBadRequest, err.Error())
+		return
+	}
+	name, ok := archiveObjectName(folder, sourcePath)
+	if !ok || len(loc.Prefix)+len(name) > maxObjectNameLength {
+		fail(http.StatusBadRequest, "The file's path can't be used as an object name")
+		return
+	}
+
+	deadlines := &deadlineExtendingReader{r: r.Body, rc: http.NewResponseController(w)}
+	deadlines.extend()
+	body := http.MaxBytesReader(w, deadlines, maxUploadBytes)
+
+	outcome, err := u.storeNamedEntry(ctx, collection, loc, name, sourcePath, body)
+	deadlines.extend()
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while storing folder file", slog.String("collection", collection.ID), slog.String("object", name), slog.Any("err", err))
+		code := http.StatusInternalServerError
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			code = http.StatusRequestEntityTooLarge
+		}
+		fail(code, uploadUserError(err))
+		return
+	}
+
+	resp := folderFileResponse{Name: name}
+	switch outcome {
+	case entryStored:
+		resp.Outcome = "stored"
+		slog.InfoContext(ctx, "Stored folder file", slog.String("collection", collection.ID), slog.String("object", name), slog.String("user", user.ID))
+	case entryExisted:
+		resp.Outcome = "existed"
+	case entrySkipped:
+		resp.Outcome = "skipped"
+	}
+	writeFolderFileResponse(ctx, w, http.StatusOK, resp)
 }
 
 // storeNumberedObject writes content into the collection under the next

@@ -3,6 +3,8 @@ package webui
 import (
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -172,5 +174,25 @@ func TestTimedCopy(t *testing.T) {
 	}
 	if dst.String() != src || stats.bytes != int64(len(src)) {
 		t.Errorf("copied %d bytes (stats say %d), want %d", dst.Len(), stats.bytes, len(src))
+	}
+}
+
+func TestUploadFolderFileLink(t *testing.T) {
+	if got, want := uploadFolderFileLink("abc"), "/upload-folder-file?collection=abc"; got != want {
+		t.Errorf("uploadFolderFileLink = %q, want %q", got, want)
+	}
+}
+
+func TestStaticHandler(t *testing.T) {
+	rec := httptest.NewRecorder()
+	staticHandler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/uploadfolder.js?v=abc", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/javascript") {
+		t.Errorf("Content-Type = %q, want text/javascript", ct)
+	}
+	if !strings.Contains(rec.Body.String(), "React.createElement") {
+		t.Errorf("body does not look like uploadfolder.js")
 	}
 }

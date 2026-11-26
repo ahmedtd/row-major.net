@@ -94,6 +94,8 @@ func (u *WebUI) Register(m *http.ServeMux, host string) {
 	m.HandleFunc("POST "+host+"/resync-metadata", u.resyncMetadataHandler)
 	m.HandleFunc("GET "+host+"/upload-object", u.uploadObjectGetHandler)
 	m.HandleFunc("POST "+host+"/upload-object", u.uploadObjectPostHandler)
+	m.HandleFunc("POST "+host+"/upload-folder-file", u.uploadFolderFileHandler)
+	m.Handle("GET "+host+"/static/", staticHandler())
 
 	// Catch-all so that requests for this host never fall through to other
 	// sites registered on the same mux.
